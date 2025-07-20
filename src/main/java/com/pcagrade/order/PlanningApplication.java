@@ -1,4 +1,4 @@
-package com.pcagrade.planning;
+package com.pcagrade.order;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

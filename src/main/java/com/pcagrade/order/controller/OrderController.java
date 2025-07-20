@@ -1,12 +1,23 @@
-package com.pcagrade.planning.controller;
+package com.pcagrade.order.controller;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.pcagrade.order.service.OrderService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
+import com.github.f4b6a3.ulid.Ulid;
+import com.pcagrade.order.entity.Order;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
+    @Autowired
+    private OrderService orderService;
 
     @GetMapping("/frontend/orders")
     public ResponseEntity<List<Map<String, Object>>> getOrdersFrontend() {
