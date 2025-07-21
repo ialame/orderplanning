@@ -1,139 +1,263 @@
 package com.pcagrade.order.entity;
 
 import com.pcagrade.order.util.AbstractUlidEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Order entity representing Pokemon card orders
+ * Translated from Commande to Order with enhanced functionality
+ */
 @Entity
 @Table(name = "`order`")
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Order extends AbstractUlidEntity {
-    @Column(name = "order_number")
+
+    /**
+     * Unique order number for tracking
+     */
+    @NotBlank(message = "Order number is required")
+    @Size(max = 50, message = "Order number must not exceed 50 characters")
+    @Column(name = "order_number", nullable = false, unique = true, length = 50)
     private String orderNumber;
 
-    @Column(name = "card_count")
+    /**
+     * Number of cards in this order
+     */
+    @NotNull(message = "Card count is required")
+    @Positive(message = "Card count must be positive")
+    @Min(value = 1, message = "Minimum 1 card per order")
+    @Max(value = 10000, message = "Maximum 10000 cards per order")
+    @Column(name = "card_count", nullable = false)
     private Integer cardCount;
 
-    @Column(name = "priority_string")
-    private String priority;
+    /**
+     * Order priority level
+     */
+    @NotNull(message = "Priority is required")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority", nullable = false, length = 10)
+    @Builder.Default
+    private OrderPriority priority = OrderPriority.MEDIUM;
 
-    @Column(name = "total_price")
+    /**
+     * Total price of the order
+     */
+    @DecimalMin(value = "0.0", message = "Total price cannot be negative")
+    @Digits(integer = 8, fraction = 2, message = "Invalid price format")
+    @Column(name = "total_price", precision = 10, scale = 2)
     private Double totalPrice;
 
+    /**
+     * Estimated processing time in minutes
+     */
+    @Min(value = 1, message = "Estimated time must be at least 1 minute")
     @Column(name = "estimated_time_minutes")
     private Integer estimatedTimeMinutes;
 
-    @Column(name = "creation_date")
-    private LocalDateTime creationDate;
+    /**
+     * Order status
+     */
+    @NotNull(message = "Status is required")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 15)
+    @Builder.Default
+    private OrderStatus status = OrderStatus.PENDING;
 
-    @Column(name = "modification_date")
-    private LocalDateTime modificationDate;
+    /**
+     * Date when the order was placed
+     */
+    @NotNull(message = "Order date is required")
+    @Column(name = "order_date", nullable = false)
+    @Builder.Default
+    private LocalDate orderDate = LocalDate.now();
 
+    /**
+     * Order deadline
+     */
     @Column(name = "deadline_date")
     private LocalDateTime deadlineDate;
 
+    /**
+     * When processing started
+     */
     @Column(name = "processing_start_date")
     private LocalDateTime processingStartDate;
 
+    /**
+     * When processing finished
+     */
     @Column(name = "processing_end_date")
     private LocalDateTime processingEndDate;
 
+    /**
+     * Number of unsealed packs (if applicable)
+     */
+    @Min(value = 0, message = "Unseal count cannot be negative")
     @Column(name = "unseal_count")
     private Integer unsealCount;
 
-    // Methods
-    public void setOrderNumber(String orderNumber) {
-        this.orderNumber = orderNumber;
+    /**
+     * Customer or client name
+     */
+    @Size(max = 100, message = "Customer name must not exceed 100 characters")
+    @Column(name = "customer_name", length = 100)
+    private String customerName;
+
+    /**
+     * Additional notes or comments
+     */
+    @Size(max = 2000, message = "Notes must not exceed 2000 characters")
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
+    /**
+     * Record creation timestamp
+     */
+    @Column(name = "creation_date", nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime creationDate = LocalDateTime.now();
+
+    /**
+     * Record last modification timestamp
+     */
+    @Column(name = "modification_date", nullable = false)
+    @Builder.Default
+    private LocalDateTime modificationDate = LocalDateTime.now();
+
+    // ========== BUSINESS LOGIC METHODS ==========
+
+    /**
+     * Calculate estimated processing time based on card count
+     * Default: 3 minutes per card
+     */
+    public void calculateEstimatedTime() {
+        if (this.cardCount != null) {
+            this.estimatedTimeMinutes = this.cardCount * 3; // 3 minutes per card
+        }
     }
 
-//    public int getCardCount() {
-//        return cardCertifications != null ? cardCertifications.size() : 0;
-//    }
-
-
-    public String getOrderNumber() {
-        return orderNumber;
+    /**
+     * Check if order is overdue
+     */
+    public boolean isOverdue() {
+        return deadlineDate != null
+                && deadlineDate.isBefore(LocalDateTime.now())
+                && status != OrderStatus.COMPLETED
+                && status != OrderStatus.CANCELLED;
     }
 
-    public Integer getCardCount() {
-        return cardCount;
+    /**
+     * Check if order is high priority
+     */
+    public boolean isHighPriority() {
+        return priority == OrderPriority.HIGH;
     }
 
-    public void setCardCount(Integer cardCount) {
-        this.cardCount = cardCount;
+    /**
+     * Check if order is ready for processing
+     */
+    public boolean isReadyForProcessing() {
+        return status == OrderStatus.PENDING || status == OrderStatus.SCHEDULED;
     }
 
-    public String getPriority() {
-        return priority;
+    /**
+     * Check if order is in progress
+     */
+    public boolean isInProgress() {
+        return status == OrderStatus.IN_PROGRESS;
     }
 
-    public void setPriority(String priority) {
-        this.priority = priority;
+    /**
+     * Check if order is completed
+     */
+    public boolean isCompleted() {
+        return status == OrderStatus.COMPLETED;
     }
 
-    public Double getTotalPrice() {
-        return totalPrice;
+    /**
+     * Mark order as started
+     */
+    public void markAsStarted() {
+        this.status = OrderStatus.IN_PROGRESS;
+        this.processingStartDate = LocalDateTime.now();
+        this.modificationDate = LocalDateTime.now();
     }
 
-    public void setTotalPrice(Double totalPrice) {
-        this.totalPrice = totalPrice;
+    /**
+     * Mark order as completed
+     */
+    public void markAsCompleted() {
+        this.status = OrderStatus.COMPLETED;
+        this.processingEndDate = LocalDateTime.now();
+        this.modificationDate = LocalDateTime.now();
     }
 
-    public Integer getEstimatedTimeMinutes() {
-        return estimatedTimeMinutes;
+    /**
+     * Update modification date
+     */
+    @PreUpdate
+    protected void onUpdate() {
+        this.modificationDate = LocalDateTime.now();
     }
 
-    public void setEstimatedTimeMinutes(Integer estimatedTimeMinutes) {
-        this.estimatedTimeMinutes = estimatedTimeMinutes;
+    /**
+     * Set creation date before persist
+     */
+    @PrePersist
+    protected void onCreate() {
+        if (this.creationDate == null) {
+            this.creationDate = LocalDateTime.now();
+        }
+        if (this.modificationDate == null) {
+            this.modificationDate = LocalDateTime.now();
+        }
+        if (this.orderDate == null) {
+            this.orderDate = LocalDate.now();
+        }
+        if (this.priority == null) {
+            this.priority = OrderPriority.MEDIUM;
+        }
+        if (this.status == null) {
+            this.status = OrderStatus.PENDING;
+        }
+        // Calculate estimated time if not set
+        if (this.estimatedTimeMinutes == null && this.cardCount != null) {
+            calculateEstimatedTime();
+        }
     }
 
-    public LocalDateTime getCreationDate() {
-        return creationDate;
+    // ========== INNER ENUMS ==========
+
+    /**
+     * Order status enumeration
+     */
+    public enum OrderStatus {
+        PENDING,      // Waiting to be processed
+        SCHEDULED,    // Scheduled for processing
+        IN_PROGRESS,  // Currently being processed
+        COMPLETED,    // Processing completed
+        CANCELLED     // Order cancelled
     }
 
-    public void setCreationDate(LocalDateTime creationDate) {
-        this.creationDate = creationDate;
-    }
-
-    public LocalDateTime getModificationDate() {
-        return modificationDate;
-    }
-
-    public void setModificationDate(LocalDateTime modificationDate) {
-        this.modificationDate = modificationDate;
-    }
-
-    public LocalDateTime getDeadlineDate() {
-        return deadlineDate;
-    }
-
-    public void setDeadlineDate(LocalDateTime deadlineDate) {
-        this.deadlineDate = deadlineDate;
-    }
-
-    public LocalDateTime getProcessingStartDate() {
-        return processingStartDate;
-    }
-
-    public void setProcessingStartDate(LocalDateTime processingStartDate) {
-        this.processingStartDate = processingStartDate;
-    }
-
-    public LocalDateTime getProcessingEndDate() {
-        return processingEndDate;
-    }
-
-    public void setProcessingEndDate(LocalDateTime processingEndDate) {
-        this.processingEndDate = processingEndDate;
-    }
-
-    public Integer getUnsealCount() {
-        return unsealCount;
-    }
-
-    public void setUnsealCount(Integer unsealCount) {
-        this.unsealCount = unsealCount;
+    /**
+     * Order priority enumeration
+     */
+    public enum OrderPriority {
+        HIGH,     // 1 week - price >= 1000€
+        MEDIUM,   // 2 weeks - price >= 500€
+        LOW       // 4 weeks - price < 500€
     }
 }

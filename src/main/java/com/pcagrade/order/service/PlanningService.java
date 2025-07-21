@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 /**
  * Service for managing planning and scheduling operations
  * Translated from PlanificationService to PlanningService with enhanced functionality
+ * Handles Pokemon card order scheduling across multiple employees
  */
 @Service
 @Transactional
@@ -39,6 +40,8 @@ public class PlanningService {
     private static final int DEFAULT_WORK_END_HOUR = 17;   // 5 PM
     private static final int DEFAULT_BREAK_MINUTES = 60;   // 1 hour lunch break
     private static final int MAX_PLANNING_DAYS_AHEAD = 365; // 1 year
+    private static final int CARD_PROCESSING_TIME_MINUTES = 3; // 3 minutes per card
+    private static final int DEFAULT_HISTORICAL_DAYS = 30; // 30 days for historical planning
 
     @Autowired
     private PlanningRepository planningRepository;
@@ -77,42 +80,65 @@ public class PlanningService {
             planning.setProgressPercentage(0);
         }
 
-        // Calculate estimated end time
-        planning.setEstimatedEndTime(planning.calculateEndTime());
+        // Calculate estimated end time if not provided
+        if (planning.getEstimatedEndTime() == null && planning.getEstimatedDurationMinutes() != null) {
+            planning.setEstimatedEndTime(
+                    planning.getStartTime().plusMinutes(planning.getEstimatedDurationMinutes())
+            );
+        }
+
+        // Set audit fields
+        planning.setCreatedAt(LocalDateTime.now());
+        planning.setUpdatedAt(LocalDateTime.now());
 
         Planning savedPlanning = planningRepository.save(planning);
-        log.info("Planning entry created successfully with ID: {}", savedPlanning.getId());
+        log.info("Planning entry created with ID: {}", savedPlanning.getId());
+
         return savedPlanning;
     }
 
     /**
      * Update an existing planning entry
-     * @param planning the planning entry to update
+     * @param planningId the ID of the planning to update
+     * @param updatedPlanning the updated planning data
      * @return updated planning entry
      */
-    public Planning updatePlanningEntry(@Valid @NotNull Planning planning) {
-        log.info("Updating planning entry: {}", planning.getId());
+    public Planning updatePlanningEntry(@NotNull String planningId, @Valid @NotNull Planning updatedPlanning) {
+        log.info("Updating planning entry with ID: {}", planningId);
 
-        if (!planningRepository.existsById(planning.getId())) {
-            throw new IllegalArgumentException("Planning entry not found with ID: " + planning.getId());
+        Planning existingPlanning = planningRepository.findById(planningId)
+                .orElseThrow(() -> new RuntimeException("Planning entry not found with ID: " + planningId));
+
+        // Update allowed fields
+        existingPlanning.setStartTime(updatedPlanning.getStartTime());
+        existingPlanning.setEstimatedDurationMinutes(updatedPlanning.getEstimatedDurationMinutes());
+        existingPlanning.setEstimatedEndTime(updatedPlanning.getEstimatedEndTime());
+        existingPlanning.setStatus(updatedPlanning.getStatus());
+        existingPlanning.setPriority(updatedPlanning.getPriority());
+        existingPlanning.setProgressPercentage(updatedPlanning.getProgressPercentage());
+        existingPlanning.setNotes(updatedPlanning.getNotes());
+        existingPlanning.setUpdatedAt(LocalDateTime.now());
+
+        // If marked as completed, set actual end time
+        if (updatedPlanning.getStatus() == Planning.PlanningStatus.COMPLETED
+                && existingPlanning.getActualEndTime() == null) {
+            existingPlanning.setActualEndTime(LocalDateTime.now());
+            existingPlanning.setProgressPercentage(100);
         }
 
-        // Validate time conflicts (excluding current entry)
-        validateTimeConflicts(planning, planning.getId());
+        Planning savedPlanning = planningRepository.save(existingPlanning);
+        log.info("Planning entry updated successfully");
 
-        Planning updatedPlanning = planningRepository.save(planning);
-        log.info("Planning entry updated successfully: {}", updatedPlanning.getId());
-        return updatedPlanning;
+        return savedPlanning;
     }
 
     /**
-     * Find planning entry by ID
-     * @param id the planning ID
-     * @return optional planning entry
+     * Get planning entry by ID
+     * @param planningId the planning ID
+     * @return planning entry if found
      */
-    @Transactional(readOnly = true)
-    public Optional<Planning> findById(@NotNull UUID id) {
-        return planningRepository.findById(id);
+    public Optional<Planning> getPlanningById(@NotNull String planningId) {
+        return planningRepository.findById(planningId);
     }
 
     /**
@@ -120,356 +146,417 @@ public class PlanningService {
      * @param pageable pagination information
      * @return page of planning entries
      */
-    @Transactional(readOnly = true)
-    public Page<Planning> getAllPlanningEntries(Pageable pageable) {
+    public Page<Planning> getAllPlannings(Pageable pageable) {
         return planningRepository.findAll(pageable);
     }
 
     /**
      * Delete a planning entry
-     * @param id the planning ID
+     * @param planningId the ID of the planning to delete
      */
-    public void deletePlanningEntry(@NotNull UUID id) {
-        log.info("Deleting planning entry: {}", id);
+    public void deletePlanning(@NotNull String planningId) {
+        log.info("Deleting planning entry with ID: {}", planningId);
 
-        if (!planningRepository.existsById(id)) {
-            throw new IllegalArgumentException("Planning entry not found with ID: " + id);
+        if (!planningRepository.existsById(planningId)) {
+            throw new RuntimeException("Planning entry not found with ID: " + planningId);
         }
 
-        planningRepository.deleteById(id);
-        log.info("Planning entry deleted successfully: {}", id);
+        planningRepository.deleteById(planningId);
+        log.info("Planning entry deleted successfully");
     }
 
-    // ========== PLANNING QUERIES ==========
+    // ========== BUSINESS LOGIC METHODS ==========
 
     /**
-     * Find planning entries by employee and date range
+     * Execute automatic planning for orders from a specific date
+     * @param startDate the date from which to start planning
+     * @return planning results summary
+     */
+    @Transactional
+    public Map<String, Object> executeAutomaticPlanning(@NotNull LocalDate startDate) {
+        long executionStart = System.currentTimeMillis();
+        log.info("Starting automatic planning from date: {}", startDate);
+
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // Get orders to plan
+            List<Order> ordersToSchedule = getOrdersToSchedule(startDate);
+            if (ordersToSchedule.isEmpty()) {
+                return createErrorResult("No orders found to schedule from " + startDate);
+            }
+
+            // Get available employees
+            List<Employee> availableEmployees = getAvailableEmployees();
+            if (availableEmployees.isEmpty()) {
+                return createErrorResult("No employees available for scheduling");
+            }
+
+            log.info("Found {} orders to schedule with {} available employees",
+                    ordersToSchedule.size(), availableEmployees.size());
+
+            // Sort orders by priority (high priority first)
+            ordersToSchedule.sort((o1, o2) ->
+                    Integer.compare(o2.getPriority().ordinal(), o1.getPriority().ordinal()));
+
+            // Execute planning algorithm
+            List<Planning> createdPlannings = executeGreedyPlanningAlgorithm(ordersToSchedule, availableEmployees);
+
+            // Save all planning entries
+            planningRepository.saveAll(createdPlannings);
+
+            // Prepare result
+            long executionTime = System.currentTimeMillis() - executionStart;
+            result.put("success", true);
+            result.put("message", "Automatic planning completed successfully");
+            result.put("ordersScheduled", createdPlannings.size());
+            result.put("totalOrders", ordersToSchedule.size());
+            result.put("executionTimeMs", executionTime);
+            result.put("algorithm", "GREEDY");
+            result.put("timestamp", LocalDateTime.now());
+
+            log.info("Automatic planning completed: {} out of {} orders scheduled in {}ms",
+                    createdPlannings.size(), ordersToSchedule.size(), executionTime);
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("Error during automatic planning", e);
+            result.put("success", false);
+            result.put("message", "Error during automatic planning: " + e.getMessage());
+            result.put("timestamp", LocalDateTime.now());
+            return result;
+        }
+    }
+
+    /**
+     * Execute automatic planning with default parameters (last 30 days)
+     * @return planning results summary
+     */
+    public Map<String, Object> executeAutomaticPlanning() {
+        LocalDate startDate = LocalDate.now().minusDays(DEFAULT_HISTORICAL_DAYS);
+        return executeAutomaticPlanning(startDate);
+    }
+
+    /**
+     * Execute automatic planning for a specific date range
+     * @param day day of the start date
+     * @param month month of the start date
+     * @param year year of the start date
+     * @return planning results summary
+     */
+    public Map<String, Object> executeAutomaticPlanning(int day, int month, int year) {
+        try {
+            LocalDate startDate = LocalDate.of(year, month, day);
+            Map<String, Object> result = executeAutomaticPlanning(startDate);
+
+            // Add input parameters to result
+            Map<String, Object> parameters = new HashMap<>();
+            parameters.put("day", day);
+            parameters.put("month", month);
+            parameters.put("year", year);
+            parameters.put("startDate", startDate.toString());
+
+            result.put("parameters", parameters);
+            return result;
+
+        } catch (Exception e) {
+            log.error("Error in automatic planning with parameters: {}/{}/{}", day, month, year, e);
+            return createErrorResult("Invalid date parameters: " + day + "/" + month + "/" + year);
+        }
+    }
+
+    /**
+     * Get planning entries for a specific employee
      * @param employeeId the employee ID
-     * @param startDate start date
-     * @param endDate end date
-     * @return list of planning entries
+     * @return list of planning entries for the employee
      */
-    @Transactional(readOnly = true)
-    public List<Planning> findPlanningByEmployeeAndDateRange(@NotNull UUID employeeId,
-                                                             @NotNull LocalDate startDate,
-                                                             @NotNull LocalDate endDate) {
-        return planningRepository.findByEmployeeIdAndPlanningDateBetween(employeeId, startDate, endDate);
+    public List<Planning> getPlanningsByEmployee(@NotNull String employeeId) {
+        return planningRepository.findByEmployeeIdOrderByStartTimeAsc(employeeId);
     }
 
     /**
-     * Find planning entries by date range
-     * @param startDate start date
-     * @param endDate end date
-     * @return list of planning entries
-     */
-    @Transactional(readOnly = true)
-    public List<Planning> findPlanningByDateRange(@NotNull LocalDate startDate, @NotNull LocalDate endDate) {
-        return planningRepository.findByPlanningDateBetween(startDate, endDate);
-    }
-
-    /**
-     * Find planning entries for a specific date
-     * @param planningDate the date
-     * @return list of planning entries
-     */
-    @Transactional(readOnly = true)
-    public List<Planning> findPlanningByDate(@NotNull LocalDate planningDate) {
-        return planningRepository.findByPlanningDate(planningDate);
-    }
-
-    /**
-     * Find planning entries by order
+     * Get planning entries for a specific order
      * @param orderId the order ID
      * @return list of planning entries for the order
      */
-    @Transactional(readOnly = true)
-    public List<Planning> findPlanningByOrder(@NotNull UUID orderId) {
-        return planningRepository.findByOrderId(orderId);
+    public List<Planning> getPlanningsByOrder(@NotNull String orderId) {
+        return planningRepository.findByOrderIdOrderByStartTimeAsc(orderId);
     }
 
     /**
-     * Find incomplete planning entries
-     * @return list of incomplete planning entries
+     * Get planning entries for a specific date range
+     * @param startDate start date (inclusive)
+     * @param endDate end date (inclusive)
+     * @return list of planning entries in the date range
      */
-    @Transactional(readOnly = true)
-    public List<Planning> findIncompletePlanningEntries() {
-        return planningRepository.findIncompleteEntries();
+    public List<Planning> getPlanningsByDateRange(@NotNull LocalDate startDate, @NotNull LocalDate endDate) {
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        return planningRepository.findByStartTimeBetweenOrderByStartTimeAsc(startDateTime, endDateTime);
     }
 
     /**
-     * Find upcoming planning entries (from today onwards)
-     * @return list of upcoming planning entries
+     * Get planning statistics for reporting
+     * @return map containing various planning statistics
      */
-    @Transactional(readOnly = true)
-    public List<Planning> findUpcomingPlanningEntries() {
-        return planningRepository.findUpcomingEntries();
-    }
-
-    /**
-     * Find overdue incomplete planning entries
-     * @return list of overdue planning entries
-     */
-    @Transactional(readOnly = true)
-    public List<Planning> findOverduePlanningEntries() {
-        return planningRepository.findOverdueIncompleteEntries();
-    }
-
-    // ========== WORKLOAD AND CAPACITY ==========
-
-    /**
-     * Get total planned minutes for an employee on a specific date
-     * @param employeeId the employee ID
-     * @param planningDate the date
-     * @return total planned minutes
-     */
-    @Transactional(readOnly = true)
-    public long getTotalPlannedMinutes(@NotNull UUID employeeId, @NotNull LocalDate planningDate) {
-        Long total = planningRepository.getTotalPlannedMinutesForEmployeeAndDate(employeeId, planningDate);
-        return total != null ? total : 0L;
-    }
-
-    /**
-     * Get workload statistics for all employees on a specific date
-     * @param planningDate the date
-     * @return workload statistics map
-     */
-    @Transactional(readOnly = true)
-    public Map<String, Object> getWorkloadStatistics(@NotNull LocalDate planningDate) {
+    public Map<String, Object> getPlanningStatistics() {
         Map<String, Object> stats = new HashMap<>();
 
         try {
-            List<Object[]> workloadData = planningRepository.getWorkloadStatsByDate(planningDate);
+            // Total planning entries
+            long totalPlannings = planningRepository.count();
+            stats.put("totalPlannings", totalPlannings);
 
-            List<Map<String, Object>> employeeWorkloads = new ArrayList<>();
-            long totalPlannedMinutes = 0;
-            int employeeCount = 0;
-
-            for (Object[] row : workloadData) {
-                UUID employeeId = (UUID) row[0];
-                Long taskCount = (Long) row[1];
-                Long plannedMinutes = (Long) row[2];
-
-                // Get employee details
-                Optional<Employee> optEmployee = employeeRepository.findById(employeeId);
-                if (optEmployee.isPresent()) {
-                    Employee employee = optEmployee.get();
-
-                    Map<String, Object> employeeWorkload = new HashMap<>();
-                    employeeWorkload.put("employeeId", employeeId.toString());
-                    employeeWorkload.put("employeeName", employee.getFullName());
-                    employeeWorkload.put("taskCount", taskCount);
-                    employeeWorkload.put("plannedMinutes", plannedMinutes);
-                    employeeWorkload.put("plannedHours", Math.round((plannedMinutes / 60.0) * 100.0) / 100.0);
-
-                    // Calculate utilization
-                    double maxMinutes = employee.getWorkMinutesPerDay();
-                    double utilization = (plannedMinutes / maxMinutes) * 100;
-                    employeeWorkload.put("utilization", Math.round(utilization * 100.0) / 100.0);
-
-                    // Determine workload status
-                    String status = "NORMAL";
-                    if (utilization > 100) status = "OVERLOADED";
-                    else if (utilization > 80) status = "BUSY";
-                    else if (utilization < 50) status = "AVAILABLE";
-                    employeeWorkload.put("status", status);
-
-                    employeeWorkloads.add(employeeWorkload);
-                    totalPlannedMinutes += plannedMinutes;
-                    employeeCount++;
-                }
+            // Planning by status
+            Map<String, Long> statusCounts = new HashMap<>();
+            for (Planning.PlanningStatus status : Planning.PlanningStatus.values()) {
+                long count = planningRepository.countByStatus(status);
+                statusCounts.put(status.name(), count);
             }
+            stats.put("planningsByStatus", statusCounts);
 
-            stats.put("date", planningDate.toString());
-            stats.put("employeeWorkloads", employeeWorkloads);
-            stats.put("totalEmployees", employeeCount);
-            stats.put("totalPlannedMinutes", totalPlannedMinutes);
-            stats.put("totalPlannedHours", Math.round((totalPlannedMinutes / 60.0) * 100.0) / 100.0);
-
-            if (employeeCount > 0) {
-                double avgPlannedMinutes = (double) totalPlannedMinutes / employeeCount;
-                stats.put("averagePlannedMinutes", Math.round(avgPlannedMinutes * 100.0) / 100.0);
-                stats.put("averagePlannedHours", Math.round((avgPlannedMinutes / 60.0) * 100.0) / 100.0);
+            // Planning by priority
+            Map<String, Long> priorityCounts = new HashMap<>();
+            for (Planning.PlanningPriority priority : Planning.PlanningPriority.values()) {
+                long count = planningRepository.countByPriority(priority);
+                priorityCounts.put(priority.name(), count);
             }
+            stats.put("planningsByPriority", priorityCounts);
 
-            stats.put("status", "success");
+            // Recent planning activity (last 7 days)
+            LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+            long recentPlannings = planningRepository.countByCreatedAtAfter(sevenDaysAgo);
+            stats.put("recentPlannings", recentPlannings);
+
+            // Employee workload distribution
+            List<Object[]> employeeWorkload = planningRepository.findEmployeeWorkloadDistribution();
+            Map<String, Long> workloadMap = employeeWorkload.stream()
+                    .collect(Collectors.toMap(
+                            row -> (String) row[0], // employeeId
+                            row -> (Long) row[1]    // planning count
+                    ));
+            stats.put("employeeWorkload", workloadMap);
+
+            stats.put("success", true);
+            stats.put("timestamp", LocalDateTime.now());
 
         } catch (Exception e) {
-            log.error("Error calculating workload statistics for {}: {}", planningDate, e.getMessage());
-            stats.put("status", "error");
+            log.error("Error getting planning statistics", e);
+            stats.put("success", false);
             stats.put("error", e.getMessage());
         }
 
         return stats;
     }
 
+    // ========== PRIVATE HELPER METHODS ==========
+
     /**
-     * Check if employee is available at specific time
-     * @param employeeId the employee ID
-     * @param planningDate the date
-     * @param startTime start time
-     * @param durationMinutes duration in minutes
-     * @return true if available
+     * Validate a new planning entry according to business rules
      */
-    @Transactional(readOnly = true)
-    public boolean isEmployeeAvailable(@NotNull UUID employeeId,
-                                       @NotNull LocalDate planningDate,
-                                       @NotNull LocalTime startTime,
-                                       @Positive int durationMinutes) {
-        LocalTime endTime = startTime.plusMinutes(durationMinutes);
+    private void validateNewPlanningEntry(Planning planning) {
+        // Check if employee exists and is active
+        Employee employee = employeeRepository.findById(planning.getEmployeeId())
+                .orElseThrow(() -> new RuntimeException("Employee not found: " + planning.getEmployeeId()));
 
-        List<Planning> conflicts = planningRepository.findOverlappingEntries(
-                employeeId, planningDate, startTime, endTime);
+        if (!employee.getIsActive()) {
+            throw new RuntimeException("Cannot assign planning to inactive employee: " + planning.getEmployeeId());
+        }
 
-        return conflicts.isEmpty();
+        // Check if order exists
+        Order order = orderRepository.findById(planning.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Order not found: " + planning.getOrderId()));
+
+        // Check for scheduling conflicts
+        if (hasSchedulingConflict(planning)) {
+            throw new RuntimeException("Scheduling conflict detected for employee " +
+                    planning.getEmployeeId() + " at " + planning.getStartTime());
+        }
+
+        // Validate start time is not in the past (allow some tolerance)
+        if (planning.getStartTime().isBefore(LocalDateTime.now().minusHours(1))) {
+            throw new RuntimeException("Cannot schedule planning in the past");
+        }
+
+        // Validate planning is not too far in the future
+        if (planning.getStartTime().isAfter(LocalDateTime.now().plusDays(MAX_PLANNING_DAYS_AHEAD))) {
+            throw new RuntimeException("Cannot schedule planning more than " + MAX_PLANNING_DAYS_AHEAD + " days ahead");
+        }
     }
 
     /**
-     * Find available time slots for an employee on a specific date
-     * @param employeeId the employee ID
-     * @param planningDate the date
-     * @param minDurationMinutes minimum duration needed
-     * @return list of available time slots
+     * Check if there's a scheduling conflict for the given planning
      */
-    @Transactional(readOnly = true)
-    public List<Map<String, Object>> findAvailableTimeSlots(@NotNull UUID employeeId,
-                                                            @NotNull LocalDate planningDate,
-                                                            @Positive int minDurationMinutes) {
-        List<Map<String, Object>> availableSlots = new ArrayList<>();
-
-        // Get employee's existing schedule for the date
-        List<Planning> existingPlanning = planningRepository.findEmployeeScheduleForDate(employeeId, planningDate);
-
-        // Get employee work hours
-        Optional<Employee> optEmployee = employeeRepository.findById(employeeId);
-        if (optEmployee.isEmpty()) {
-            return availableSlots;
+    private boolean hasSchedulingConflict(Planning planning) {
+        if (planning.getEstimatedEndTime() == null) {
+            return false; // Can't check conflict without end time
         }
 
-        Employee employee = optEmployee.get();
-        int workMinutesPerDay = employee.getWorkMinutesPerDay();
+        List<Planning> existingPlannings = planningRepository
+                .findByEmployeeIdAndStartTimeBetween(
+                        planning.getEmployeeId(),
+                        planning.getStartTime().minusMinutes(1),
+                        planning.getEstimatedEndTime().plusMinutes(1)
+                );
 
-        // Define work day boundaries
-        LocalTime workStart = LocalTime.of(DEFAULT_WORK_START_HOUR, 0);
-        LocalTime workEnd = LocalTime.of(DEFAULT_WORK_END_HOUR, 0);
+        return !existingPlannings.isEmpty();
+    }
 
-        // Sort existing planning by start time
-        existingPlanning.sort((p1, p2) -> p1.getStartTime().compareTo(p2.getStartTime()));
+    /**
+     * Get orders that need to be scheduled from a given date
+     */
+    private List<Order> getOrdersToSchedule(LocalDate fromDate) {
+        LocalDateTime fromDateTime = fromDate.atStartOfDay();
 
-        // Find gaps in the schedule
-        LocalTime currentTime = workStart;
+        // Get orders that:
+        // 1. Were created from the specified date
+        // 2. Don't have completed planning
+        // 3. Are not cancelled
 
-        for (Planning planning : existingPlanning) {
-            LocalTime planningStart = planning.getStartTime();
+        String jpql = """
+            SELECT DISTINCT o FROM Order o 
+            LEFT JOIN Planning p ON o.id = p.orderId 
+            WHERE o.orderDate >= :fromDate 
+            AND o.status != 'CANCELLED'
+            AND (p.id IS NULL OR p.status != 'COMPLETED')
+            ORDER BY o.priority DESC, o.orderDate ASC
+            """;
 
-            // Check if there's a gap before this planning
-            if (currentTime.isBefore(planningStart)) {
-                long gapMinutes = java.time.Duration.between(currentTime, planningStart).toMinutes();
-                if (gapMinutes >= minDurationMinutes) {
-                    Map<String, Object> slot = new HashMap<>();
-                    slot.put("startTime", currentTime.toString());
-                    slot.put("endTime", planningStart.toString());
-                    slot.put("durationMinutes", gapMinutes);
-                    availableSlots.add(slot);
+        return entityManager.createQuery(jpql, Order.class)
+                .setParameter("fromDate", fromDateTime)
+                .getResultList();
+    }
+
+    /**
+     * Get list of available employees for planning
+     */
+    private List<Employee> getAvailableEmployees() {
+        return employeeRepository.findByIsActiveTrue();
+    }
+
+    /**
+     * Execute greedy planning algorithm
+     * Assigns orders to employees based on availability and priority
+     */
+    private List<Planning> executeGreedyPlanningAlgorithm(List<Order> orders, List<Employee> employees) {
+        List<Planning> plannings = new ArrayList<>();
+
+        // Track employee availability (next available time)
+        Map<String, LocalDateTime> employeeAvailability = new HashMap<>();
+        for (Employee employee : employees) {
+            employeeAvailability.put(employee.getId(), LocalDateTime.now());
+        }
+
+        for (Order order : orders) {
+            // Find employee with earliest availability
+            String bestEmployeeId = null;
+            LocalDateTime earliestTime = null;
+
+            for (Employee employee : employees) {
+                LocalDateTime availableTime = employeeAvailability.get(employee.getId());
+                if (earliestTime == null || availableTime.isBefore(earliestTime)) {
+                    earliestTime = availableTime;
+                    bestEmployeeId = employee.getId();
                 }
             }
 
-            // Move current time to after this planning
-            LocalTime planningEnd = planning.calculateEndTime();
-            if (planningEnd != null && planningEnd.isAfter(currentTime)) {
-                currentTime = planningEnd;
+            if (bestEmployeeId != null && earliestTime != null) {
+                // Calculate duration based on card count
+                int durationMinutes = order.getCardCount() * CARD_PROCESSING_TIME_MINUTES;
+
+                // Create planning entry
+                Planning planning = new Planning();
+                planning.setOrderId(order.getId());
+                planning.setEmployeeId(bestEmployeeId);
+                planning.setStartTime(earliestTime);
+                planning.setEstimatedDurationMinutes(durationMinutes);
+                planning.setEstimatedEndTime(earliestTime.plusMinutes(durationMinutes));
+                planning.setStatus(Planning.PlanningStatus.SCHEDULED);
+                planning.setPriority(convertOrderPriorityToPlanningPriority(order.getPriority()));
+                planning.setProgressPercentage(0);
+                planning.setCreatedAt(LocalDateTime.now());
+                planning.setUpdatedAt(LocalDateTime.now());
+
+                plannings.add(planning);
+
+                // Update employee availability
+                employeeAvailability.put(bestEmployeeId,
+                        earliestTime.plusMinutes(durationMinutes + 15)); // 15 min buffer between tasks
             }
         }
 
-        // Check if there's time left at the end of the work day
-        if (currentTime.isBefore(workEnd)) {
-            long remainingMinutes = java.time.Duration.between(currentTime, workEnd).toMinutes();
-            if (remainingMinutes >= minDurationMinutes) {
-                Map<String, Object> slot = new HashMap<>();
-                slot.put("startTime", currentTime.toString());
-                slot.put("endTime", workEnd.toString());
-                slot.put("durationMinutes", remainingMinutes);
-                availableSlots.add(slot);
-            }
-        }
-
-        return availableSlots;
-    }
-
-    // ========== PLANNING STATUS OPERATIONS ==========
-
-    /**
-     * Start a planning task
-     * @param planningId the planning ID
-     * @return updated planning entry
-     */
-    public Planning startTask(@NotNull UUID planningId) {
-        log.info("Starting task: {}", planningId);
-
-        Planning planning = planningRepository.findById(planningId)
-                .orElseThrow(() -> new IllegalArgumentException("Planning entry not found: " + planningId));
-
-        planning.startTask();
-
-        Planning updatedPlanning = planningRepository.save(planning);
-        log.info("Task started successfully: {}", planningId);
-        return updatedPlanning;
+        return plannings;
     }
 
     /**
-     * Complete a planning task
-     * @param planningId the planning ID
-     * @return updated planning entry
+     * Convert Order priority to Planning priority
      */
-    public Planning completeTask(@NotNull UUID planningId) {
-        log.info("Completing task: {}", planningId);
-
-        Planning planning = planningRepository.findById(planningId)
-                .orElseThrow(() -> new IllegalArgumentException("Planning entry not found: " + planningId));
-
-        planning.completeTask();
-
-        Planning updatedPlanning = planningRepository.save(planning);
-        log.info("Task completed successfully: {}", planningId);
-        return updatedPlanning;
+    private Planning.PlanningPriority convertOrderPriorityToPlanningPriority(Order.OrderPriority orderPriority) {
+        return switch (orderPriority) {
+            case HIGH -> Planning.PlanningPriority.HIGH;
+            case MEDIUM -> Planning.PlanningPriority.MEDIUM;
+            case LOW -> Planning.PlanningPriority.LOW;
+        };
     }
 
     /**
-     * Update task progress
-     * @param planningId the planning ID
-     * @param progressPercentage new progress percentage (0-100)
-     * @return updated planning entry
+     * Create error result map
      */
-    public Planning updateTaskProgress(@NotNull UUID planningId, @Positive int progressPercentage) {
-        log.info("Updating task progress: {} to {}%", planningId, progressPercentage);
+    private Map<String, Object> createErrorResult(String message) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", false);
+        result.put("message", message);
+        result.put("timestamp", LocalDateTime.now());
+        return result;
+    }
 
-        Planning planning = planningRepository.findById(planningId)
-                .orElseThrow(() -> new IllegalArgumentException("Planning entry not found: " + planningId));
+    // ========== COMPATIBILITY METHODS (for migration from PlanificationService) ==========
 
-        planning.updateProgress(progressPercentage);
-
-        Planning updatedPlanning = planningRepository.save(planning);
-        log.info("Task progress updated successfully: {}", planningId);
-        return updatedPlanning;
+    /**
+     * Legacy method for compatibility with existing code
+     * @deprecated Use executeAutomaticPlanning() instead
+     */
+    @Deprecated
+    public Map<String, Object> executerPlanificationAutomatique() {
+        log.warn("Using deprecated method executerPlanificationAutomatique(), please use executeAutomaticPlanning()");
+        return executeAutomaticPlanning();
     }
 
     /**
-     * Pause a planning task
-     * @param planningId the planning ID
-     * @return updated planning entry
+     * Legacy method for compatibility with existing code
+     * @deprecated Use executeAutomaticPlanning(int, int, int) instead
      */
-    public Planning pauseTask(@NotNull UUID planningId) {
-        log.info("Pausing task: {}", planningId);
-
-        Planning planning = planningRepository.findById(planningId)
-                .orElseThrow(() -> new IllegalArgumentException("Planning entry not found: " + planningId));
-
-        planning.pauseTask();
-
-        Planning updatedPlanning = planningRepository.save(planning);
-        log.info("Task paused successfully: {}", planningId);
-        return updatedPlanning;
+    @Deprecated
+    public Map<String, Object> executerPlanificationAutomatique(int jour, int mois, int annee) {
+        log.warn("Using deprecated method executerPlanificationAutomatique(), please use executeAutomaticPlanning()");
+        return executeAutomaticPlanning(jour, mois, annee);
     }
 
-/**
- * Cancel a planning task
- * @param planningId the planning
+    /**
+     * Get all plannings as Map objects (for compatibility with legacy frontend)
+     * @return list of planning maps
+     */
+    public List<Map<String, Object>> getAllPlanningsAsMap() {
+        List<Planning> plannings = planningRepository.findAll();
+
+        return plannings.stream().map(planning -> {
+            Map<String, Object> planningMap = new HashMap<>();
+            planningMap.put("id", planning.getId());
+            planningMap.put("orderId", planning.getOrderId());
+            planningMap.put("employeeId", planning.getEmployeeId());
+            planningMap.put("startTime", planning.getStartTime());
+            planningMap.put("estimatedDurationMinutes", planning.getEstimatedDurationMinutes());
+            planningMap.put("estimatedEndTime", planning.getEstimatedEndTime());
+            planningMap.put("actualEndTime", planning.getActualEndTime());
+            planningMap.put("status", planning.getStatus().name());
+            planningMap.put("priority", planning.getPriority().name());
+            planningMap.put("progressPercentage", planning.getProgressPercentage());
+            planningMap.put("notes", planning.getNotes());
+            planningMap.put("createdAt", planning.getCreatedAt());
+            planningMap.put("updatedAt", planning.getUpdatedAt());
+            return planningMap;
+        }).collect(Collectors.toList());
+    }
+}
