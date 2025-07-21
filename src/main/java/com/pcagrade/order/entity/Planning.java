@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -133,6 +134,22 @@ public class Planning extends AbstractUlidEntity {
     private String notes;
 
     /**
+     * Estimated cost for this planning entry (optional)
+     */
+    @DecimalMin(value = "0.0", message = "Cost cannot be negative")
+    @Digits(integer = 8, fraction = 2, message = "Invalid cost format")
+    @Column(name = "estimated_cost")
+    private BigDecimal estimatedCost;
+
+    /**
+     * Actual cost for this planning entry (optional)
+     */
+    @DecimalMin(value = "0.0", message = "Actual cost cannot be negative")
+    @Digits(integer = 8, fraction = 2, message = "Invalid actual cost format")
+    @Column(name = "actual_cost")
+    private BigDecimal actualCost;
+
+    /**
      * Creation timestamp
      */
     @Builder.Default
@@ -222,7 +239,6 @@ public class Planning extends AbstractUlidEntity {
     /**
      * Set creation date before persist
      */
-    @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) {
             this.createdAt = LocalDateTime.now();
@@ -397,4 +413,6 @@ public class Planning extends AbstractUlidEntity {
             markAsCompleted();
         }
     }
+
+
 }

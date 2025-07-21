@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -59,7 +60,7 @@ public class Employee extends AbstractUlidEntity {
     @NotNull(message = "Work hours per day is required")
     @DecimalMin(value = "0.5", message = "Work hours must be at least 0.5 hours")
     @DecimalMax(value = "12.0", message = "Work hours cannot exceed 12 hours per day")
-    @Column(name = "work_hours_per_day", nullable = false, precision = 3, scale = 1)
+    @Column(name = "work_hours_per_day", nullable = false)
     private Double workHoursPerDay = 8.0;
 
     /**
@@ -93,9 +94,13 @@ public class Employee extends AbstractUlidEntity {
     /**
      * Employee's hourly rate (for cost calculations)
      */
+    /**
+     * Employee's hourly rate (for cost calculations) - using BigDecimal for precision
+     */
     @DecimalMin(value = "0.0", message = "Hourly rate cannot be negative")
-    @Column(name = "hourly_rate", precision = 10, scale = 2)
-    private Double hourlyRate;
+    @Digits(integer = 5, fraction = 2, message = "Invalid hourly rate format")
+    @Column(name = "hourly_rate")
+    private BigDecimal hourlyRate;
 
     /**
      * Employee's skill level
@@ -158,7 +163,6 @@ public class Employee extends AbstractUlidEntity {
     /**
      * Set creation date before persist
      */
-    @PrePersist
     protected void onCreate() {
         if (this.hireDate == null) {
             this.hireDate = LocalDateTime.now();

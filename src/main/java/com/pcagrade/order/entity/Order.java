@@ -53,11 +53,10 @@ public class Order extends AbstractUlidEntity {
     private OrderPriority priority = OrderPriority.MEDIUM;
 
     /**
-     * Total price of the order
+     * Total price of the order (removed precision and scale for Double)
      */
     @DecimalMin(value = "0.0", message = "Total price cannot be negative")
-    @Digits(integer = 8, fraction = 2, message = "Invalid price format")
-    @Column(name = "total_price", precision = 10, scale = 2)
+    @Column(name = "total_price")
     private Double totalPrice;
 
     /**
@@ -68,11 +67,18 @@ public class Order extends AbstractUlidEntity {
     private Integer estimatedTimeMinutes;
 
     /**
+     * Customer name or identifier
+     */
+    @Size(max = 255, message = "Customer name must not exceed 255 characters")
+    @Column(name = "customer_name", length = 255)
+    private String customerName;
+
+    /**
      * Order status
      */
     @NotNull(message = "Status is required")
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 15)
+    @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
@@ -85,7 +91,7 @@ public class Order extends AbstractUlidEntity {
     private LocalDate orderDate = LocalDate.now();
 
     /**
-     * Order deadline
+     * Deadline for completing this order
      */
     @Column(name = "deadline_date")
     private LocalDateTime deadlineDate;
@@ -97,30 +103,16 @@ public class Order extends AbstractUlidEntity {
     private LocalDateTime processingStartDate;
 
     /**
-     * When processing finished
+     * When processing ended
      */
     @Column(name = "processing_end_date")
     private LocalDateTime processingEndDate;
 
     /**
-     * Number of unsealed packs (if applicable)
+     * Additional notes or special instructions
      */
-    @Min(value = 0, message = "Unseal count cannot be negative")
-    @Column(name = "unseal_count")
-    private Integer unsealCount;
-
-    /**
-     * Customer or client name
-     */
-    @Size(max = 100, message = "Customer name must not exceed 100 characters")
-    @Column(name = "customer_name", length = 100)
-    private String customerName;
-
-    /**
-     * Additional notes or comments
-     */
-    @Size(max = 2000, message = "Notes must not exceed 2000 characters")
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Size(max = 1000, message = "Notes must not exceed 1000 characters")
+    @Column(name = "notes", length = 1000)
     private String notes;
 
     /**
@@ -136,6 +128,64 @@ public class Order extends AbstractUlidEntity {
     @Column(name = "modification_date", nullable = false)
     @Builder.Default
     private LocalDateTime modificationDate = LocalDateTime.now();
+
+    // ========== ENUMS ==========
+
+    /**
+     * Order priority levels
+     */
+    public enum OrderPriority {
+        HIGH,     // 1 week - price >= 1000€
+        MEDIUM,   // 2 weeks - price >= 500€
+        LOW       // 4 weeks - price < 500€
+    }
+
+    /**
+     * Order status enumeration
+     */
+    public enum OrderStatus {
+        PENDING,      // Waiting to be processed
+        SCHEDULED,    // Scheduled for processing
+        IN_PROGRESS,  // Currently being processed
+        COMPLETED,    // Processing completed
+        CANCELLED     // Order cancelled
+    }
+
+    // ========== LIFECYCLE HOOKS ==========
+
+    /**
+     * Set creation date before persist
+     */
+    @PrePersist
+    protected void onCreate() {
+        if (this.creationDate == null) {
+            this.creationDate = LocalDateTime.now();
+        }
+        if (this.modificationDate == null) {
+            this.modificationDate = LocalDateTime.now();
+        }
+        if (this.orderDate == null) {
+            this.orderDate = LocalDate.now();
+        }
+        if (this.priority == null) {
+            this.priority = OrderPriority.MEDIUM;
+        }
+        if (this.status == null) {
+            this.status = OrderStatus.PENDING;
+        }
+        // Calculate estimated time if not set
+        if (this.estimatedTimeMinutes == null && this.cardCount != null) {
+            calculateEstimatedTime();
+        }
+    }
+
+    /**
+     * Update modification date before update
+     */
+    @PreUpdate
+    protected void onUpdate() {
+        this.modificationDate = LocalDateTime.now();
+    }
 
     // ========== BUSINESS LOGIC METHODS ==========
 
@@ -205,59 +255,59 @@ public class Order extends AbstractUlidEntity {
         this.modificationDate = LocalDateTime.now();
     }
 
+
     /**
-     * Update modification date
+     * Get formatted priority display
      */
-    @PreUpdate
-    protected void onUpdate() {
-        this.modificationDate = LocalDateTime.now();
+    public String getPriorityDisplay() {
+        return switch (priority) {
+            case HIGH -> "Haute priorité";
+            case MEDIUM -> "Priorité normale";
+            case LOW -> "Basse priorité";
+        };
     }
 
     /**
-     * Set creation date before persist
+     * Get formatted status display
      */
-    @PrePersist
-    protected void onCreate() {
-        if (this.creationDate == null) {
-            this.creationDate = LocalDateTime.now();
-        }
-        if (this.modificationDate == null) {
-            this.modificationDate = LocalDateTime.now();
-        }
-        if (this.orderDate == null) {
-            this.orderDate = LocalDate.now();
-        }
-        if (this.priority == null) {
-            this.priority = OrderPriority.MEDIUM;
-        }
-        if (this.status == null) {
-            this.status = OrderStatus.PENDING;
-        }
-        // Calculate estimated time if not set
-        if (this.estimatedTimeMinutes == null && this.cardCount != null) {
-            calculateEstimatedTime();
-        }
-    }
-
-    // ========== INNER ENUMS ==========
-
-    /**
-     * Order status enumeration
-     */
-    public enum OrderStatus {
-        PENDING,      // Waiting to be processed
-        SCHEDULED,    // Scheduled for processing
-        IN_PROGRESS,  // Currently being processed
-        COMPLETED,    // Processing completed
-        CANCELLED     // Order cancelled
+    public String getStatusDisplay() {
+        return switch (status) {
+            case PENDING -> "En attente";
+            case SCHEDULED -> "Planifiée";
+            case IN_PROGRESS -> "En cours";
+            case COMPLETED -> "Terminée";
+            case CANCELLED -> "Annulée";
+        };
     }
 
     /**
-     * Order priority enumeration
+     * Calculate estimated end date based on start date and processing time
      */
-    public enum OrderPriority {
-        HIGH,     // 1 week - price >= 1000€
-        MEDIUM,   // 2 weeks - price >= 500€
-        LOW       // 4 weeks - price < 500€
+    public LocalDateTime getEstimatedEndDate() {
+        if (processingStartDate != null && estimatedTimeMinutes != null) {
+            return processingStartDate.plusMinutes(estimatedTimeMinutes);
+        }
+        return null;
+    }
+
+    /**
+     * Get actual processing duration in minutes
+     */
+    public Integer getActualProcessingTimeMinutes() {
+        if (processingStartDate != null && processingEndDate != null) {
+            return (int) java.time.Duration.between(processingStartDate, processingEndDate).toMinutes();
+        }
+        return null;
+    }
+
+    /**
+     * Check if processing is delayed
+     */
+    public boolean isProcessingDelayed() {
+        if (processingStartDate != null && estimatedTimeMinutes != null && status == OrderStatus.IN_PROGRESS) {
+            LocalDateTime estimatedEnd = processingStartDate.plusMinutes(estimatedTimeMinutes);
+            return LocalDateTime.now().isAfter(estimatedEnd);
+        }
+        return false;
     }
 }

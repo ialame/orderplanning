@@ -461,7 +461,7 @@ public class OrderService {
 
     /**
      * Get recent orders (for OrderController)
-     * @return list of recent orders
+     * @return list of recent orders as Order entities
      */
     @Transactional(readOnly = true)
     public List<Order> getRecentOrders() {
@@ -469,6 +469,16 @@ public class OrderService {
                 .sorted((o1, o2) -> o2.getCreationDate().compareTo(o1.getCreationDate()))
                 .limit(10)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Get recent orders as maps (for OrderController frontend compatibility)
+     * @return list of recent orders as maps
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getRecentOrdersAsMap() {
+        List<Order> orders = getRecentOrders();
+        return orders.stream().map(this::convertOrderToMap).collect(Collectors.toList());
     }
 
     // ========== COMPATIBILITY METHODS (for migration from CommandeService) ==========
