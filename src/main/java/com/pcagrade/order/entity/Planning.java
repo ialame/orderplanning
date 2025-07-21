@@ -64,49 +64,37 @@ public class Planning extends AbstractUlidEntity {
      * Duration of the task in minutes
      */
     @NotNull(message = "Duration is required")
-    @Min(value = 1, message = "Duration must be at least 1 minute")
-    @Max(value = 720, message = "Duration cannot exceed 12 hours (720 minutes)")
+    @Positive(message = "Duration must be positive")
+    @Min(value = 1, message = "Minimum duration is 1 minute")
+    @Max(value = 1440, message = "Maximum duration is 1440 minutes (24 hours)")
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
 
     /**
      * Whether this task has been completed
      */
-    @NotNull(message = "Completion status is required")
+    @NotNull(message = "Completed status is required")
     @Column(name = "completed", nullable = false)
+    @Builder.Default
     private Boolean completed = false;
 
     /**
      * Priority level of this planning entry
      */
+    @NotNull(message = "Priority is required")
     @Enumerated(EnumType.STRING)
-    @Column(name = "priority", length = 20)
+    @Column(name = "priority", nullable = false, length = 10)
+    @Builder.Default
     private PlanningPriority priority = PlanningPriority.MEDIUM;
 
     /**
-     * Status of this planning entry
+     * Current status of this planning entry
      */
+    @NotNull(message = "Status is required")
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20)
+    @Column(name = "status", nullable = false, length = 15)
+    @Builder.Default
     private PlanningStatus status = PlanningStatus.SCHEDULED;
-
-    /**
-     * Actual start time (when task actually began)
-     */
-    @Column(name = "actual_start_time")
-    private LocalDateTime actualStartTime;
-
-    /**
-     * Actual end time (when task actually finished)
-     */
-    @Column(name = "actual_end_time")
-    private LocalDateTime actualEndTime;
-
-    /**
-     * Estimated end time (calculated from start time + duration)
-     */
-    @Column(name = "estimated_end_time")
-    private LocalTime estimatedEndTime;
 
     /**
      * Progress percentage (0-100)
@@ -114,12 +102,31 @@ public class Planning extends AbstractUlidEntity {
     @Min(value = 0, message = "Progress cannot be negative")
     @Max(value = 100, message = "Progress cannot exceed 100%")
     @Column(name = "progress_percentage")
+    @Builder.Default
     private Integer progressPercentage = 0;
 
     /**
-     * Number of cards to process in this planning entry
+     * Actual start time when work began
      */
-    @Min(value = 0, message = "Card count cannot be negative")
+    @Column(name = "actual_start_time")
+    private LocalDateTime actualStartTime;
+
+    /**
+     * Actual end time when work finished
+     */
+    @Column(name = "actual_end_time")
+    private LocalDateTime actualEndTime;
+
+    /**
+     * Calculated end time based on start time and duration
+     */
+    @Column(name = "end_time", nullable = false)
+    private LocalTime endTime;
+
+    /**
+     * Number of cards to process in this task
+     */
+    @Positive(message = "Card count cannot be negative")
     @Column(name = "card_count")
     private Integer cardCount;
 
@@ -150,13 +157,15 @@ public class Planning extends AbstractUlidEntity {
      * Record creation timestamp
      */
     @Column(name = "creation_date", nullable = false, updatable = false)
-    private LocalDateTime creationDate;
+    @Builder.Default
+    private LocalDateTime creationDate = LocalDateTime.now();
 
     /**
      * Record last modification timestamp
      */
     @Column(name = "modification_date", nullable = false)
-    private LocalDateTime modificationDate;
+    @Builder.Default
+    private LocalDateTime modificationDate = LocalDateTime.now();
 
     /**
      * Who created this planning entry
@@ -231,26 +240,50 @@ public class Planning extends AbstractUlidEntity {
         this.creationDate = LocalDateTime.now();
         this.modificationDate = LocalDateTime.now();
 
-        // Calculate estimated end time
-        this.estimatedEndTime = calculateEndTime();
+        // Calculate end time automatically
+        this.endTime = startTime.plusMinutes(durationMinutes);
     }
 
     // ========== UTILITY METHODS ==========
 
     /**
-     * Calculate estimated end time based on start time and duration
-     * @return estimated end time
+     * Calculate and set end time based on start time and duration
      */
-    public LocalTime calculateEndTime() {
+    @PrePersist
+    @PreUpdate
+    public void calculateEndTime() {
         if (startTime != null && durationMinutes != null) {
-            return startTime.plusMinutes(durationMinutes);
+            this.endTime = startTime.plusMinutes(durationMinutes);
         }
-        return null;
+        if (this.creationDate == null) {
+            this.creationDate = LocalDateTime.now();
+        }
+        this.modificationDate = LocalDateTime.now();
     }
 
     /**
-     * Get actual duration in minutes (if task is completed)
-     * @return actual duration or null if not completed
+     * Check if this planning entry is overdue
+     */
+    public boolean isOverdue() {
+        if (completed || status == PlanningStatus.COMPLETED) {
+            return false;
+        }
+        LocalDateTime plannedDateTime = LocalDateTime.of(planningDate, endTime);
+        return LocalDateTime.now().isAfter(plannedDateTime);
+    }
+
+    /**
+     * Get total planned duration in hours as a formatted string
+     */
+    public String getFormattedDuration() {
+        if (durationMinutes == null) return "0h00";
+        int hours = durationMinutes / 60;
+        int minutes = durationMinutes % 60;
+        return String.format("%dh%02d", hours, minutes);
+    }
+
+    /**
+     * Get actual duration if both start and end times are set
      */
     public Integer getActualDurationMinutes() {
         if (actualStartTime != null && actualEndTime != null) {
@@ -260,232 +293,40 @@ public class Planning extends AbstractUlidEntity {
     }
 
     /**
-     * Check if this planning entry is overdue
-     * @return true if past the planned date and not completed
+     * Mark this planning entry as completed
      */
-    public boolean isOverdue() {
-        return planningDate != null
-                && planningDate.isBefore(LocalDate.now())
-                && !Boolean.TRUE.equals(completed);
-    }
-
-    /**
-     * Check if this planning entry is for today
-     * @return true if planned for today
-     */
-    public boolean isToday() {
-        return planningDate != null && planningDate.equals(LocalDate.now());
-    }
-
-    /**
-     * Check if this planning entry is in the future
-     * @return true if planned for future date
-     */
-    public boolean isFuture() {
-        return planningDate != null && planningDate.isAfter(LocalDate.now());
-    }
-
-    /**
-     * Get formatted time range (e.g., "09:00 - 10:30")
-     * @return formatted time range
-     */
-    public String getTimeRange() {
-        if (startTime != null) {
-            LocalTime endTime = (estimatedEndTime != null) ? estimatedEndTime : calculateEndTime();
-            if (endTime != null) {
-                return String.format("%s - %s", startTime.toString(), endTime.toString());
-            }
-            return startTime.toString();
-        }
-        return "Unknown";
-    }
-
-    /**
-     * Get duration in hours and minutes format
-     * @return formatted duration (e.g., "2h 30m")
-     */
-    public String getFormattedDuration() {
-        if (durationMinutes != null) {
-            int hours = durationMinutes / 60;
-            int minutes = durationMinutes % 60;
-            if (hours > 0 && minutes > 0) {
-                return String.format("%dh %dm", hours, minutes);
-            } else if (hours > 0) {
-                return String.format("%dh", hours);
-            } else {
-                return String.format("%dm", minutes);
-            }
-        }
-        return "Unknown";
-    }
-
-    /**
-     * Calculate efficiency percentage (estimated vs actual time)
-     * @return efficiency percentage or null if not applicable
-     */
-    public Double getEfficiencyPercentage() {
-        Integer actualDuration = getActualDurationMinutes();
-        if (durationMinutes != null && actualDuration != null && actualDuration > 0) {
-            return (durationMinutes.doubleValue() / actualDuration.doubleValue()) * 100;
-        }
-        return null;
-    }
-
-    /**
-     * Check if there's a time conflict with another planning entry
-     * @param other another planning entry
-     * @return true if there's a time conflict
-     */
-    public boolean hasTimeConflictWith(Planning other) {
-        if (other == null || !this.employeeId.equals(other.employeeId)
-                || !this.planningDate.equals(other.planningDate)) {
-            return false;
-        }
-
-        LocalTime thisEnd = this.calculateEndTime();
-        LocalTime otherEnd = other.calculateEndTime();
-
-        if (thisEnd == null || otherEnd == null) {
-            return false;
-        }
-
-        // Check for overlap
-        return (this.startTime.isBefore(otherEnd) && thisEnd.isAfter(other.startTime));
-    }
-
-    /**
-     * Start the task (set actual start time and update status)
-     */
-    public void startTask() {
-        this.actualStartTime = LocalDateTime.now();
-        this.status = PlanningStatus.IN_PROGRESS;
-        this.modificationDate = LocalDateTime.now();
-    }
-
-    /**
-     * Complete the task (set actual end time, mark as completed)
-     */
-    public void completeTask() {
-        this.actualEndTime = LocalDateTime.now();
+    public void markAsCompleted() {
         this.completed = true;
         this.status = PlanningStatus.COMPLETED;
         this.progressPercentage = 100;
+        if (this.actualEndTime == null) {
+            this.actualEndTime = LocalDateTime.now();
+        }
         this.modificationDate = LocalDateTime.now();
     }
 
     /**
-     * Pause the task
+     * Start working on this planning entry
      */
-    public void pauseTask() {
+    public void startWork() {
+        this.status = PlanningStatus.IN_PROGRESS;
+        this.actualStartTime = LocalDateTime.now();
+        this.modificationDate = LocalDateTime.now();
+    }
+
+    /**
+     * Pause work on this planning entry
+     */
+    public void pauseWork() {
         this.status = PlanningStatus.PAUSED;
         this.modificationDate = LocalDateTime.now();
     }
 
     /**
-     * Cancel the task
+     * Cancel this planning entry
      */
-    public void cancelTask() {
+    public void cancel() {
         this.status = PlanningStatus.CANCELLED;
         this.modificationDate = LocalDateTime.now();
-    }
-
-    /**
-     * Update progress percentage
-     * @param progress new progress percentage (0-100)
-     */
-    public void updateProgress(Integer progress) {
-        if (progress != null && progress >= 0 && progress <= 100) {
-            this.progressPercentage = progress;
-            this.modificationDate = LocalDateTime.now();
-
-            // Auto-complete if progress reaches 100%
-            if (progress == 100 && !Boolean.TRUE.equals(completed)) {
-                completeTask();
-            }
-        }
-    }
-
-    // ========== JPA LIFECYCLE CALLBACKS ==========
-
-    /**
-     * Set timestamps and calculate values before persisting
-     */
-    @PrePersist
-    protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        if (creationDate == null) {
-            creationDate = now;
-        }
-        if (modificationDate == null) {
-            modificationDate = now;
-        }
-
-        // Calculate estimated end time
-        estimatedEndTime = calculateEndTime();
-
-        // Update status based on completion
-        updateStatusFromCompletion();
-
-        // Validate business rules
-        validateBusinessRules();
-    }
-
-    /**
-     * Update modification timestamp and recalculate values before updating
-     */
-    @PreUpdate
-    protected void onUpdate() {
-        modificationDate = LocalDateTime.now();
-
-        // Recalculate estimated end time
-        estimatedEndTime = calculateEndTime();
-
-        // Update status based on completion
-        updateStatusFromCompletion();
-
-        // Check if overdue
-        if (isOverdue() && status != PlanningStatus.COMPLETED && status != PlanningStatus.CANCELLED) {
-            status = PlanningStatus.OVERDUE;
-        }
-
-        // Validate business rules
-        validateBusinessRules();
-    }
-
-    /**
-     * Update status based on completion flag
-     */
-    private void updateStatusFromCompletion() {
-        if (Boolean.TRUE.equals(completed)) {
-            if (status != PlanningStatus.COMPLETED) {
-                status = PlanningStatus.COMPLETED;
-                progressPercentage = 100;
-            }
-        }
-    }
-
-    /**
-     * Validate business rules
-     */
-    private void validateBusinessRules() {
-        // Ensure planning date is not too far in the past
-        if (planningDate != null && planningDate.isBefore(LocalDate.now().minusDays(365))) {
-            throw new IllegalArgumentException("Planning date cannot be more than 1 year in the past");
-        }
-
-        // Ensure start time is reasonable (between 00:00 and 23:59)
-        if (startTime != null && (startTime.isBefore(LocalTime.of(0, 0)) || startTime.isAfter(LocalTime.of(23, 59)))) {
-            throw new IllegalArgumentException("Start time must be between 00:00 and 23:59");
-        }
-
-        // Ensure actual end time is after actual start time
-        if (actualStartTime != null && actualEndTime != null && actualEndTime.isBefore(actualStartTime)) {
-            throw new IllegalArgumentException("Actual end time cannot be before actual start time");
-        }
-
-        // Ensure progress percentage is valid
-        if (progressPercentage != null && (progressPercentage < 0 || progressPercentage > 100)) {
-            progressPercentage = Math.max(0, Math.min(100, progressPercentage));
-        }
     }
 }
