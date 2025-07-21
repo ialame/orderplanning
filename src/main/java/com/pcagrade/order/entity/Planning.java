@@ -12,7 +12,7 @@ import java.util.UUID;
 
 /**
  * Planning entity for managing work schedules and task assignments
- * Translated from Planification to Planning with UUID instead of ULID
+ * Translated from Planification to Planning with correct method names
  */
 @Entity
 @Table(name = "j_planning",
@@ -20,7 +20,7 @@ import java.util.UUID;
                 @Index(name = "idx_planning_employee_date", columnList = "employeeId, planningDate"),
                 @Index(name = "idx_planning_order", columnList = "orderId"),
                 @Index(name = "idx_planning_date", columnList = "planningDate"),
-                @Index(name = "idx_planning_completed", columnList = "completed"),
+                @Index(name = "idx_planning_status", columnList = "status"),
                 @Index(name = "idx_planning_start_time", columnList = "startTime"),
                 @Index(name = "idx_planning_employee_time", columnList = "employeeId, planningDate, startTime")
         })
@@ -58,130 +58,101 @@ public class Planning extends AbstractUlidEntity {
      */
     @NotNull(message = "Start time is required")
     @Column(name = "start_time", nullable = false)
-    private LocalTime startTime;
+    private LocalDateTime startTime; // Changed to LocalDateTime for compatibility
 
     /**
-     * Duration of the task in minutes
+     * End time of the task
+     */
+    @Column(name = "end_time")
+    private LocalDateTime endTime;
+
+    /**
+     * Estimated duration of the task in minutes
      */
     @NotNull(message = "Duration is required")
-    @Positive(message = "Duration must be positive")
-    @Min(value = 1, message = "Minimum duration is 1 minute")
-    @Max(value = 1440, message = "Maximum duration is 1440 minutes (24 hours)")
-    @Column(name = "duration_minutes", nullable = false)
-    private Integer durationMinutes;
+    @Min(value = 1, message = "Duration must be at least 1 minute")
+    @Max(value = 720, message = "Duration cannot exceed 12 hours (720 minutes)")
+    @Column(name = "estimated_duration_minutes", nullable = false)
+    private Integer estimatedDurationMinutes;
 
     /**
-     * Whether this task has been completed
+     * Estimated end time (calculated from start time + duration)
      */
-    @NotNull(message = "Completed status is required")
-    @Column(name = "completed", nullable = false)
-    @Builder.Default
-    private Boolean completed = false;
+    @Column(name = "estimated_end_time")
+    private LocalDateTime estimatedEndTime;
 
     /**
      * Priority level of this planning entry
      */
-    @NotNull(message = "Priority is required")
     @Enumerated(EnumType.STRING)
-    @Column(name = "priority", nullable = false, length = 10)
     @Builder.Default
+    @Column(name = "priority", length = 20)
     private PlanningPriority priority = PlanningPriority.MEDIUM;
 
     /**
-     * Current status of this planning entry
+     * Status of this planning entry
      */
-    @NotNull(message = "Status is required")
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 15)
     @Builder.Default
+    @Column(name = "status", length = 20)
     private PlanningStatus status = PlanningStatus.SCHEDULED;
+
+    /**
+     * Actual start time (when task actually began)
+     */
+    @Column(name = "actual_start_time")
+    private LocalDateTime actualStartTime;
+
+    /**
+     * Actual end time (when task actually finished)
+     */
+    @Column(name = "actual_end_time")
+    private LocalDateTime actualEndTime;
 
     /**
      * Progress percentage (0-100)
      */
     @Min(value = 0, message = "Progress cannot be negative")
     @Max(value = 100, message = "Progress cannot exceed 100%")
-    @Column(name = "progress_percentage")
     @Builder.Default
+    @Column(name = "progress_percentage")
     private Integer progressPercentage = 0;
 
     /**
-     * Actual start time when work began
+     * Number of cards to process in this planning entry
      */
-    @Column(name = "actual_start_time")
-    private LocalDateTime actualStartTime;
-
-    /**
-     * Actual end time when work finished
-     */
-    @Column(name = "actual_end_time")
-    private LocalDateTime actualEndTime;
-
-    /**
-     * Calculated end time based on start time and duration
-     */
-    @Column(name = "end_time", nullable = false)
-    private LocalTime endTime;
-
-    /**
-     * Number of cards to process in this task
-     */
-    @Positive(message = "Card count cannot be negative")
+    @Min(value = 0, message = "Card count cannot be negative")
     @Column(name = "card_count")
     private Integer cardCount;
 
     /**
-     * Estimated cost for this task
+     * Additional notes or comments
      */
-    @DecimalMin(value = "0.0", message = "Cost cannot be negative")
-    @Digits(integer = 8, fraction = 2, message = "Invalid cost format")
-    @Column(name = "estimated_cost", precision = 10, scale = 2)
-    private Double estimatedCost;
+    @Size(max = 1000, message = "Notes cannot exceed 1000 characters")
+    @Column(name = "notes", length = 1000)
+    private String notes;
 
     /**
-     * Actual cost for this task
+     * Creation timestamp
      */
-    @DecimalMin(value = "0.0", message = "Actual cost cannot be negative")
-    @Digits(integer = 8, fraction = 2, message = "Invalid actual cost format")
-    @Column(name = "actual_cost", precision = 10, scale = 2)
-    private Double actualCost;
-
-    /**
-     * Comments or notes about this planning entry
-     */
-    @Size(max = 1000, message = "Comments must not exceed 1000 characters")
-    @Column(name = "comments", columnDefinition = "TEXT")
-    private String comments;
-
-    /**
-     * Record creation timestamp
-     */
-    @Column(name = "creation_date", nullable = false, updatable = false)
     @Builder.Default
-    private LocalDateTime creationDate = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     /**
-     * Record last modification timestamp
+     * Last update timestamp
      */
-    @Column(name = "modification_date", nullable = false)
     @Builder.Default
-    private LocalDateTime modificationDate = LocalDateTime.now();
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
     /**
-     * Who created this planning entry
+     * Whether this task has been completed (legacy field for compatibility)
      */
-    @Size(max = 100, message = "Created by field must not exceed 100 characters")
-    @Column(name = "created_by", length = 100)
-    private String createdBy;
+    @Column(name = "completed")
+    private Boolean completed = false;
 
-    /**
-     * Who last modified this planning entry
-     */
-    @Size(max = 100, message = "Modified by field must not exceed 100 characters")
-    @Column(name = "modified_by", length = 100)
-    private String modifiedBy;
-
-    // ========== RELATIONSHIPS (OPTIONAL) ==========
+    // ========== RELATIONSHIPS ==========
 
     /**
      * Reference to the Order entity (lazy loaded to avoid performance issues)
@@ -227,63 +198,97 @@ public class Planning extends AbstractUlidEntity {
      * Constructor for basic planning entry
      */
     public Planning(UUID orderId, UUID employeeId, LocalDate planningDate,
-                    LocalTime startTime, Integer durationMinutes) {
+                    LocalDateTime startTime, Integer estimatedDurationMinutes) {
         this.orderId = orderId;
         this.employeeId = employeeId;
         this.planningDate = planningDate;
         this.startTime = startTime;
-        this.durationMinutes = durationMinutes;
-        this.completed = false;
-        this.priority = PlanningPriority.MEDIUM;
+        this.estimatedDurationMinutes = estimatedDurationMinutes;
         this.status = PlanningStatus.SCHEDULED;
+        this.priority = PlanningPriority.MEDIUM;
         this.progressPercentage = 0;
-        this.creationDate = LocalDateTime.now();
-        this.modificationDate = LocalDateTime.now();
+        this.completed = false;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
 
-        // Calculate end time automatically
-        this.endTime = startTime.plusMinutes(durationMinutes);
+        // Calculate estimated end time
+        if (startTime != null && estimatedDurationMinutes != null) {
+            this.estimatedEndTime = startTime.plusMinutes(estimatedDurationMinutes);
+        }
     }
 
-    // ========== UTILITY METHODS ==========
+    // ========== LIFECYCLE HOOKS ==========
 
     /**
-     * Calculate and set end time based on start time and duration
+     * Set creation date before persist
      */
     @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+        if (this.updatedAt == null) {
+            this.updatedAt = LocalDateTime.now();
+        }
+        if (this.status == null) {
+            this.status = PlanningStatus.SCHEDULED;
+        }
+        if (this.priority == null) {
+            this.priority = PlanningPriority.MEDIUM;
+        }
+        if (this.progressPercentage == null) {
+            this.progressPercentage = 0;
+        }
+        if (this.completed == null) {
+            this.completed = false;
+        }
+
+        // Calculate estimated end time if not set
+        if (this.estimatedEndTime == null && this.startTime != null && this.estimatedDurationMinutes != null) {
+            this.estimatedEndTime = this.startTime.plusMinutes(this.estimatedDurationMinutes);
+        }
+    }
+
+    /**
+     * Update modification date before update
+     */
     @PreUpdate
-    public void calculateEndTime() {
-        if (startTime != null && durationMinutes != null) {
-            this.endTime = startTime.plusMinutes(durationMinutes);
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+
+        // Update completed status based on status
+        if (this.status == PlanningStatus.COMPLETED) {
+            this.completed = true;
+            this.progressPercentage = 100;
+            if (this.actualEndTime == null) {
+                this.actualEndTime = LocalDateTime.now();
+            }
+        } else {
+            this.completed = false;
         }
-        if (this.creationDate == null) {
-            this.creationDate = LocalDateTime.now();
+
+        // Recalculate estimated end time if changed
+        if (this.startTime != null && this.estimatedDurationMinutes != null) {
+            this.estimatedEndTime = this.startTime.plusMinutes(this.estimatedDurationMinutes);
         }
-        this.modificationDate = LocalDateTime.now();
     }
 
+    // ========== BUSINESS LOGIC METHODS ==========
+
     /**
-     * Check if this planning entry is overdue
+     * Calculate estimated end time based on start time and duration
+     * @return estimated end time
      */
-    public boolean isOverdue() {
-        if (completed || status == PlanningStatus.COMPLETED) {
-            return false;
+    public LocalDateTime calculateEstimatedEndTime() {
+        if (startTime != null && estimatedDurationMinutes != null) {
+            return startTime.plusMinutes(estimatedDurationMinutes);
         }
-        LocalDateTime plannedDateTime = LocalDateTime.of(planningDate, endTime);
-        return LocalDateTime.now().isAfter(plannedDateTime);
+        return null;
     }
 
     /**
-     * Get total planned duration in hours as a formatted string
-     */
-    public String getFormattedDuration() {
-        if (durationMinutes == null) return "0h00";
-        int hours = durationMinutes / 60;
-        int minutes = durationMinutes % 60;
-        return String.format("%dh%02d", hours, minutes);
-    }
-
-    /**
-     * Get actual duration if both start and end times are set
+     * Get actual duration in minutes (if task is completed)
+     * @return actual duration or null if not completed
      */
     public Integer getActualDurationMinutes() {
         if (actualStartTime != null && actualEndTime != null) {
@@ -293,40 +298,103 @@ public class Planning extends AbstractUlidEntity {
     }
 
     /**
-     * Mark this planning entry as completed
+     * Check if this planning entry is overdue
+     * @return true if past the estimated end time and not completed
      */
-    public void markAsCompleted() {
-        this.completed = true;
-        this.status = PlanningStatus.COMPLETED;
-        this.progressPercentage = 100;
-        if (this.actualEndTime == null) {
-            this.actualEndTime = LocalDateTime.now();
-        }
-        this.modificationDate = LocalDateTime.now();
+    public boolean isOverdue() {
+        return estimatedEndTime != null
+                && estimatedEndTime.isBefore(LocalDateTime.now())
+                && status != PlanningStatus.COMPLETED
+                && status != PlanningStatus.CANCELLED;
     }
 
     /**
-     * Start working on this planning entry
+     * Check if this planning entry is for today
+     * @return true if planned for today
      */
-    public void startWork() {
+    public boolean isToday() {
+        return planningDate != null && planningDate.equals(LocalDate.now());
+    }
+
+    /**
+     * Check if this planning entry is in the future
+     * @return true if planned for future date
+     */
+    public boolean isFuture() {
+        return planningDate != null && planningDate.isAfter(LocalDate.now());
+    }
+
+    /**
+     * Get formatted time range (e.g., "09:00 - 10:30")
+     * @return formatted time range
+     */
+    public String getTimeRange() {
+        if (startTime != null && estimatedEndTime != null) {
+            return String.format("%02d:%02d - %02d:%02d",
+                    startTime.getHour(), startTime.getMinute(),
+                    estimatedEndTime.getHour(), estimatedEndTime.getMinute());
+        } else if (startTime != null && estimatedDurationMinutes != null) {
+            LocalDateTime endTime = startTime.plusMinutes(estimatedDurationMinutes);
+            return String.format("%02d:%02d - %02d:%02d",
+                    startTime.getHour(), startTime.getMinute(),
+                    endTime.getHour(), endTime.getMinute());
+        }
+        return "Time not set";
+    }
+
+    /**
+     * Get remaining time in minutes
+     * @return remaining time or null if not applicable
+     */
+    public Integer getRemainingTimeMinutes() {
+        if (estimatedEndTime != null && status == PlanningStatus.IN_PROGRESS) {
+            long remaining = java.time.Duration.between(LocalDateTime.now(), estimatedEndTime).toMinutes();
+            return remaining > 0 ? (int) remaining : 0;
+        }
+        return null;
+    }
+
+    /**
+     * Mark as started
+     */
+    public void markAsStarted() {
         this.status = PlanningStatus.IN_PROGRESS;
         this.actualStartTime = LocalDateTime.now();
-        this.modificationDate = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     /**
-     * Pause work on this planning entry
+     * Mark as completed
      */
-    public void pauseWork() {
-        this.status = PlanningStatus.PAUSED;
-        this.modificationDate = LocalDateTime.now();
+    public void markAsCompleted() {
+        this.status = PlanningStatus.COMPLETED;
+        this.completed = true;
+        this.progressPercentage = 100;
+        this.actualEndTime = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     /**
-     * Cancel this planning entry
+     * Mark as cancelled
      */
-    public void cancel() {
+    public void markAsCancelled() {
         this.status = PlanningStatus.CANCELLED;
-        this.modificationDate = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Update progress
+     * @param progressPercentage the new progress percentage (0-100)
+     */
+    public void updateProgress(int progressPercentage) {
+        if (progressPercentage < 0 || progressPercentage > 100) {
+            throw new IllegalArgumentException("Progress must be between 0 and 100");
+        }
+        this.progressPercentage = progressPercentage;
+        this.updatedAt = LocalDateTime.now();
+
+        if (progressPercentage == 100 && this.status != PlanningStatus.COMPLETED) {
+            markAsCompleted();
+        }
     }
 }

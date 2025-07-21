@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * Employee entity for managing staff members
- * Translated from Employe to Employee with UUID instead of ULID
+ * Translated from Employe to Employee with correct method names for compatibility
  */
 @Entity
 @Table(name = "j_employee",
@@ -77,42 +77,41 @@ public class Employee extends AbstractUlidEntity {
     private String phoneNumber;
 
     /**
-     * Employee's department or team
+     * Employee's department
      */
     @Size(max = 100, message = "Department name must not exceed 100 characters")
     @Column(name = "department", length = 100)
     private String department;
 
     /**
-     * Employee's job title or position
+     * Employee's job position/title
      */
     @Size(max = 100, message = "Position must not exceed 100 characters")
     @Column(name = "position", length = 100)
     private String position;
 
     /**
-     * Employee's hourly rate (optional, for cost calculations)
+     * Employee's hourly rate (for cost calculations)
      */
     @DecimalMin(value = "0.0", message = "Hourly rate cannot be negative")
-    @Digits(integer = 5, fraction = 2, message = "Invalid hourly rate format")
-    @Column(name = "hourly_rate", precision = 7, scale = 2)
+    @Column(name = "hourly_rate", precision = 10, scale = 2)
     private Double hourlyRate;
 
     /**
-     * Employee's skill level (BEGINNER, INTERMEDIATE, ADVANCED, EXPERT)
+     * Employee's skill level
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "skill_level", length = 20)
     private SkillLevel skillLevel = SkillLevel.INTERMEDIATE;
 
     /**
-     * Date when employee was hired
+     * Hire date
      */
     @Column(name = "hire_date")
     private LocalDateTime hireDate;
 
     /**
-     * Date when employee left (null if still active)
+     * Termination date (if applicable)
      */
     @Column(name = "termination_date")
     private LocalDateTime terminationDate;
@@ -121,130 +120,142 @@ public class Employee extends AbstractUlidEntity {
      * Additional notes about the employee
      */
     @Size(max = 1000, message = "Notes must not exceed 1000 characters")
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Column(name = "notes", length = 1000)
     private String notes;
 
-    /**
-     * Record creation timestamp
-     */
-    @Column(name = "creation_date", nullable = false, updatable = false)
-    private LocalDateTime creationDate;
+    // ========== ENUMS ==========
 
     /**
-     * Record last modification timestamp
-     */
-    @Column(name = "modification_date", nullable = false)
-    private LocalDateTime modificationDate;
-
-    /**
-     * Skill level enumeration
+     * Skill levels for employees
      */
     public enum SkillLevel {
-        BEGINNER,     // New employee, needs training
-        INTERMEDIATE, // Standard level, can work independently
-        ADVANCED,     // Experienced, can handle complex tasks
-        EXPERT        // Master level, can train others
+        BEGINNER,      // New to Pokemon card processing
+        INTERMEDIATE,  // Moderate experience
+        ADVANCED,      // High skill level
+        EXPERT         // Master level
     }
 
-    // ========== CONSTRUCTORS ==========
+    // ========== COMPATIBILITY METHODS FOR PLANNINGSERVICE ==========
 
     /**
-     * Constructor for creating a basic employee
+     * Alternative getter for active status (compatibility with PlanningService)
+     * @return true if employee is active
      */
-    public Employee(String firstName, String lastName, String email) {
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.email = email;
-        this.workHoursPerDay = 8.0;
-        this.active = true;
-        this.skillLevel = SkillLevel.INTERMEDIATE;
-        this.hireDate = LocalDateTime.now();
-        this.creationDate = LocalDateTime.now();
-        this.modificationDate = LocalDateTime.now();
+    public Boolean getIsActive() {
+        return this.active;
     }
 
     /**
-     * Constructor with work hours
+     * Alternative setter for active status
+     * @param isActive the active status
      */
-    public Employee(String firstName, String lastName, String email, Double workHoursPerDay) {
-        this(firstName, lastName, email);
-        this.workHoursPerDay = workHoursPerDay;
+    public void setIsActive(Boolean isActive) {
+        this.active = isActive;
     }
 
-    // ========== UTILITY METHODS ==========
+    // ========== LIFECYCLE HOOKS ==========
 
     /**
-     * Get employee's full name
-     * @return formatted full name (FirstName LastName)
+     * Set creation date before persist
+     */
+    @PrePersist
+    protected void onCreate() {
+        if (this.hireDate == null) {
+            this.hireDate = LocalDateTime.now();
+        }
+        if (this.active == null) {
+            this.active = true;
+        }
+        if (this.workHoursPerDay == null) {
+            this.workHoursPerDay = 8.0;
+        }
+        if (this.skillLevel == null) {
+            this.skillLevel = SkillLevel.INTERMEDIATE;
+        }
+    }
+
+    /**
+     * Update modification date before update
+     */
+    @PreUpdate
+    protected void onUpdate() {
+        // This will be handled by AbstractUlidEntity
+    }
+
+    // ========== BUSINESS LOGIC METHODS ==========
+
+    /**
+     * Get full name (first + last)
+     * @return full name
      */
     public String getFullName() {
-        return firstName + " " + lastName;
+        return String.format("%s %s", firstName, lastName);
     }
 
     /**
-     * Get employee's display name for UI
-     * @return formatted display name (LastName, FirstName)
+     * Get display name (last, first)
+     * @return display name
      */
     public String getDisplayName() {
-        return lastName + ", " + firstName;
+        return String.format("%s, %s", lastName, firstName);
     }
 
     /**
-     * Get employee's initials
-     * @return initials (FL)
-     */
-    public String getInitials() {
-        String firstInitial = (firstName != null && !firstName.isEmpty()) ?
-                firstName.substring(0, 1).toUpperCase() : "";
-        String lastInitial = (lastName != null && !lastName.isEmpty()) ?
-                lastName.substring(0, 1).toUpperCase() : "";
-        return firstInitial + lastInitial;
-    }
-
-    /**
-     * Calculate total work minutes per day
+     * Calculate daily work minutes
      * @return work minutes per day
      */
-    public Integer getWorkMinutesPerDay() {
-        return (workHoursPerDay != null) ? (int) (workHoursPerDay * 60) : 480; // Default 8 hours
+    public int getDailyWorkMinutes() {
+        return (int) (workHoursPerDay * 60);
     }
 
     /**
-     * Check if employee is part-time (less than 8 hours)
-     * @return true if part-time
+     * Calculate weekly work hours
+     * @return work hours per week (assuming 5 work days)
+     */
+    public double getWeeklyWorkHours() {
+        return workHoursPerDay * 5;
+    }
+
+    /**
+     * Check if employee is available for work
+     * @return true if active and has work hours > 0
+     */
+    public boolean isAvailableForWork() {
+        return Boolean.TRUE.equals(active) && workHoursPerDay > 0;
+    }
+
+    /**
+     * Check if employee is part-time
+     * @return true if work hours < 8
      */
     public boolean isPartTime() {
         return workHoursPerDay != null && workHoursPerDay < 8.0;
     }
 
     /**
-     * Check if employee is full-time (8+ hours)
-     * @return true if full-time
+     * Check if employee is full-time
+     * @return true if work hours >= 8
      */
     public boolean isFullTime() {
         return workHoursPerDay != null && workHoursPerDay >= 8.0;
     }
 
     /**
-     * Get work capacity category
-     * @return capacity level
+     * Get skill level display name
+     * @return formatted skill level
      */
-    public String getWorkCapacity() {
-        if (workHoursPerDay == null) return "UNKNOWN";
-        if (workHoursPerDay >= 8.0) return "HIGH";
-        if (workHoursPerDay >= 6.0) return "MEDIUM";
-        return "LOW";
+    public String getSkillLevelDisplay() {
+        return skillLevel != null ? skillLevel.name().toLowerCase().replace("_", " ") : "Unknown";
     }
 
     /**
-     * Calculate daily cost (hourly rate * work hours)
-     * @return daily cost or null if hourly rate not set
+     * Calculate employment duration in days
+     * @return days since hire date, or 0 if not hired yet
      */
-    public Double getDailyCost() {
-        if (hourlyRate != null && workHoursPerDay != null) {
-            return hourlyRate * workHoursPerDay;
-        }
-        return null;
+    public long getEmploymentDurationDays() {
+        if (hireDate == null) return 0;
+        LocalDateTime endDate = terminationDate != null ? terminationDate : LocalDateTime.now();
+        return java.time.Duration.between(hireDate, endDate).toDays();
     }
 
     /**
@@ -252,72 +263,54 @@ public class Employee extends AbstractUlidEntity {
      * @return true if active and not terminated
      */
     public boolean isCurrentlyEmployed() {
-        return active != null && active && terminationDate == null;
+        return Boolean.TRUE.equals(active) && terminationDate == null;
     }
 
     /**
-     * Get employment duration in days
-     * @return days since hire date
+     * Activate employee
      */
-    public Long getEmploymentDurationDays() {
-        if (hireDate == null) return null;
-        LocalDateTime endDate = (terminationDate != null) ? terminationDate : LocalDateTime.now();
-        return java.time.Duration.between(hireDate, endDate).toDays();
-    }
-
-    // ========== JPA LIFECYCLE CALLBACKS ==========
-
-    /**
-     * Set timestamps before persisting
-     */
-    @PrePersist
-    protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        if (creationDate == null) {
-            creationDate = now;
-        }
-        if (modificationDate == null) {
-            modificationDate = now;
-        }
-        if (hireDate == null) {
-            hireDate = now;
-        }
-
-        // Validate business rules
-        validateBusinessRules();
+    public void activate() {
+        this.active = true;
+        this.terminationDate = null;
     }
 
     /**
-     * Update modification timestamp before updating
+     * Deactivate employee
      */
-    @PreUpdate
-    protected void onUpdate() {
-        modificationDate = LocalDateTime.now();
-
-        // Validate business rules
-        validateBusinessRules();
+    public void deactivate() {
+        this.active = false;
+        this.terminationDate = LocalDateTime.now();
     }
 
     /**
-     * Validate business rules
+     * Update work hours with validation
+     * @param newWorkHours new work hours per day
      */
-    private void validateBusinessRules() {
-        // If employee is inactive, ensure termination date is set
-        if (active != null && !active && terminationDate == null) {
-            terminationDate = LocalDateTime.now();
+    public void updateWorkHours(double newWorkHours) {
+        if (newWorkHours < 0.5 || newWorkHours > 12.0) {
+            throw new IllegalArgumentException("Work hours must be between 0.5 and 12.0");
         }
+        this.workHoursPerDay = newWorkHours;
+    }
 
-        // If termination date is set, mark as inactive
-        if (terminationDate != null && (active == null || active)) {
-            active = false;
+    /**
+     * Set email with validation
+     * @param email the new email
+     */
+    public void setEmailWithValidation(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email cannot be empty");
         }
-
-        // Ensure email is lowercase
-        if (email != null) {
-            email = email.toLowerCase().trim();
+        if (!email.contains("@")) {
+            throw new IllegalArgumentException("Invalid email format");
         }
+        this.email = email.trim().toLowerCase();
+    }
 
-        // Trim names
+    /**
+     * Trim and format names
+     */
+    private void formatNames() {
         if (firstName != null) {
             firstName = firstName.trim();
         }
@@ -326,104 +319,11 @@ public class Employee extends AbstractUlidEntity {
         }
     }
 
-    // ========== BUILDER PATTERN METHODS ==========
+    // ========== TOSTRING FOR DEBUGGING ==========
 
-    /**
-     * Create a new employee builder
-     * @return new employee builder
-     */
-    public static EmployeeBuilder builder() {
-        return new EmployeeBuilder();
-    }
-
-    /**
-     * Custom builder for Employee
-     */
-    public static class EmployeeBuilder {
-        private String firstName;
-        private String lastName;
-        private String email;
-        private Double workHoursPerDay = 8.0;
-        private Boolean active = true;
-        private String phoneNumber;
-        private String department;
-        private String position;
-        private Double hourlyRate;
-        private SkillLevel skillLevel = SkillLevel.INTERMEDIATE;
-        private String notes;
-
-        public EmployeeBuilder firstName(String firstName) {
-            this.firstName = firstName;
-            return this;
-        }
-
-        public EmployeeBuilder lastName(String lastName) {
-            this.lastName = lastName;
-            return this;
-        }
-
-        public EmployeeBuilder email(String email) {
-            this.email = email;
-            return this;
-        }
-
-        public EmployeeBuilder workHours(Double workHoursPerDay) {
-            this.workHoursPerDay = workHoursPerDay;
-            return this;
-        }
-
-        public EmployeeBuilder active(Boolean active) {
-            this.active = active;
-            return this;
-        }
-
-        public EmployeeBuilder phone(String phoneNumber) {
-            this.phoneNumber = phoneNumber;
-            return this;
-        }
-
-        public EmployeeBuilder department(String department) {
-            this.department = department;
-            return this;
-        }
-
-        public EmployeeBuilder position(String position) {
-            this.position = position;
-            return this;
-        }
-
-        public EmployeeBuilder hourlyRate(Double hourlyRate) {
-            this.hourlyRate = hourlyRate;
-            return this;
-        }
-
-        public EmployeeBuilder skillLevel(SkillLevel skillLevel) {
-            this.skillLevel = skillLevel;
-            return this;
-        }
-
-        public EmployeeBuilder notes(String notes) {
-            this.notes = notes;
-            return this;
-        }
-
-        public Employee build() {
-            Employee employee = new Employee();
-            employee.firstName = this.firstName;
-            employee.lastName = this.lastName;
-            employee.email = this.email;
-            employee.workHoursPerDay = this.workHoursPerDay;
-            employee.active = this.active;
-            employee.phoneNumber = this.phoneNumber;
-            employee.department = this.department;
-            employee.position = this.position;
-            employee.hourlyRate = this.hourlyRate;
-            employee.skillLevel = this.skillLevel;
-            employee.notes = this.notes;
-            employee.hireDate = LocalDateTime.now();
-            employee.creationDate = LocalDateTime.now();
-            employee.modificationDate = LocalDateTime.now();
-            return employee;
-        }
+    @Override
+    public String toString() {
+        return String.format("Employee{id=%s, name='%s', email='%s', active=%s, workHours=%.1f}",
+                getId(), getFullName(), email, active, workHoursPerDay);
     }
 }

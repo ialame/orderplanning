@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -14,13 +15,43 @@ import java.util.UUID;
 
 /**
  * Repository for Planning entity management
- * Translated from PlanificationRepository to PlanningRepository
+ * Translated from PlanificationRepository to PlanningRepository with all required methods
  */
 @Repository
 public interface PlanningRepository extends JpaRepository<Planning, UUID> {
 
     /**
-     * Find planning entries by employee and date range
+     * Find planning entries by employee ID ordered by start time
+     * @param employeeId the employee ID
+     * @return list of planning entries sorted by start time
+     */
+    List<Planning> findByEmployeeIdOrderByStartTimeAsc(UUID employeeId);
+
+    /**
+     * Find planning entries by employee ID (string) ordered by start time
+     * @param employeeId the employee ID as string
+     * @return list of planning entries sorted by start time
+     */
+    @Query("SELECT p FROM Planning p WHERE CAST(p.employeeId AS string) = :employeeId ORDER BY p.startTime ASC")
+    List<Planning> findByEmployeeIdOrderByStartTimeAsc(String employeeId);
+
+    /**
+     * Find planning entries by order ID ordered by start time
+     * @param orderId the order ID
+     * @return list of planning entries sorted by start time
+     */
+    List<Planning> findByOrderIdOrderByStartTimeAsc(UUID orderId);
+
+    /**
+     * Find planning entries by order ID (string) ordered by start time
+     * @param orderId the order ID as string
+     * @return list of planning entries sorted by start time
+     */
+    @Query("SELECT p FROM Planning p WHERE CAST(p.orderId AS string) = :orderId ORDER BY p.startTime ASC")
+    List<Planning> findByOrderIdOrderByStartTimeAsc(String orderId);
+
+    /**
+     * Find planning entries by employee ID and date range
      * @param employeeId the employee ID
      * @param startDate start date of the range
      * @param endDate end date of the range
@@ -47,6 +78,14 @@ public interface PlanningRepository extends JpaRepository<Planning, UUID> {
             @Param("endDate") LocalDate endDate);
 
     /**
+     * Find planning entries by start time between two LocalDateTime values
+     * @param startTime start time
+     * @param endTime end time
+     * @return list of planning entries sorted by start time
+     */
+    List<Planning> findByStartTimeBetweenOrderByStartTimeAsc(LocalDateTime startTime, LocalDateTime endTime);
+
+    /**
      * Find planning entries by order ID
      * @param orderId the order ID
      * @return list of planning entries for the specified order
@@ -55,154 +94,109 @@ public interface PlanningRepository extends JpaRepository<Planning, UUID> {
     List<Planning> findByOrderId(@Param("orderId") UUID orderId);
 
     /**
-     * Find incomplete planning entries
-     * @return list of planning entries that are not completed
+     * Find incomplete planning entries (not completed)
+     * @return list of incomplete planning entries
      */
-    @Query("SELECT p FROM Planning p WHERE p.completed = false " +
+    @Query("SELECT p FROM Planning p WHERE p.status != 'COMPLETED' " +
             "ORDER BY p.planningDate, p.startTime")
     List<Planning> findIncompleteEntries();
 
     /**
-     * Find planning entries by employee ID
-     * @param employeeId the employee ID
-     * @return list of planning entries for the specified employee
+     * Find planning entries by status
+     * @param status the planning status
+     * @return list of planning entries with specified status
      */
-    @Query("SELECT p FROM Planning p WHERE p.employeeId = :employeeId " +
-            "ORDER BY p.planningDate DESC, p.startTime DESC")
-    List<Planning> findByEmployeeId(@Param("employeeId") UUID employeeId);
+    List<Planning> findByStatus(Planning.PlanningStatus status);
+
+    /**
+     * Count planning entries by status
+     * @param status the planning status
+     * @return number of planning entries with specified status
+     */
+    long countByStatus(Planning.PlanningStatus status);
+
+    /**
+     * Find planning entries by priority
+     * @param priority the planning priority
+     * @return list of planning entries with specified priority
+     */
+    List<Planning> findByPriority(Planning.PlanningPriority priority);
+
+    /**
+     * Count planning entries by priority
+     * @param priority the planning priority
+     * @return number of planning entries with specified priority
+     */
+    long countByPriority(Planning.PlanningPriority priority);
+
+    /**
+     * Count planning entries created after a specific date
+     * @param createdAfter the date threshold
+     * @return number of planning entries created after the date
+     */
+    long countByCreatedAtAfter(LocalDateTime createdAfter);
+
+    /**
+     * Find employee workload distribution
+     * @return list of objects containing employee ID and workload data
+     */
+    @Query("SELECT p.employeeId, COUNT(p), SUM(p.estimatedDurationMinutes) " +
+            "FROM Planning p " +
+            "WHERE p.status IN ('SCHEDULED', 'IN_PROGRESS') " +
+            "GROUP BY p.employeeId " +
+            "ORDER BY COUNT(p) DESC")
+    List<Object[]> findEmployeeWorkloadDistribution();
 
     /**
      * Find planning entries for a specific date
-     * @param planningDate the date to search for
+     * @param planningDate the planning date
      * @return list of planning entries for the specified date
      */
-    @Query("SELECT p FROM Planning p WHERE p.planningDate = :planningDate " +
-            "ORDER BY p.startTime")
-    List<Planning> findByPlanningDate(@Param("planningDate") LocalDate planningDate);
+    List<Planning> findByPlanningDate(LocalDate planningDate);
 
     /**
-     * Find planning entries by employee for a specific date
+     * Find planning entries by employee and date
      * @param employeeId the employee ID
      * @param planningDate the planning date
      * @return list of planning entries for the employee on the specified date
      */
-    @Query("SELECT p FROM Planning p WHERE p.employeeId = :employeeId AND p.planningDate = :planningDate " +
-            "ORDER BY p.startTime")
-    List<Planning> findByEmployeeIdAndPlanningDate(
-            @Param("employeeId") UUID employeeId,
-            @Param("planningDate") LocalDate planningDate);
+    List<Planning> findByEmployeeIdAndPlanningDate(UUID employeeId, LocalDate planningDate);
 
     /**
      * Find overlapping planning entries for an employee
      * @param employeeId the employee ID
-     * @param planningDate the date to check
-     * @param startTime start time of the new entry
-     * @param endTime end time of the new entry
+     * @param startTime start time to check
+     * @param endTime end time to check
      * @return list of overlapping planning entries
      */
     @Query("SELECT p FROM Planning p WHERE p.employeeId = :employeeId " +
-            "AND p.planningDate = :planningDate " +
-            "AND ((p.startTime <= :startTime AND p.endTime > :startTime) " +
-            "OR (p.startTime < :endTime AND p.endTime >= :endTime) " +
-            "OR (p.startTime >= :startTime AND p.endTime <= :endTime))")
+            "AND p.startTime < :endTime AND p.endTime > :startTime")
     List<Planning> findOverlappingEntries(
             @Param("employeeId") UUID employeeId,
-            @Param("planningDate") LocalDate planningDate,
-            @Param("startTime") LocalTime startTime,
-            @Param("endTime") LocalTime endTime);
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
 
     /**
-     * Get total planned minutes for an employee on a specific date
-     * @param employeeId the employee ID
-     * @param planningDate the date
-     * @return total minutes planned
-     */
-    @Query("SELECT COALESCE(SUM(p.durationMinutes), 0) FROM Planning p " +
-            "WHERE p.employeeId = :employeeId AND p.planningDate = :planningDate")
-    Long getTotalPlannedMinutesForEmployeeAndDate(
-            @Param("employeeId") UUID employeeId,
-            @Param("planningDate") LocalDate planningDate);
-
-    /**
-     * Get workload statistics for all employees on a specific date
-     * @param planningDate the date
-     * @return list of workload data
-     */
-    @Query("SELECT p.employeeId, COUNT(p), SUM(p.durationMinutes) " +
-            "FROM Planning p WHERE p.planningDate = :planningDate " +
-            "GROUP BY p.employeeId")
-    List<Object[]> getWorkloadStatsByDate(@Param("planningDate") LocalDate planningDate);
-
-    /**
-     * Find planning entries by status (completed/incomplete)
-     * @param completed completion status
-     * @return list of planning entries with specified completion status
-     */
-    List<Planning> findByCompletedOrderByPlanningDateDescStartTimeDesc(boolean completed);
-
-    /**
-     * Count planning entries by employee and date range
-     * @param employeeId the employee ID
+     * Get planning statistics for a date range
      * @param startDate start date
      * @param endDate end date
-     * @return number of planning entries
+     * @return list of planning statistics
      */
-    @Query("SELECT COUNT(p) FROM Planning p WHERE p.employeeId = :employeeId " +
-            "AND p.planningDate BETWEEN :startDate AND :endDate")
-    Long countByEmployeeIdAndDateRange(
-            @Param("employeeId") UUID employeeId,
+    @Query("SELECT p.status, COUNT(p), AVG(p.estimatedDurationMinutes) " +
+            "FROM Planning p " +
+            "WHERE p.planningDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY p.status")
+    List<Object[]> getPlanningStatistics(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
     /**
-     * Find upcoming planning entries (from today onwards)
-     * @return list of upcoming planning entries
-     */
-    @Query("SELECT p FROM Planning p WHERE p.planningDate >= CURRENT_DATE " +
-            "ORDER BY p.planningDate, p.startTime")
-    List<Planning> findUpcomingEntries();
-
-    /**
-     * Find overdue incomplete planning entries (past dates, not completed)
+     * Find planning entries that are overdue
+     * @param currentTime current timestamp
      * @return list of overdue planning entries
      */
-    @Query("SELECT p FROM Planning p WHERE p.planningDate < CURRENT_DATE AND p.completed = false " +
-            "ORDER BY p.planningDate DESC, p.startTime DESC")
-    List<Planning> findOverdueIncompleteEntries();
-
-    /**
-     * Get planning efficiency statistics
-     * @param startDate start date for analysis
-     * @param endDate end date for analysis
-     * @return efficiency statistics
-     */
-    @Query("SELECT " +
-            "COUNT(CASE WHEN p.completed = true THEN 1 END) as completedCount, " +
-            "COUNT(CASE WHEN p.completed = false THEN 1 END) as incompleteCount, " +
-            "AVG(p.durationMinutes) as avgDuration " +
-            "FROM Planning p WHERE p.planningDate BETWEEN :startDate AND :endDate")
-    Object[] getPlanningEfficiencyStats(
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
-
-    /**
-     * Delete planning entries older than specified date
-     * @param cutoffDate date before which to delete entries
-     * @return number of deleted entries
-     */
-    @Query("DELETE FROM Planning p WHERE p.planningDate < :cutoffDate")
-    int deleteOldEntries(@Param("cutoffDate") LocalDate cutoffDate);
-
-    /**
-     * Find available time slots for an employee on a specific date
-     * This is a helper method to find gaps in the schedule
-     * @param employeeId the employee ID
-     * @param planningDate the date
-     * @return list of existing planning entries (to calculate gaps externally)
-     */
-    @Query("SELECT p FROM Planning p WHERE p.employeeId = :employeeId AND p.planningDate = :planningDate " +
-            "ORDER BY p.startTime")
-    List<Planning> findEmployeeScheduleForDate(
-            @Param("employeeId") UUID employeeId,
-            @Param("planningDate") LocalDate planningDate);
+    @Query("SELECT p FROM Planning p WHERE p.endTime < :currentTime " +
+            "AND p.status NOT IN ('COMPLETED', 'CANCELLED') " +
+            "ORDER BY p.endTime ASC")
+    List<Planning> findOverdueEntries(@Param("currentTime") LocalDateTime currentTime);
 }

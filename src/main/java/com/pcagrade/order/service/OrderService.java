@@ -55,7 +55,7 @@ public class OrderService {
 
         // Set default values
         if (order.getStatus() == null) {
-            order.setStatus(OrderStatus.PENDING);
+            order.setStatus(Order.OrderStatus.PENDING);
         }
         if (order.getEstimatedTimeMinutes() == null && order.getCardCount() != null) {
             order.setEstimatedTimeMinutes(calculateEstimatedTime(order.getCardCount()));
@@ -64,7 +64,7 @@ public class OrderService {
             order.setOrderDate(LocalDate.now());
         }
         if (order.getPriority() == null) {
-            order.setPriority(OrderPriority.MEDIUM);
+            order.setPriority(Order.OrderPriority.MEDIUM);
         }
 
         Order savedOrder = orderRepository.save(order);
@@ -147,7 +147,7 @@ public class OrderService {
      * @return list of orders
      */
     @Transactional(readOnly = true)
-    public List<Order> findOrdersByStatus(@NotNull OrderStatus status) {
+    public List<Order> findOrdersByStatus(@NotNull Order.OrderStatus status) {
         return orderRepository.findByStatus(status);
     }
 
@@ -157,7 +157,7 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public List<Order> findPendingOrders() {
-        return orderRepository.findByStatus(OrderStatus.PENDING);
+        return orderRepository.findUnassignedOrders(Order.OrderStatus.PENDING);
     }
 
     /**
@@ -166,7 +166,7 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public List<Order> findInProgressOrders() {
-        return orderRepository.findByStatus(OrderStatus.IN_PROGRESS);
+        return orderRepository.findByStatus(Order.OrderStatus.IN_PROGRESS);
     }
 
     /**
@@ -175,197 +175,216 @@ public class OrderService {
      */
     @Transactional(readOnly = true)
     public List<Order> findCompletedOrders() {
-        return orderRepository.findByStatus(OrderStatus.COMPLETED);
+        return orderRepository.findByStatus(Order.OrderStatus.COMPLETED);
     }
 
     /**
      * Update order status
-     * @param id the order ID
-     * @param status the new status
+     * @param orderId the order ID
+     * @param newStatus the new status
      * @return updated order
      */
-    public Order updateOrderStatus(@NotNull UUID id, @NotNull OrderStatus status) {
-        log.info("Updating order {} status to {}", id, status);
+    public Order updateOrderStatus(@NotNull UUID orderId, @NotNull Order.OrderStatus newStatus) {
+        log.info("Updating order {} status to {}", orderId, newStatus);
 
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + id));
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
-        order.setStatus(status);
+        // Validate status transition
+        validateStatusTransition(order.getStatus(), newStatus);
 
-        // Set completion date if completed
-        if (status == OrderStatus.COMPLETED && order.getCompletionDate() == null) {
-            order.setCompletionDate(LocalDateTime.now());
+        order.setStatus(newStatus);
+
+        // Set processing dates based on status
+        if (newStatus == Order.OrderStatus.IN_PROGRESS && order.getProcessingStartDate() == null) {
+            order.setProcessingStartDate(LocalDateTime.now());
+        } else if (newStatus == Order.OrderStatus.COMPLETED && order.getProcessingEndDate() == null) {
+            order.setProcessingEndDate(LocalDateTime.now());
         }
 
         Order updatedOrder = orderRepository.save(order);
-        log.info("Order status updated successfully");
+        log.info("Order status updated successfully: {} -> {}", orderId, newStatus);
         return updatedOrder;
     }
 
-    // ========== BUSINESS OPERATIONS ==========
+    // ========== BUSINESS LOGIC METHODS ==========
 
     /**
-     * Get recent orders (for frontend display)
-     * @return list of recent orders as maps
+     * Calculate estimated processing time
+     * @param cardCount number of cards
+     * @return estimated time in minutes
+     */
+    public int calculateEstimatedTime(@Positive int cardCount) {
+        return cardCount * DEFAULT_PROCESSING_TIME_PER_CARD;
+    }
+
+    /**
+     * Get orders that need planning from a specific date
+     * @param day day of the month
+     * @param month month (1-12)
+     * @param year year
+     * @return list of orders as maps for compatibility
      */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getRecentOrders() {
+    public List<Map<String, Object>> getOrdersForPlanning(int day, int month, int year) {
         try {
-            log.info("Fetching recent orders for frontend display");
+            LocalDate fromDate = LocalDate.of(year, month, day);
 
-            String sql = """
-                SELECT 
-                    HEX(o.id) as id,
-                    o.order_number as orderNumber,
-                    o.card_count as cardCount,
-                    o.priority as priority,
-                    o.status as status,
-                    o.total_price as totalPrice,
-                    o.estimated_time_minutes as estimatedTimeMinutes,
-                    o.order_date as orderDate,
-                    o.creation_date as creationDate,
-                    o.completion_date as completionDate,
-                    o.customer_name as customerName,
-                    o.description as description
-                FROM `order` o
-                ORDER BY o.creation_date DESC
-                LIMIT 100
+            String jpql = """
+                SELECT o FROM Order o 
+                WHERE o.orderDate >= :fromDate 
+                ORDER BY o.priority DESC, o.orderDate ASC
                 """;
 
-            Query query = entityManager.createNativeQuery(sql);
-            List<Object[]> results = query.getResultList();
+            Query query = entityManager.createQuery(jpql, Order.class);
+            query.setParameter("fromDate", fromDate);
 
-            List<Map<String, Object>> orders = new ArrayList<>();
-            for (Object[] row : results) {
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("id", (String) row[0]);
-                orderData.put("orderNumber", (String) row[1]);
-                orderData.put("cardCount", row[2]);
-                orderData.put("priority", (String) row[3]);
-                orderData.put("status", (String) row[4]);
-                orderData.put("totalPrice", row[5]);
-                orderData.put("estimatedTimeMinutes", row[6]);
-                orderData.put("orderDate", row[7]);
-                orderData.put("creationDate", row[8]);
-                orderData.put("completionDate", row[9]);
-                orderData.put("customerName", (String) row[10]);
-                orderData.put("description", (String) row[11]);
+            @SuppressWarnings("unchecked")
+            List<Order> orders = query.getResultList();
 
-                // Add calculated fields
-                Integer cardCount = (Integer) row[2];
-                Integer estimatedTime = (Integer) row[6];
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Order order : orders) {
+                Map<String, Object> orderMap = new HashMap<>();
+                orderMap.put("id", order.getId().toString());
+                orderMap.put("numeroCommande", order.getOrderNumber());
+                orderMap.put("date", order.getOrderDate());
+                orderMap.put("delai", calculateDeadlineLabel(order));
+                orderMap.put("nombreCartes", order.getCardCount());
+                orderMap.put("priorite", order.getPriority().name());
+                orderMap.put("prixTotal", order.getTotalPrice());
+                orderMap.put("status", order.getStatus().ordinal());
+                orderMap.put("dateCreation", order.getCreationDate());
+                orderMap.put("dateModification", order.getModificationDate());
 
-                if (cardCount != null) {
-                    orderData.put("estimatedHours", Math.round((estimatedTime != null ? estimatedTime : cardCount * 3) / 60.0 * 100.0) / 100.0);
-                    orderData.put("complexityLevel", getComplexityLevel(cardCount));
-                }
-
-                // Add status display info
-                String status = (String) row[4];
-                orderData.put("statusDisplay", getStatusDisplay(status));
-                orderData.put("statusColor", getStatusColor(status));
-                orderData.put("isCompleted", "COMPLETED".equals(status));
-                orderData.put("isPending", "PENDING".equals(status));
-                orderData.put("isInProgress", "IN_PROGRESS".equals(status));
-
-                orders.add(orderData);
+                result.add(orderMap);
             }
 
-            log.info("Successfully fetched {} recent orders", orders.size());
-            return orders;
+            log.info("✅ {} orders loaded from {}/{}/{}", result.size(), day, month, year);
+            return result;
 
         } catch (Exception e) {
-            log.error("Error fetching recent orders: {}", e.getMessage(), e);
+            log.error("❌ Error loading orders: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }
 
     /**
-     * Get all orders as map data (for frontend compatibility)
-     * @return list of order data maps
+     * Get all orders as map for compatibility
+     * @return list of orders as maps
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getAllOrdersAsMap() {
-        return getRecentOrders(); // For now, same implementation
-    }
-
-    /**
-     * Get orders for planning from a specific date
-     * @param jour day
-     * @param mois month
-     * @param annee year
-     * @return list of order data maps
-     */
-    @Transactional(readOnly = true)
-    public List<Map<String, Object>> getOrdersForPlanning(int jour, int mois, int annee) {
         try {
-            LocalDate fromDate = LocalDate.of(annee, mois, jour);
-            log.info("Fetching orders for planning from date: {}", fromDate);
+            List<Order> orders = orderRepository.findAll();
+            List<Map<String, Object>> result = new ArrayList<>();
 
-            String sql = """
-                SELECT 
-                    HEX(o.id) as id,
-                    o.order_number as orderNumber,
-                    o.card_count as cardCount,
-                    o.priority as priority,
-                    o.status as status,
-                    o.estimated_time_minutes as estimatedTimeMinutes,
-                    o.order_date as orderDate,
-                    o.creation_date as creationDate
-                FROM `order` o
-                WHERE o.order_date >= ? 
-                  AND o.status IN ('PENDING', 'IN_PROGRESS')
-                ORDER BY 
-                    CASE o.priority 
-                        WHEN 'HIGH' THEN 1 
-                        WHEN 'MEDIUM' THEN 2 
-                        WHEN 'LOW' THEN 3 
-                        ELSE 4 
-                    END,
-                    o.order_date ASC,
-                    o.creation_date ASC
-                """;
-
-            Query query = entityManager.createNativeQuery(sql);
-            query.setParameter(1, fromDate);
-            List<Object[]> results = query.getResultList();
-
-            List<Map<String, Object>> orders = new ArrayList<>();
-            for (Object[] row : results) {
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("id", (String) row[0]);
-                orderData.put("numeroCommande", (String) row[1]); // Legacy compatibility
-                orderData.put("orderNumber", (String) row[1]);
-                orderData.put("nombreCartes", row[2]); // Legacy compatibility
-                orderData.put("cardCount", row[2]);
-                orderData.put("priorite", (String) row[3]); // Legacy compatibility
-                orderData.put("priority", (String) row[3]);
-                orderData.put("statut", (String) row[4]); // Legacy compatibility
-                orderData.put("status", (String) row[4]);
-                orderData.put("dureeEstimeeMinutes", row[5]); // Legacy compatibility
-                orderData.put("estimatedTimeMinutes", row[5]);
-
-                orders.add(orderData);
+            for (Order order : orders) {
+                Map<String, Object> orderMap = convertOrderToMap(order);
+                result.add(orderMap);
             }
 
-            log.info("Found {} orders for planning from {}", orders.size(), fromDate);
-            return orders;
+            return result;
 
         } catch (Exception e) {
-            log.error("Error fetching orders for planning: {}", e.getMessage(), e);
+            log.error("Error retrieving all orders", e);
             return new ArrayList<>();
         }
     }
 
+    // ========== VALIDATION METHODS ==========
+
     /**
-     * Count orders by status
-     * @param status the order status
-     * @return count of orders
+     * Validate new order business rules
+     */
+    private void validateNewOrder(Order order) {
+        if (order.getCardCount() != null) {
+            if (order.getCardCount() < MIN_CARDS_PER_ORDER || order.getCardCount() > MAX_CARDS_PER_ORDER) {
+                throw new IllegalArgumentException(
+                        String.format("Card count must be between %d and %d", MIN_CARDS_PER_ORDER, MAX_CARDS_PER_ORDER)
+                );
+            }
+        }
+
+        if (order.getOrderNumber() != null && orderRepository.findByOrderNumber(order.getOrderNumber()).isPresent()) {
+            throw new IllegalArgumentException("Order number already exists: " + order.getOrderNumber());
+        }
+    }
+
+    /**
+     * Validate status transition
+     */
+    private void validateStatusTransition(Order.OrderStatus currentStatus, Order.OrderStatus newStatus) {
+        // Define valid transitions
+        Set<Order.OrderStatus> validTransitions = new HashSet<>();
+
+        if (currentStatus != null) {
+            switch (currentStatus) {
+                case PENDING:
+                    validTransitions.addAll(Arrays.asList(
+                            Order.OrderStatus.SCHEDULED,
+                            Order.OrderStatus.IN_PROGRESS,
+                            Order.OrderStatus.CANCELLED
+                    ));
+                    break;
+                case SCHEDULED:
+                    validTransitions.addAll(Arrays.asList(
+                            Order.OrderStatus.IN_PROGRESS,
+                            Order.OrderStatus.CANCELLED,
+                            Order.OrderStatus.PENDING // Allow going back to pending if needed
+                    ));
+                    break;
+                case IN_PROGRESS:
+                    validTransitions.addAll(Arrays.asList(
+                            Order.OrderStatus.COMPLETED,
+                            Order.OrderStatus.CANCELLED,
+                            Order.OrderStatus.SCHEDULED // Allow going back to scheduled if needed
+                    ));
+                    break;
+                case COMPLETED:
+                    // Generally, completed orders shouldn't change status
+                    // But allow reopening if needed
+                    validTransitions.add(Order.OrderStatus.IN_PROGRESS);
+                    break;
+                case CANCELLED:
+                    // Allow reactivating cancelled orders
+                    validTransitions.add(Order.OrderStatus.PENDING);
+                    break;
+            }
+        } else {
+            // If no current status, allow any status
+            validTransitions.addAll(Arrays.asList(Order.OrderStatus.values()));
+        }
+
+        if (!validTransitions.contains(newStatus)) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid status transition from %s to %s", currentStatus, newStatus)
+            );
+        }
+    }
+
+    // ========== SEARCH AND FILTERING ==========
+
+    /**
+     * Search orders by various criteria
+     * @param searchTerm search term
+     * @param status order status filter
+     * @param priority priority filter
+     * @return list of filtered orders
      */
     @Transactional(readOnly = true)
-    public long countOrdersByStatus(@NotNull OrderStatus status) {
-        return orderRepository.countByStatus(status);
+    public List<Order> searchOrders(String searchTerm, Order.OrderStatus status, Order.OrderPriority priority) {
+        // Implementation would depend on specific search requirements
+        // For now, return a basic filtered list
+        return orderRepository.findAll().stream()
+                .filter(order -> searchTerm == null ||
+                        order.getOrderNumber().toLowerCase().contains(searchTerm.toLowerCase()) ||
+                        order.getCustomerName().toLowerCase().contains(searchTerm.toLowerCase()))
+                .filter(order -> status == null || order.getStatus().equals(status))
+                .filter(order -> priority == null || order.getPriority().equals(priority))
+                .collect(Collectors.toList());
     }
+
+    // ========== STATISTICS METHODS ==========
 
     /**
      * Get order statistics
@@ -378,9 +397,9 @@ public class OrderService {
         try {
             // Basic counts
             long totalOrders = orderRepository.count();
-            long pendingCount = countOrdersByStatus(OrderStatus.PENDING);
-            long inProgressCount = countOrdersByStatus(OrderStatus.IN_PROGRESS);
-            long completedCount = countOrdersByStatus(OrderStatus.COMPLETED);
+            long pendingCount = orderRepository.countByStatus(Order.OrderStatus.PENDING);
+            long inProgressCount = orderRepository.countByStatus(Order.OrderStatus.IN_PROGRESS);
+            long completedCount = orderRepository.countByStatus(Order.OrderStatus.COMPLETED);
 
             stats.put("totalOrders", totalOrders);
             stats.put("pendingOrders", pendingCount);
@@ -410,76 +429,46 @@ public class OrderService {
     // ========== UTILITY METHODS ==========
 
     /**
-     * Calculate estimated processing time based on card count
-     * @param cardCount number of cards
-     * @return estimated time in minutes
+     * Convert Order entity to Map for compatibility
      */
-    private int calculateEstimatedTime(int cardCount) {
-        return cardCount * DEFAULT_PROCESSING_TIME_PER_CARD;
+    private Map<String, Object> convertOrderToMap(Order order) {
+        Map<String, Object> orderMap = new HashMap<>();
+        orderMap.put("id", order.getId().toString());
+        orderMap.put("numeroCommande", order.getOrderNumber());
+        orderMap.put("date", order.getOrderDate());
+        orderMap.put("delai", calculateDeadlineLabel(order));
+        orderMap.put("nombreCartes", order.getCardCount());
+        orderMap.put("priorite", order.getPriority().name());
+        orderMap.put("prixTotal", order.getTotalPrice());
+        orderMap.put("status", order.getStatus().ordinal());
+        orderMap.put("dateCreation", order.getCreationDate());
+        orderMap.put("dateModification", order.getModificationDate());
+        return orderMap;
     }
 
     /**
-     * Validate new order business rules
-     * @param order the order to validate
+     * Calculate deadline label based on priority
      */
-    private void validateNewOrder(Order order) {
-        // Validate order number uniqueness
-        if (order.getOrderNumber() != null &&
-                orderRepository.findByOrderNumber(order.getOrderNumber()).isPresent()) {
-            throw new IllegalArgumentException("Order number already exists: " + order.getOrderNumber());
+    private String calculateDeadlineLabel(Order order) {
+        if (order.getPriority() == Order.OrderPriority.HIGH) {
+            return "X"; // Urgent
+        } else if (order.getPriority() == Order.OrderPriority.MEDIUM) {
+            return "M"; // Medium
+        } else {
+            return "N"; // Normal
         }
-
-        // Validate card count
-        if (order.getCardCount() != null) {
-            if (order.getCardCount() < MIN_CARDS_PER_ORDER ||
-                    order.getCardCount() > MAX_CARDS_PER_ORDER) {
-                throw new IllegalArgumentException(
-                        String.format("Card count must be between %d and %d",
-                                MIN_CARDS_PER_ORDER, MAX_CARDS_PER_ORDER));
-            }
-        }
     }
 
     /**
-     * Get complexity level based on card count
-     * @param cardCount number of cards
-     * @return complexity level string
+     * Get recent orders (for OrderController)
+     * @return list of recent orders
      */
-    private String getComplexityLevel(int cardCount) {
-        if (cardCount <= 10) return "LOW";
-        else if (cardCount <= 50) return "MEDIUM";
-        else if (cardCount <= 100) return "HIGH";
-        else return "VERY_HIGH";
-    }
-
-    /**
-     * Get status display text
-     * @param status order status
-     * @return display text
-     */
-    private String getStatusDisplay(String status) {
-        return switch (status) {
-            case "PENDING" -> "En attente";
-            case "IN_PROGRESS" -> "En cours";
-            case "COMPLETED" -> "Terminée";
-            case "CANCELLED" -> "Annulée";
-            default -> status;
-        };
-    }
-
-    /**
-     * Get status color for UI
-     * @param status order status
-     * @return color string
-     */
-    private String getStatusColor(String status) {
-        return switch (status) {
-            case "PENDING" -> "orange";
-            case "IN_PROGRESS" -> "blue";
-            case "COMPLETED" -> "green";
-            case "CANCELLED" -> "red";
-            default -> "gray";
-        };
+    @Transactional(readOnly = true)
+    public List<Order> getRecentOrders() {
+        return orderRepository.findAll().stream()
+                .sorted((o1, o2) -> o2.getCreationDate().compareTo(o1.getCreationDate()))
+                .limit(10)
+                .collect(Collectors.toList());
     }
 
     // ========== COMPATIBILITY METHODS (for migration from CommandeService) ==========
