@@ -1,3 +1,6 @@
+// ========== ENGLISH VERSION: EmployeeService.java ==========
+// src/main/java/com/pcagrade/order/service/EmployeeService.java
+
 package com.pcagrade.order.service;
 
 import com.pcagrade.order.entity.Employee;
@@ -6,23 +9,18 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Email;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
- * Service for managing employees and employee-related operations
- * Translated from EmployeService to EmployeeService with enhanced functionality
+ * Employee Service - English Version
+ * Handles all employee-related business logic
  */
 @Service
 @Transactional
@@ -30,9 +28,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class EmployeeService {
 
-    private static final double DEFAULT_WORK_HOURS = 8.0;
-    private static final double MIN_WORK_HOURS = 0.5;
-    private static final double MAX_WORK_HOURS = 12.0;
+    private static final int DEFAULT_WORK_HOURS_PER_DAY = 8;
+    private static final int MAX_WORK_HOURS_PER_DAY = 12;
 
     @Autowired
     private EmployeeRepository employeeRepository;
@@ -48,25 +45,36 @@ public class EmployeeService {
      * @return created employee
      */
     public Employee createEmployee(@Valid @NotNull Employee employee) {
-        log.info("Creating new employee: {} {}", employee.getFirstName(), employee.getLastName());
+        try {
+            log.info("Creating new employee: {} {}", employee.getFirstName(), employee.getLastName());
 
-        // Validate business rules
-        validateNewEmployee(employee);
+            // Validate business rules
+            validateNewEmployee(employee);
 
-        // Set default values
-        if (employee.getWorkHoursPerDay() == null) {
-            employee.setWorkHoursPerDay(DEFAULT_WORK_HOURS);
-        }
-        if (employee.getActive() == null) {
-            employee.setActive(true);  // FIXED: Use setActive instead of getActive() = true
-        }
-        if (employee.getSkillLevel() == null) {
-            employee.setSkillLevel(Employee.SkillLevel.INTERMEDIATE);
-        }
+            // Set default values if not provided
+            if (employee.getWorkHoursPerDay() == null) {
+                employee.setWorkHoursPerDay(DEFAULT_WORK_HOURS_PER_DAY);
+            }
+            if (employee.getActive() == null) {
+                employee.setActive(true);
+            }
+            if (employee.getCreationDate() == null) {
+                employee.setCreationDate(LocalDateTime.now());
+            }
+            if (employee.getModificationDate() == null) {
+                employee.setModificationDate(LocalDateTime.now());
+            }
 
-        Employee savedEmployee = employeeRepository.save(employee);
-        log.info("Employee created successfully with ID: {}", savedEmployee.getId());
-        return savedEmployee;
+            // Save the employee
+            Employee savedEmployee = employeeRepository.save(employee);
+
+            log.info("Employee created successfully with ID: {}", savedEmployee.getId());
+            return savedEmployee;
+
+        } catch (Exception e) {
+            log.error("Error creating employee: {}", e.getMessage(), e);
+            throw new RuntimeException("Error creating employee: " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -81,304 +89,285 @@ public class EmployeeService {
             throw new IllegalArgumentException("Employee not found with ID: " + employee.getId());
         }
 
-        // Validate email uniqueness (excluding current employee)
-        if (!employeeRepository.isEmailAvailable(employee.getEmail(), employee.getId())) {
-            throw new IllegalArgumentException("Email already exists: " + employee.getEmail());
-        }
+        employee.setModificationDate(LocalDateTime.now());
+        Employee updatedEmployee = employeeRepository.save(employee);
 
-        Employee savedEmployee = employeeRepository.save(employee);
-        log.info("Employee updated successfully: {}", employee.getId());
-        return savedEmployee;
+        log.info("Employee updated successfully: {}", updatedEmployee.getId());
+        return updatedEmployee;
     }
 
     /**
-     * Get employee by ID
+     * Find employee by ID
      * @param id the employee ID
-     * @return employee if found
+     * @return optional employee
      */
     @Transactional(readOnly = true)
-    public Optional<Employee> getEmployeeById(@NotNull UUID id) {
-        return employeeRepository.findById(id);
-    }
-
-    /**
-     * Get all employees with pagination
-     * @param pageable pagination parameters
-     * @return page of employees
-     */
-    @Transactional(readOnly = true)
-    public Page<Employee> getAllEmployees(Pageable pageable) {
-        return employeeRepository.findAll(pageable);
-    }
-
-    /**
-     * Delete employee by ID
-     * @param id the employee ID
-     */
-    public void deleteEmployee(@NotNull UUID id) {
-        log.info("Deleting employee: {}", id);
-
-        if (!employeeRepository.existsById(id)) {
-            throw new IllegalArgumentException("Employee not found: " + id);
-        }
-
-        employeeRepository.deleteById(id);
-        log.info("Employee deleted successfully: {}", id);
-    }
-
-    // ========== BUSINESS OPERATIONS ==========
-
-    /**
-     * Find all active employees
-     * @return list of active employees
-     */
-    @Transactional(readOnly = true)
-    public List<Employee> findActiveEmployees() {
-        return employeeRepository.findByActiveTrue();
-    }
-
-    /**
-     * Find employees by email
-     * @param email the email to search
-     * @return employee if found
-     */
-    @Transactional(readOnly = true)
-    public Optional<Employee> findByEmail(@Email @NotBlank String email) {
-        return employeeRepository.findByEmail(email);
-    }
-
-    /**
-     * Search employees by name pattern
-     * @param namePattern pattern to search
-     * @return list of matching employees
-     */
-    @Transactional(readOnly = true)
-    public List<Employee> searchEmployeesByName(@NotBlank String namePattern) {
-        String searchPattern = "%" + namePattern.toLowerCase() + "%";
-        return employeeRepository.findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
-                namePattern, namePattern);
-    }
-
-    /**
-     * Get employee workload distribution
-     * @return map of employee workload statistics
-     */
-    @Transactional(readOnly = true)
-    public Map<String, Object> getEmployeeWorkloadDistribution() {
-        List<Employee> activeEmployees = findActiveEmployees();
-        Map<String, Object> distribution = new HashMap<>();
-
-        if (activeEmployees.isEmpty()) {
-            distribution.put("totalEmployees", 0);
-            distribution.put("averageWorkHours", 0.0);
-            distribution.put("employees", Collections.emptyList());
-        } else {
-            double totalHours = activeEmployees.stream()
-                    .mapToDouble(Employee::getWorkHoursPerDay)
-                    .sum();
-            double averageHours = totalHours / activeEmployees.size();
-
-            distribution.put("totalEmployees", activeEmployees.size());
-            distribution.put("averageWorkHours", Math.round(averageHours * 100.0) / 100.0);
-            distribution.put("totalWorkHours", Math.round(totalHours * 100.0) / 100.0);
-
-            List<Map<String, Object>> employeeData = activeEmployees.stream()
-                    .map(this::convertEmployeeToWorkloadMap)
-                    .collect(Collectors.toList());
-            distribution.put("employees", employeeData);
-        }
-
-        return distribution;
-    }
-
-    // ========== EMPLOYEE ACTIVATION/DEACTIVATION ==========
-
-    /**
-     * Activate an employee
-     * @param id the employee ID
-     * @return activated employee
-     */
-    public Employee activateEmployee(@NotNull UUID id) {
-        log.info("Activating employee: {}", id);
-
-        Employee employee = employeeRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Employee not found: " + id));
-
-        employee.setActive(true);
-        employee.setTerminationDate(null); // Clear termination date
-
-        Employee activatedEmployee = employeeRepository.save(employee);
-        log.info("Employee activated successfully: {}", id);
-        return activatedEmployee;
-    }
-
-    /**
-     * Deactivate an employee
-     * @param id the employee ID
-     * @return deactivated employee
-     */
-    public Employee deactivateEmployee(@NotNull UUID id) {
-        log.info("Deactivating employee: {}", id);
-
-        Employee employee = employeeRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Employee not found: " + id));
-
-        employee.setActive(false);
-        employee.setTerminationDate(LocalDateTime.now());
-
-        Employee deactivatedEmployee = employeeRepository.save(employee);
-        log.info("Employee deactivated successfully: {}", id);
-        return deactivatedEmployee;
-    }
-
-    /**
-     * Find inactive employees
-     * @return list of inactive employees
-     */
-    @Transactional(readOnly = true)
-    public List<Employee> findInactiveEmployees() {
-        return employeeRepository.findByActiveFalse();
-    }
-
-    // ========== UTILITY METHODS ==========
-
-    /**
-     * Check if email is available
-     * @param email the email to check
-     * @param excludeEmployeeId employee ID to exclude from check
-     * @return true if available
-     */
-    @Transactional(readOnly = true)
-    public boolean isEmailAvailable(@Email @NotBlank String email, UUID excludeEmployeeId) {
-        return employeeRepository.isEmailAvailable(email, excludeEmployeeId);
-    }
-
-    /**
-     * Convert employee to workload map
-     * @param employee the employee
-     * @return workload map
-     */
-    private Map<String, Object> convertEmployeeToWorkloadMap(Employee employee) {
-        Map<String, Object> workload = new HashMap<>();
-        workload.put("id", employee.getId());
-        workload.put("name", employee.getFirstName() + " " + employee.getLastName());
-        workload.put("email", employee.getEmail());
-        workload.put("workHoursPerDay", employee.getWorkHoursPerDay());
-        workload.put("workMinutesPerDay", (int) (employee.getWorkHoursPerDay() * 60));
-        workload.put("active", employee.getActive());
-        workload.put("skillLevel", employee.getSkillLevel());
-        workload.put("department", employee.getDepartment());
-        workload.put("position", employee.getPosition());
-        return workload;
-    }
-
-    /**
-     * Validate new employee business rules
-     * @param employee the employee to validate
-     */
-    private void validateNewEmployee(Employee employee) {
-        // Check email uniqueness
-        if (employeeRepository.findByEmail(employee.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Email already exists: " + employee.getEmail());
-        }
-
-        // Validate work hours
-        if (employee.getWorkHoursPerDay() != null) {
-            if (employee.getWorkHoursPerDay() < MIN_WORK_HOURS ||
-                    employee.getWorkHoursPerDay() > MAX_WORK_HOURS) {
-                throw new IllegalArgumentException(
-                        String.format("Work hours must be between %.1f and %.1f",
-                                MIN_WORK_HOURS, MAX_WORK_HOURS));
-            }
-        }
-    }
-
-    /**
-     * Get work capacity category based on hours
-     * @param workHours daily work hours
-     * @return capacity category
-     */
-    private String getWorkCapacityCategory(double workHours) {
-        if (workHours < 4.0) return "LOW";
-        else if (workHours < 7.0) return "MEDIUM";
-        else if (workHours <= 8.0) return "STANDARD";
-        else return "HIGH";
-    }
-
-    /**
-     * Count active employees
-     * @return number of active employees
-     */
-    @Transactional(readOnly = true)
-    public long countActiveEmployees() {
-        return employeeRepository.countByActiveTrue();
-    }
-
-    /**
-     * Get active employees as simple map data
-     * @return list of employee data maps
-     */
-    @Transactional(readOnly = true)
-    public List<Map<String, Object>> getActiveEmployeesData() {
+    public Optional<Employee> findById(@NotNull String id) {
         try {
+            UUID employeeId = UUID.fromString(id.replace("-", ""));
+            return employeeRepository.findById(employeeId);
+        } catch (Exception e) {
+            log.error("Error finding employee by ID {}: {}", id, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Find employee by name
+     * @param lastName the last name
+     * @return optional employee
+     */
+    @Transactional(readOnly = true)
+    public Optional<Employee> findByLastName(@NotNull String lastName) {
+        List<Employee> employees = employeeRepository.findByLastName(lastName);
+        return employees.isEmpty() ? Optional.empty() : Optional.of(employees.get(0));
+    }
+
+    /**
+     * Delete an employee
+     * @param id the employee ID
+     */
+    public void deleteEmployee(@NotNull String id) {
+        try {
+            log.info("Deleting employee: {}", id);
+
+            Optional<Employee> employee = findById(id);
+            if (employee.isPresent()) {
+                employeeRepository.delete(employee.get());
+                log.info("Employee deleted successfully: {}", id);
+            } else {
+                throw new IllegalArgumentException("Employee not found with ID: " + id);
+            }
+
+        } catch (Exception e) {
+            log.error("Error deleting employee: {}", e.getMessage());
+            throw new RuntimeException("Error deleting employee: " + e.getMessage(), e);
+        }
+    }
+
+    // ========== BUSINESS LOGIC METHODS ==========
+
+    /**
+     * Get all active employees
+     * @return list of active employees as maps for frontend compatibility
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getAllActiveEmployees() {
+        try {
+            log.info("Getting all active employees");
+
+            // Check if employee table exists
+            String sqlCheckTable = "SHOW TABLES LIKE 'employee'";
+            Query queryCheck = entityManager.createNativeQuery(sqlCheckTable);
+            @SuppressWarnings("unchecked")
+            List<Object> tables = queryCheck.getResultList();
+
+            if (tables.isEmpty()) {
+                log.warn("Employee table does not exist");
+                return new ArrayList<>();
+            }
+
+            // Query to get real employees
             String sql = """
                 SELECT 
                     HEX(e.id) as id,
-                    e.first_name as firstName,
-                    e.last_name as lastName,
-                    e.email as email,
-                    e.work_hours_per_day as workHoursPerDay,
-                    e.active as active,
-                    e.department as department,
-                    e.position as position,
-                    e.skill_level as skillLevel,
-                    e.creation_date as creationDate
-                FROM j_employee e
-                WHERE e.active = true
+                    e.first_name,
+                    e.last_name,
+                    e.email,
+                    e.work_hours_per_day,
+                    e.active,
+                    e.creation_date
+                FROM employee e
+                WHERE e.active = 1
                 ORDER BY e.last_name, e.first_name
-                """;
+            """;
 
             Query query = entityManager.createNativeQuery(sql);
+            @SuppressWarnings("unchecked")
             List<Object[]> results = query.getResultList();
 
             List<Map<String, Object>> employees = new ArrayList<>();
+
+            log.info("Found {} active employees", results.size());
+
             for (Object[] row : results) {
-                Map<String, Object> employeeData = new HashMap<>();
-                employeeData.put("id", (String) row[0]);
-                employeeData.put("firstName", (String) row[1]);
-                employeeData.put("lastName", (String) row[2]);
-                employeeData.put("email", (String) row[3]);
-                employeeData.put("workHoursPerDay", row[4]);
-                employeeData.put("active", row[5]);
-                employeeData.put("department", (String) row[6]);
-                employeeData.put("position", (String) row[7]);
-                employeeData.put("skillLevel", (String) row[8]);
-                employeeData.put("creationDate", row[9]);
+                Map<String, Object> employee = new HashMap<>();
+                employee.put("id", (String) row[0]);
+                employee.put("firstName", (String) row[1]);
+                employee.put("lastName", (String) row[2]);
+                employee.put("email", (String) row[3]);
+                employee.put("workHoursPerDay", row[4] != null ? ((Number) row[4]).intValue() : DEFAULT_WORK_HOURS_PER_DAY);
+                employee.put("active", row[5] != null ? (Boolean) row[5] : true);
+                employee.put("creationDate", row[6]);
 
-                // Add calculated fields
-                Double workHours = (Double) row[4];
-                if (workHours != null) {
-                    employeeData.put("workMinutesPerDay", (int) (workHours * 60));
-                    employeeData.put("workCapacity", getWorkCapacityCategory(workHours));
-                    employeeData.put("isPartTime", workHours < 8.0);
-                    employeeData.put("isFullTime", workHours >= 8.0);
-                }
+                // Calculated fields
+                employee.put("fullName", row[1] + " " + row[2]);
+                employee.put("available", true);
+                employee.put("currentLoad", 0);
 
-                // Add full name
-                String firstName = (String) row[1];
-                String lastName = (String) row[2];
-                employeeData.put("fullName", firstName + " " + lastName);
-                employeeData.put("displayName", lastName + ", " + firstName);
-
-                employees.add(employeeData);
+                employees.add(employee);
+                log.debug("Employee: {} {}", row[1], row[2]);
             }
 
-            log.info("Found {} active employees", employees.size());
             return employees;
 
         } catch (Exception e) {
-            log.error("Error fetching active employees: {}", e.getMessage());
+            log.error("Error getting active employees: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
+    }
+
+    /**
+     * Get employees with planning data for a specific date
+     * @param date the target date
+     * @return list of employees with planning information
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getEmployeesWithPlanningData(String date) {
+        try {
+            log.info("Getting employees with planning data for date: {}", date);
+
+            String sql = """
+                SELECT 
+                    HEX(e.id) as id,
+                    CONCAT(e.first_name, ' ', e.last_name) as name,
+                    e.work_hours_per_day * 60 as max_minutes,
+                    COALESCE(SUM(p.duration_minutes), 0) as total_minutes,
+                    COUNT(p.id) as task_count,
+                    COALESCE(SUM(o.card_count), 0) as card_count
+                FROM employee e
+                LEFT JOIN planning p ON e.id = p.employee_id AND DATE(p.planned_date) = ?
+                LEFT JOIN `order` o ON p.order_id = o.id
+                WHERE e.active = 1
+                GROUP BY e.id, e.first_name, e.last_name, e.work_hours_per_day
+                ORDER BY e.last_name, e.first_name
+            """;
+
+            Query query = entityManager.createNativeQuery(sql);
+            query.setParameter(1, date);
+            @SuppressWarnings("unchecked")
+            List<Object[]> results = query.getResultList();
+
+            List<Map<String, Object>> employeesWithPlanning = new ArrayList<>();
+
+            for (Object[] row : results) {
+                Map<String, Object> employee = new HashMap<>();
+                employee.put("id", (String) row[0]);
+                employee.put("name", (String) row[1]);
+                employee.put("maxMinutes", ((Number) row[2]).intValue());
+                employee.put("totalMinutes", ((Number) row[3]).intValue());
+                employee.put("taskCount", ((Number) row[4]).intValue());
+                employee.put("cardCount", ((Number) row[5]).intValue());
+
+                // Calculate status based on workload
+                int totalMinutes = ((Number) row[3]).intValue();
+                int maxMinutes = ((Number) row[2]).intValue();
+                double workloadPercent = (double) totalMinutes / maxMinutes;
+
+                String status;
+                if (workloadPercent > 1.0) {
+                    status = "overloaded";
+                } else if (workloadPercent >= 0.9) {
+                    status = "full";
+                } else {
+                    status = "available";
+                }
+                employee.put("status", status);
+
+                employeesWithPlanning.add(employee);
+            }
+
+            log.info("Found {} employees with planning data", employeesWithPlanning.size());
+            return employeesWithPlanning;
+
+        } catch (Exception e) {
+            log.error("Error getting employees with planning data: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Get employee statistics
+     * @return map with employee statistics
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getEmployeeStatistics() {
+        Map<String, Object> stats = new HashMap<>();
+
+        try {
+            // Basic counts
+            long totalEmployees = employeeRepository.count();
+            long activeEmployees = employeeRepository.countByActive(true);
+            long inactiveEmployees = totalEmployees - activeEmployees;
+
+            stats.put("totalEmployees", totalEmployees);
+            stats.put("activeEmployees", activeEmployees);
+            stats.put("inactiveEmployees", inactiveEmployees);
+
+            // Calculate average work hours
+            if (activeEmployees > 0) {
+                String avgHoursSql = "SELECT AVG(work_hours_per_day) FROM employee WHERE active = 1";
+                Query avgQuery = entityManager.createNativeQuery(avgHoursSql);
+                Number avgHours = (Number) avgQuery.getSingleResult();
+                stats.put("averageWorkHours", avgHours != null ? avgHours.doubleValue() : 0.0);
+            } else {
+                stats.put("averageWorkHours", 0.0);
+            }
+
+            stats.put("success", true);
+            stats.put("timestamp", LocalDateTime.now());
+
+        } catch (Exception e) {
+            log.error("Error calculating employee statistics", e);
+            stats.put("success", false);
+            stats.put("error", e.getMessage());
+        }
+
+        return stats;
+    }
+
+    // ========== VALIDATION METHODS ==========
+
+    /**
+     * Validate new employee data
+     * @param employee the employee to validate
+     */
+    private void validateNewEmployee(Employee employee) {
+        if (employee.getWorkHoursPerDay() != null &&
+                (employee.getWorkHoursPerDay() <= 0 || employee.getWorkHoursPerDay() > MAX_WORK_HOURS_PER_DAY)) {
+            throw new IllegalArgumentException(
+                    String.format("Work hours per day must be between 1 and %d", MAX_WORK_HOURS_PER_DAY)
+            );
+        }
+
+        // Check for duplicate email if provided
+        if (employee.getEmail() != null && !employee.getEmail().isEmpty()) {
+            Optional<Employee> existingEmployee = employeeRepository.findByEmail(employee.getEmail());
+            if (existingEmployee.isPresent()) {
+                throw new IllegalArgumentException("Employee with email already exists: " + employee.getEmail());
+            }
+        }
+    }
+
+    // ========== LEGACY COMPATIBILITY METHODS ==========
+
+    /**
+     * Legacy method for compatibility with existing code
+     * @deprecated Use getAllActiveEmployees() instead
+     */
+    @Deprecated
+    public List<Map<String, Object>> getTousEmployesActifs() {
+        log.warn("Using deprecated method getTousEmployesActifs(), please use getAllActiveEmployees()");
+        return getAllActiveEmployees();
+    }
+
+    /**
+     * Legacy method for compatibility with existing code
+     * @deprecated Use createEmployee() instead
+     */
+    @Deprecated
+    public Employee creerEmploye(Employee employee) {
+        log.warn("Using deprecated method creerEmploye(), please use createEmployee()");
+        return createEmployee(employee);
     }
 }

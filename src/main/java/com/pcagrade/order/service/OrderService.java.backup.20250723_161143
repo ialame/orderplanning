@@ -489,6 +489,7 @@ public class OrderService {
         }
     }
 
+
     // ========== COMPATIBILITY METHODS (for migration from CommandeService) ==========
 
     /**
@@ -617,7 +618,6 @@ public class OrderService {
             return new ArrayList<>();
         }
     }
-
 
 
 }
