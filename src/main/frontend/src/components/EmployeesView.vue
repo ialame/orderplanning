@@ -1,72 +1,69 @@
 <template>
-  <div class="min-h-screen bg-gray-50 p-6">
-    <div class="max-w-7xl mx-auto">
+  <div class="max-w-7xl mx-auto px-6 py-8 bg-gray-100 min-h-screen">
+    <div class="bg-white rounded-lg shadow-lg p-6">
 
-      <!-- ✅ EN-TÊTE UNIFIÉ avec modes de vue -->
-      <div class="flex justify-between items-center mb-6">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900">
-            👥 Employés
+      <!-- ✅ HEADER WITH NAVIGATION -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center space-x-4">
+          <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            👥 Employees
           </h1>
-          <p class="text-gray-600 mt-1">
-            Gestion complète des employés et de leurs planifications
-          </p>
+          <p class="text-gray-600">Complete management of employees and their planning</p>
         </div>
 
-        <!-- Actions et sélecteur de mode/date -->
-        <div class="flex items-center space-x-3">
-          <!-- Mode de vue -->
-          <div class="flex bg-gray-200 rounded-lg p-1">
-            <button
-              @click="changerModeVue('gestion')"
-              :class="[
-                'px-3 py-1 rounded text-sm font-medium transition-colors',
-                modeVue === 'gestion' ? 'bg-white text-blue-600 shadow' : 'text-gray-600'
-              ]"
-            >
-              👥 Gestion
-            </button>
-            <button
-              @click="changerModeVue('planning')"
-              :class="[
-                'px-3 py-1 rounded text-sm font-medium transition-colors',
-                modeVue === 'planning' ? 'bg-white text-blue-600 shadow' : 'text-gray-600'
-              ]"
-            >
-              📅 Planning
-            </button>
-          </div>
-
-          <!-- Bouton Nouvel Employé (mode gestion seulement) -->
+        <!-- Mode Toggle Buttons -->
+        <div class="flex bg-gray-100 rounded-lg p-1">
           <button
-            v-if="modeVue === 'gestion' && !employeSelectionne"
-            @click="afficherFormulaireCreation"
-            class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2"
+            @click="changerModeVue('gestion')"
+            :class="[
+              'px-4 py-2 rounded-md text-sm font-medium transition-colors',
+              modeVue === 'gestion' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            ]"
           >
-            ➕ Nouvel Employé
+            👥 Management
           </button>
-
-          <!-- Sélecteur de date (mode planning) -->
-          <div v-if="modeVue === 'planning'" class="flex items-center gap-2">
-            <label class="text-sm font-medium text-gray-700">Date :</label>
-            <input
-              v-model="selectedDate"
-              type="date"
-              class="border border-gray-300 rounded-md px-3 py-2"
-            />
-          </div>
-
           <button
-            @click="actualiserDonnees"
-            :disabled="loading"
-            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            @click="changerModeVue('planning')"
+            :class="[
+              'px-4 py-2 rounded-md text-sm font-medium transition-colors',
+              modeVue === 'planning' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            ]"
           >
-            {{ loading ? '🔄' : '🔄 Actualiser' }}
+            📅 Planning
           </button>
         </div>
       </div>
 
-      <!-- ✅ MESSAGES DE FEEDBACK -->
+      <!-- ✅ ACTION BUTTONS -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex space-x-3">
+          <button
+            v-if="modeVue === 'gestion'"
+            @click="afficherFormulaireCreation"
+            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+          >
+            ➕ New Employee
+          </button>
+          <div v-if="modeVue === 'planning'" class="flex items-center space-x-3">
+            <label class="text-sm font-medium text-gray-700">Date:</label>
+            <input
+              v-model="selectedDate"
+              type="date"
+              class="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <button
+          @click="actualiserDonnees"
+          :disabled="loading"
+          class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {{ loading ? '🔄' : '🔄 Refresh' }}
+        </button>
+      </div>
+
+      <!-- ✅ FEEDBACK MESSAGES -->
       <div v-if="message.text" :class="[
         'mb-4 p-4 rounded-lg border',
         message.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200'
@@ -74,33 +71,33 @@
         {{ message.text }}
       </div>
 
-      <!-- ✅ CONTENU PRINCIPAL -->
+      <!-- ✅ MAIN CONTENT -->
       <div v-if="!employeSelectionne">
 
-        <!-- ========== MODE GESTION ========== -->
+        <!-- ========== MANAGEMENT MODE ========== -->
         <div v-if="modeVue === 'gestion'">
 
-          <!-- Formulaire création employé -->
+          <!-- Employee Creation Form -->
           <div v-if="showFormulaire" class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">➕ Créer un nouvel employé</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">➕ Create New Employee</h3>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                 <input
                   v-model="nouvelEmploye.nom"
                   type="text"
                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nom de famille"
+                  placeholder="Last name"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                 <input
                   v-model="nouvelEmploye.prenom"
                   type="text"
                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Prénom"
+                  placeholder="First name"
                 />
               </div>
               <div>
@@ -109,92 +106,95 @@
                   v-model="nouvelEmploye.email"
                   type="email"
                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="email@exemple.com"
+                  placeholder="email@example.com"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Heures de travail par jour</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Work Hours/Day</label>
                 <input
                   v-model.number="nouvelEmploye.heuresTravailParJour"
                   type="number"
                   min="1"
                   max="12"
-                  step="0.5"
                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <div class="flex justify-end space-x-3 mt-6">
-              <button
-                @click="annulerCreation"
-                class="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
-              >
-                Annuler
-              </button>
+            <div class="flex space-x-3 mt-6">
               <button
                 @click="creerEmploye"
-                :disabled="!peutCreerEmploye"
-                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                :disabled="!peutCreerEmploye || loading"
+                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
-                Créer l'employé
+                {{ loading ? '⏳ Creating...' : '✅ Create' }}
+              </button>
+              <button
+                @click="annulerCreation"
+                class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              >
+                ❌ Cancel
               </button>
             </div>
           </div>
 
-          <!-- État vide (mode gestion) -->
-          <div v-if="employesListe.length === 0" class="text-center py-12">
-            <div class="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <span class="text-4xl">👥</span>
-            </div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">Aucun employé</h3>
-            <p class="text-gray-500 mb-4">Commencez par créer votre premier employé</p>
+          <!-- Loading State -->
+          <div v-if="loading" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-4 text-gray-600">Loading employees...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div v-else-if="employesListe.length === 0 && !loading && !showFormulaire" class="text-center py-12">
+            <div class="text-6xl mb-4">👥</div>
+            <h3 class="text-xl font-medium text-gray-900 mb-2">No employees yet</h3>
+            <p class="text-gray-600 mb-6">Start by creating your first employee to begin planning Pokemon card orders</p>
             <button
-              @click="afficherFormulaireCreation"
+              @click="showFormulaire = true"
               class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
             >
-              ➕ Créer le premier employé
+              ➕ Create First Employee
             </button>
           </div>
 
-          <!-- Liste des employés mode gestion -->
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Employee List - Management Mode -->
+          <div v-else-if="!loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div
               v-for="employe in employesListe"
               :key="employe.id"
               @click="voirDetailEmploye(employe.id)"
               class="bg-white rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer border-l-4 border-blue-500 p-6"
             >
-              <!-- Avatar et nom -->
+              <!-- Avatar and Name -->
               <div class="flex items-center mb-4">
                 <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
                   {{ getInitiales(employe) }}
                 </div>
                 <div class="ml-3">
                   <h3 class="text-lg font-semibold text-gray-900">
-                    {{ employe.nomComplet || `${employe.firstName} ${employe.lastName}` }}
+                    {{ employe.fullName || `${employe.firstName} ${employe.lastName}` }}
                   </h3>
                   <p class="text-sm text-gray-500">{{ employe.email }}</p>
                 </div>
               </div>
 
-              <!-- Informations -->
+              <!-- Information -->
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
-                  <span>⏰ Heures/jour:</span>
-                  <span class="font-medium">{{ employe.heuresTravailParJour || employe.workHoursPerDay }}h</span>
+                  <span>⏰ Hours/day:</span>
+                  <span class="font-medium">{{ employe.workHoursPerDay }}h</span>
                 </div>
                 <div class="flex justify-between">
-                  <span>📅 Depuis:</span>
-                  <span class="font-medium">{{ formatDate(employe.dateCreation || employe.creationDate) }}</span>
+                  <span>📅 Since:</span>
+                  <span class="font-medium">{{ formatDate(employe.creationDate) }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span>📊 Statut:</span>
+                  <span>📊 Status:</span>
                   <span :class="[
                     'px-2 py-1 rounded text-xs font-medium',
-                    (employe.actif !== false && employe.active !== false) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    employe.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   ]">
-                    {{ (employe.actif !== false && employe.active !== false) ? 'Actif' : 'Inactif' }}
+                    {{ employe.active ? 'Active' : 'Inactive' }}
                   </span>
                 </div>
               </div>
@@ -202,39 +202,35 @@
           </div>
         </div>
 
-        <!-- ========== MODE PLANNING ========== -->
-        <div v-else-if="modeVue === 'planning'">
-
-          <!-- Statistiques planning -->
-          <div v-if="employesPlanning.length > 0" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <!-- ========== PLANNING MODE ========== -->
+        <div v-else>
+          <!-- Statistics Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="bg-blue-50 p-4 rounded-lg">
               <div class="text-2xl font-bold text-blue-900">{{ employesPlanning.length }}</div>
-              <div class="text-sm text-blue-800">👥 Employés actifs</div>
+              <div class="text-sm text-blue-800">👥 Active Employees</div>
             </div>
             <div class="bg-green-50 p-4 rounded-lg">
               <div class="text-2xl font-bold text-green-900">{{ employesDisponibles }}</div>
-              <div class="text-sm text-green-800">✅ Disponibles</div>
+              <div class="text-sm text-green-800">✅ Available</div>
             </div>
             <div class="bg-yellow-50 p-4 rounded-lg">
               <div class="text-2xl font-bold text-yellow-900">{{ employesCharges }}</div>
-              <div class="text-sm text-yellow-800">⚠️ Chargés</div>
+              <div class="text-sm text-yellow-800">⚠️ Loaded</div>
             </div>
             <div class="bg-red-50 p-4 rounded-lg">
               <div class="text-2xl font-bold text-red-900">{{ employesSurcharges }}</div>
-              <div class="text-sm text-red-800">🚨 Surchargés</div>
+              <div class="text-sm text-red-800">🚨 Overloaded</div>
             </div>
           </div>
 
-          <!-- État vide (mode planning) -->
-          <div v-if="employesPlanning.length === 0" class="text-center py-12">
-            <div class="w-24 h-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <span class="text-4xl">📅</span>
-            </div>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">Aucune donnée de planning</h3>
-            <p class="text-gray-500 mb-4">Aucun employé n'a de planification pour cette date</p>
+          <!-- Loading State -->
+          <div v-if="loading" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-4 text-gray-600">Loading planning data...</p>
           </div>
 
-          <!-- Grille des employés avec planning -->
+          <!-- Employee Grid with Planning -->
           <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div
               v-for="employe in employesPlanning"
@@ -245,43 +241,39 @@
                 getStatusBorderColor(employe.status)
               ]"
             >
-              <!-- Avatar et nom -->
+              <!-- Avatar and Name -->
               <div class="flex items-center mb-4">
                 <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
                   {{ getInitiales(employe) }}
                 </div>
                 <div class="ml-3">
-                  <h3 class="text-lg font-semibold text-gray-900">{{ employe.name || employe.nomComplet }}</h3>
-                  <p :class="[
-                    'text-sm font-medium',
-                    employe.status === 'overloaded' ? 'text-red-600' :
-                    employe.status === 'available' ? 'text-green-600' : 'text-yellow-600'
-                  ]">
-                    {{ getStatusText(employe.status) }}
-                  </p>
+                  <h3 class="text-lg font-semibold text-gray-900">{{ employe.name }}</h3>
+                  <p class="text-sm text-gray-500">{{ employe.cardCount || 0 }} cards</p>
                 </div>
               </div>
 
-              <!-- Métriques -->
+              <!-- Planning Information -->
               <div class="space-y-3">
-                <div class="flex justify-between text-sm">
-                  <span>📋 Tâches:</span>
-                  <span class="font-medium">{{ employe.taskCount || 0 }}</span>
-                </div>
-                <div class="flex justify-between text-sm">
-                  <span>🃏 Cartes:</span>
-                  <span class="font-medium">{{ employe.cardCount || 0 }}</span>
-                </div>
-                <div class="flex justify-between text-sm">
-                  <span>⏱️ Temps:</span>
-                  <span class="font-medium">{{ formatTime(employe.totalMinutes || 0) }}</span>
+                <!-- Status -->
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-medium">Status:</span>
+                  <span :class="[
+                    'px-2 py-1 rounded text-xs font-medium',
+                    employe.status === 'overloaded' ? 'bg-red-100 text-red-800' :
+                    employe.status === 'full' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  ]">
+                    {{ getStatusText(employe.status) }}
+                  </span>
                 </div>
 
-                <!-- Barre de progression -->
-                <div>
-                  <div class="flex justify-between text-xs text-gray-600 mb-1">
-                    <span>Charge de travail</span>
-                    <span>{{ Math.round(((employe.totalMinutes || 0) / (employe.maxMinutes || 480)) * 100) }}%</span>
+                <!-- Workload -->
+                <div class="space-y-1">
+                  <div class="flex justify-between text-sm">
+                    <span>Workload:</span>
+                    <span class="font-medium">
+                      {{ formatTime(employe.totalMinutes || 0) }} / {{ formatTime(employe.maxMinutes || 480) }}
+                    </span>
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -295,13 +287,13 @@
                   </div>
                 </div>
 
-                <!-- Actions planning -->
+                <!-- Planning Actions -->
                 <div class="flex space-x-2 mt-4">
                   <button class="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded text-sm font-medium hover:bg-blue-100">
-                    👁️ Détail
+                    👁️ Details
                   </button>
                   <button class="flex-1 bg-gray-50 text-gray-600 px-3 py-2 rounded text-sm font-medium hover:bg-gray-100">
-                    📋 {{ employe.taskCount || 0 }} tâches
+                    📋 {{ employe.taskCount || 0 }} tasks
                   </button>
                 </div>
               </div>
@@ -310,7 +302,7 @@
         </div>
       </div>
 
-      <!-- ✅ COMPOSANT DE DÉTAIL EMPLOYÉ (unifié pour les deux modes) -->
+      <!-- ✅ EMPLOYEE DETAIL COMPONENT (unified for both modes) -->
       <div v-else>
         <EmployeeDetailPage
           :employeeId="employeSelectionne"
@@ -339,16 +331,13 @@ interface NouvelEmploye {
 interface Employee {
   id: string
   name?: string
-  nomComplet?: string
+  fullName?: string
   firstName?: string
   lastName?: string
   email: string
   workHoursPerDay?: number
-  heuresTravailParJour?: number
   active?: boolean
-  actif?: boolean
   creationDate?: string
-  dateCreation?: string
   totalMinutes?: number
   maxMinutes?: number
   status?: 'overloaded' | 'available' | 'full'
@@ -356,20 +345,20 @@ interface Employee {
   cardCount?: number
 }
 
-// ========== INJECTION DES SERVICES ==========
+// ========== SERVICE INJECTION ==========
 const showNotification = inject<(message: string, type: 'success' | 'error') => void>('showNotification')
 
-// ========== ÉTAT RÉACTIF ==========
+// ========== REACTIVE STATE ==========
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const modeVue = ref<'gestion' | 'planning'>('gestion')
 const employeSelectionne = ref<string | null>(null)
 const loading = ref(false)
 
-// Données employés
-const employesListe = ref<Employee[]>([])     // Mode gestion
-const employesPlanning = ref<Employee[]>([])  // Mode planning
+// Employee data
+const employesListe = ref<Employee[]>([])     // Management mode
+const employesPlanning = ref<Employee[]>([])  // Planning mode
 
-// Formulaire création
+// Creation form
 const showFormulaire = ref(false)
 const nouvelEmploye = ref<NouvelEmploye>({
   nom: '',
@@ -404,9 +393,9 @@ const employesSurcharges = computed(() =>
   employesPlanning.value.filter(emp => emp.status === 'overloaded').length
 )
 
-// ========== MÉTHODES ==========
+// ========== METHODS ==========
 
-// Navigation et modes
+// Navigation and modes
 const changerModeVue = (mode: 'gestion' | 'planning') => {
   modeVue.value = mode
   employeSelectionne.value = null
@@ -421,7 +410,7 @@ const retourListeEmployes = () => {
   employeSelectionne.value = null
 }
 
-// Gestion des employés
+// Employee management
 const afficherFormulaireCreation = () => {
   showFormulaire.value = true
 }
@@ -443,70 +432,127 @@ const resetFormulaire = () => {
 const creerEmploye = async () => {
   try {
     loading.value = true
+    console.log('💾 Creating employee:', nouvelEmploye.value)
 
-    // Appel API pour créer l'employé
+    const requestData = {
+      lastName: nouvelEmploye.value.nom,
+      firstName: nouvelEmploye.value.prenom,
+      email: nouvelEmploye.value.email,
+      workHoursPerDay: nouvelEmploye.value.heuresTravailParJour
+    }
+
+    console.log('📤 Request payload:', requestData)
+
+    // Use Vite proxy instead of absolute URL
     const response = await fetch('/api/employees', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lastName: nouvelEmploye.value.nom,
-        firstName: nouvelEmploye.value.prenom,
-        email: nouvelEmploye.value.email,
-        workHoursPerDay: nouvelEmploye.value.heuresTravailParJour,
-        active: true
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(requestData)
     })
 
-    if (response.ok) {
-      showNotification?.('Employé créé avec succès', 'success')
-      showFormulaire.value = false
-      resetFormulaire()
-      await chargerEmployesGestion()
+    console.log('📥 Response status:', response.status)
+    const result = await response.json()
+    console.log('📥 Response data:', result)
+
+    if (response.ok && result.success) {
+      message.value = {
+        text: 'Employee created successfully!',
+        type: 'success'
+      }
+      showNotification?.('Employee created successfully!', 'success')
+      annulerCreation()
+      await actualiserDonnees()
     } else {
-      throw new Error('Erreur lors de la création')
+      message.value = {
+        text: result.message || 'Error creating employee',
+        type: 'error'
+      }
+      showNotification?.(result.message || 'Error creating employee', 'error')
     }
   } catch (error) {
-    console.error('Erreur création employé:', error)
-    showNotification?.('Erreur lors de la création de l\'employé', 'error')
+    console.error('❌ Error creating employee:', error)
+    message.value = {
+      text: 'Network error creating employee',
+      type: 'error'
+    }
+    showNotification?.('Network error creating employee', 'error')
   } finally {
     loading.value = false
   }
 }
 
-// Chargement des données
+// Data loading - REAL DATA FROM DATABASE
 const chargerEmployesGestion = async () => {
   try {
     loading.value = true
-    const response = await fetch('/api/employees')
+    console.log('📥 Loading employees from database...')
+
+    // First check if we can connect to the API
+    const debugResponse = await fetch('/api/employees/debug')
+    if (debugResponse.ok) {
+      const debugData = await debugResponse.json()
+      console.log('🔍 Debug info:', debugData)
+    }
+
+    // Call the real API endpoint that returns database data
+    const response = await fetch('/api/employees/active', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('📥 Response status:', response.status)
 
     if (response.ok) {
-      employesListe.value = await response.json()
-    } else {
-      // Données de fallback pour développement
-      employesListe.value = [
-        {
-          id: '1',
-          firstName: 'Sophie',
-          lastName: 'Dubois',
-          email: 'sophie.dubois@email.com',
-          workHoursPerDay: 7.5,
-          active: true,
-          creationDate: '2024-01-15'
-        },
-        {
-          id: '2',
-          firstName: 'Pierre',
-          lastName: 'Bernard',
-          email: 'pierre.bernard@email.com',
-          workHoursPerDay: 8,
-          active: true,
-          creationDate: '2024-02-01'
+      const data = await response.json()
+      console.log('✅ Real employees loaded:', data)
+
+      // Map the data to ensure consistent structure
+      employesListe.value = data.map((emp: any) => ({
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        fullName: emp.fullName || `${emp.firstName} ${emp.lastName}`,
+        email: emp.email,
+        workHoursPerDay: emp.workHoursPerDay,
+        active: emp.active,
+        creationDate: emp.creationDate
+      }))
+
+      if (employesListe.value.length === 0) {
+        message.value = {
+          text: 'No employees found in database. Create your first employee!',
+          type: 'error'
         }
-      ]
+      } else {
+        message.value = {
+          text: `✅ ${employesListe.value.length} employees loaded from database`,
+          type: 'success'
+        }
+      }
+    } else {
+      console.error('❌ Failed to load employees, status:', response.status)
+      const errorText = await response.text()
+      console.error('❌ Error response:', errorText)
+
+      employesListe.value = []
+      message.value = {
+        text: `Failed to load employees (HTTP ${response.status})`,
+        type: 'error'
+      }
     }
   } catch (error) {
-    console.error('Erreur chargement employés gestion:', error)
+    console.error('❌ Network error loading employees:', error)
     employesListe.value = []
+    message.value = {
+      text: 'Network error connecting to backend. Check if backend is running and frontend dev server proxy is working.',
+      type: 'error'
+    }
   } finally {
     loading.value = false
   }
@@ -515,51 +561,52 @@ const chargerEmployesGestion = async () => {
 const chargerEmployesPlanning = async () => {
   try {
     loading.value = true
-    const response = await fetch(`/api/employees/planning?date=${selectedDate.value}`)
+    console.log('📅 Loading employee planning for date:', selectedDate.value)
+
+    // Call the real API endpoint for planning data
+    const response = await fetch(`/api/employees/planning-data?date=${selectedDate.value}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('📥 Planning response status:', response.status)
 
     if (response.ok) {
-      employesPlanning.value = await response.json()
-    } else {
-      // Données de fallback pour développement
-      employesPlanning.value = [
-        {
-          id: '1',
-          name: 'Sophie Dubois',
-          totalMinutes: 360,
-          maxMinutes: 450,
-          status: 'available',
-          taskCount: 3,
-          cardCount: 12
-        },
-        {
-          id: '2',
-          name: 'Pierre Bernard',
-          totalMinutes: 520,
-          maxMinutes: 480,
-          status: 'overloaded',
-          taskCount: 5,
-          cardCount: 18
-        },
-        {
-          id: '3',
-          name: 'Marie Martin',
-          totalMinutes: 480,
-          maxMinutes: 480,
-          status: 'full',
-          taskCount: 4,
-          cardCount: 16
+      const data = await response.json()
+      console.log('✅ Real planning data loaded:', data)
+      employesPlanning.value = data
+
+      if (employesPlanning.value.length === 0) {
+        message.value = {
+          text: 'No employees with planning data found for this date',
+          type: 'error'
         }
-      ]
+      }
+    } else {
+      console.error('❌ Failed to load planning data, status:', response.status)
+      employesPlanning.value = []
+      message.value = {
+        text: 'Failed to load planning data',
+        type: 'error'
+      }
     }
   } catch (error) {
-    console.error('Erreur chargement planning:', error)
+    console.error('❌ Error loading planning data:', error)
     employesPlanning.value = []
+    message.value = {
+      text: 'Network error loading planning data',
+      type: 'error'
+    }
   } finally {
     loading.value = false
   }
 }
 
 const actualiserDonnees = async () => {
+  console.log('🔄 Refreshing data for mode:', modeVue.value)
   if (modeVue.value === 'gestion') {
     await chargerEmployesGestion()
   } else {
@@ -567,7 +614,7 @@ const actualiserDonnees = async () => {
   }
 }
 
-// Utilitaires
+// Utilities
 const getInitiales = (employe: Employee): string => {
   if (employe.firstName && employe.lastName) {
     return (employe.firstName[0] + employe.lastName[0]).toUpperCase()
@@ -576,8 +623,8 @@ const getInitiales = (employe: Employee): string => {
     const parts = employe.name.split(' ')
     return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
   }
-  if (employe.nomComplet) {
-    const parts = employe.nomComplet.split(' ')
+  if (employe.fullName) {
+    const parts = employe.fullName.split(' ')
     return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
   }
   return '??'
@@ -585,9 +632,9 @@ const getInitiales = (employe: Employee): string => {
 
 const formatDate = (dateStr: string): string => {
   try {
-    return new Date(dateStr).toLocaleDateString('fr-FR')
+    return new Date(dateStr).toLocaleDateString('en-US')
   } catch {
-    return dateStr
+    return dateStr || 'N/A'
   }
 }
 
@@ -599,9 +646,9 @@ const formatTime = (minutes: number): string => {
 
 const getStatusText = (status: string): string => {
   switch (status) {
-    case 'overloaded': return '🚨 Surchargé'
-    case 'available': return '✅ Disponible'
-    case 'full': return '⚠️ Complet'
+    case 'overloaded': return '🚨 Overloaded'
+    case 'available': return '✅ Available'
+    case 'full': return '⚠️ Full'
     default: return '📊 Normal'
   }
 }
@@ -615,14 +662,6 @@ const getStatusBorderColor = (status: string): string => {
   }
 }
 
-// Affichage des messages temporaires
-const afficherMessage = (texte: string, type: 'success' | 'error' = 'success') => {
-  message.value = { text: texte, type }
-  setTimeout(() => {
-    message.value = { text: '', type: 'success' }
-  }, 5000)
-}
-
 // ========== WATCHERS ==========
 watch(selectedDate, () => {
   if (modeVue.value === 'planning') {
@@ -630,8 +669,9 @@ watch(selectedDate, () => {
   }
 })
 
-// ========== MONTAGE DU COMPOSANT ==========
+// ========== LIFECYCLE ==========
 onMounted(() => {
+  console.log('🚀 EmployeesView mounted, loading initial data...')
   actualiserDonnees()
 })
 </script>

@@ -203,4 +203,8 @@ public class Employee extends AbstractUlidEntity {
 
         return errors;
     }
+
+    public Boolean getActive() { return active; }
+    public Boolean getIsActive() { return active; }
+    public boolean isActive() { return active != null && active; }
 }

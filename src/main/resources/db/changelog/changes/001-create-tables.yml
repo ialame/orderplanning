@@ -13,7 +13,7 @@ databaseChangeLog:
       comment: "Création de la table j_employe pour la gestion des employés"
       changes:
         - createTable:
-            tableName: j_employe
+            tableName: j_employee
             columns:
               # ID principal avec ULID
               - column:
@@ -75,14 +75,14 @@ databaseChangeLog:
 
         # Index pour optimiser les recherches
         - createIndex:
-            tableName: j_employe
+            tableName: j_employee
             indexName: idx_employe_actif
             columns:
               - column:
                   name: actif
 
         - createIndex:
-            tableName: j_employe
+            tableName: j_employee
             indexName: idx_employe_email
             columns:
               - column:
@@ -207,7 +207,7 @@ databaseChangeLog:
         - addForeignKeyConstraint:
             baseTableName: j_planification
             baseColumnNames: employe_id
-            referencedTableName: j_employe
+            referencedTableName: j_employee
             referencedColumnNames: id
             constraintName: fk_planification_employe
             onDelete: CASCADE

@@ -37,7 +37,7 @@ public class GreedyPlanningService {
             Map<String, Object> result = new HashMap<>();
 
             // 1. Get active employees
-            List<Map<String, Object>> employees = employeeService.getActiveEmployeesData();
+            List<Map<String, Object>> employees =  employeeService.getAllActiveEmployees();
             if (employees.isEmpty()) {
                 log.warn("❌ No active employees found");
                 result.put("success", false);

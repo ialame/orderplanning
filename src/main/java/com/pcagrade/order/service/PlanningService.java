@@ -327,7 +327,7 @@ public class PlanningService {
             }
 
             // Get available employees
-            List<Employee> availableEmployees = employeeRepository.findByActiveTrue();
+            List<Employee> availableEmployees = employeeRepository.findAllActive();
             log.info("Found {} available employees", availableEmployees.size());
 
             if (availableEmployees.isEmpty()) {
@@ -360,7 +360,7 @@ public class PlanningService {
         Employee employee = employeeRepository.findById(planning.getEmployeeId())
                 .orElseThrow(() -> new IllegalArgumentException("Employee not found: " + planning.getEmployeeId()));
 
-        if (!employee.getIsActive()) {
+        if (!employee.isActive()) {
             throw new IllegalArgumentException("Cannot assign planning to inactive employee: " + planning.getEmployeeId());
         }
 
@@ -485,7 +485,7 @@ public class PlanningService {
      * @return list of active employees
      */
     private List<Employee> getAvailableEmployees() {
-        return employeeRepository.findByActiveTrue();
+        return employeeRepository.findAllActive();
     }
 
     /**
@@ -671,7 +671,7 @@ public class PlanningService {
         Map<String, Object> analysis = new HashMap<>();
 
         try {
-            List<Employee> activeEmployees = employeeRepository.findByActiveTrue();
+            List<Employee> activeEmployees = employeeRepository.findAllActive();
             List<Map<String, Object>> employeeWorkloads = new ArrayList<>();
 
             for (Employee employee : activeEmployees) {

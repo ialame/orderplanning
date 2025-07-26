@@ -175,12 +175,23 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
      * Get workload statistics for employees
      * @return list of object arrays containing employee workload data
      */
-    @Query("SELECT e.id, CONCAT(e.firstName, ' ', e.lastName), e.workHoursPerDay, " +
-            "COUNT(p.id), COALESCE(SUM(p.durationMinutes), 0) " +
-            "FROM Employee e LEFT JOIN e.plannings p " +
-            "WHERE e.active = true " +
-            "GROUP BY e.id, e.firstName, e.lastName, e.workHoursPerDay " +
-            "ORDER BY e.lastName")
+    /**
+     * Get workload statistics for employees
+     * @return list of object arrays containing employee workload data
+     */
+    @Query(value = """
+    SELECT 
+        HEX(e.id) as employee_id,
+        CONCAT(e.first_name, ' ', e.last_name) as full_name,
+        e.work_hours_per_day,
+        COUNT(p.id) as planning_count,
+        COALESCE(SUM(p.duration_minutes), 0) as total_minutes
+    FROM employee e 
+    LEFT JOIN planning p ON e.id = p.employee_id
+    WHERE e.active = 1
+    GROUP BY e.id, e.first_name, e.last_name, e.work_hours_per_day
+    ORDER BY e.last_name, e.first_name
+    """, nativeQuery = true)
     List<Object[]> getEmployeeWorkloadStatistics();
 
     // ========== CUSTOM NATIVE QUERIES ==========

@@ -270,11 +270,6 @@ interface Stats {
 const loading = ref(false)
 const planning = ref<Employee[]>([])
 const stats = ref<Stats | null>(null)
-const config = ref<Config>({
-  dateDebut: new Date().toISOString().split('T')[0],
-  nombreEmployes: 3,
-  tempsParCarte: 3
-})
 
 // Methods
 const generatePlanning = async () => {
@@ -282,28 +277,122 @@ const generatePlanning = async () => {
   try {
     console.log('🚀 Generating planning with config:', config.value)
 
+    // Ensure proper data types
+    const requestData = {
+      dateDebut: config.value.dateDebut,
+      nombreEmployes: parseInt(config.value.nombreEmployes), // Convert to number
+      tempsParCarte: parseInt(config.value.tempsParCarte)     // Convert to number
+    }
+
+    console.log('📤 Sending request data:', requestData)
+
     const response = await fetch('/api/planning/generate', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      body: JSON.stringify(config.value)
+      body: JSON.stringify(requestData)
     })
 
+    console.log('📥 Response status:', response.status)
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      // Get error details
+      const errorText = await response.text()
+      console.error('❌ Response error:', errorText)
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
     }
 
     const data = await response.json()
-    planning.value = data.employees || []
-    stats.value = data.stats || null
+    console.log('✅ Planning data received:', data)
 
-    console.log('✅ Planning generated successfully')
+    if (data.success) {
+      // Update planning data
+      planning.value = data.planning || []
+      stats.value = data.stats || null
+
+      console.log('✅ Planning generated successfully:', {
+        employees: planning.value.length,
+        totalOrders: stats.value?.totalCommandes || 0
+      })
+
+      // Show success message (if you have notifications)
+      // showNotification?.('Planning generated successfully!', 'success')
+
+    } else {
+      throw new Error(data.message || 'Planning generation failed')
+    }
+
   } catch (error) {
     console.error('❌ Error generating planning:', error)
-    // You might want to add a toast notification here
+
+    // Clear previous data
+    planning.value = []
+    stats.value = null
+
+    // Show error message (you might want to add a reactive error state)
+    alert('Error generating planning: ' + error.message)
+
   } finally {
     loading.value = false
+  }
+}
+
+// ========== CORRECTION du config reactive ==========
+const config = ref({
+  dateDebut: new Date().toISOString().split('T')[0],
+  nombreEmployes: 3,  // Number instead of string
+  tempsParCarte: 3    // Number instead of string
+})
+
+// ========== AJOUT d'une méthode de test ==========
+const testBackendConnection = async () => {
+  try {
+    console.log('🔍 Testing backend connection...')
+
+    const response = await fetch('/api/planning/debug')
+    const data = await response.json()
+
+    console.log('✅ Backend test result:', data)
+
+    if (data.controllerLoaded && data.employeeServiceWorking) {
+      console.log('✅ Backend is working correctly')
+      console.log(`Found ${data.employeeCount} employees`)
+    } else {
+      console.error('❌ Backend has issues:', data)
+    }
+
+    return data
+  } catch (error) {
+    console.error('❌ Backend connection failed:', error)
+    return null
+  }
+}
+
+// ========== AJOUT d'une méthode de debug ==========
+const debugPlanning = async () => {
+  console.log('🔍 Debug mode activated')
+
+  // Test backend
+  await testBackendConnection()
+
+  // Test current config
+  console.log('Current config:', config.value)
+
+  // Test API call
+  try {
+    const response = await fetch('/api/planning/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})  // Empty config for test
+    })
+
+    const data = await response.json()
+    console.log('✅ Test API call result:', data)
+
+  } catch (error) {
+    console.error('❌ Test API call failed:', error)
   }
 }
 

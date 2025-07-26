@@ -163,6 +163,15 @@ const currentActiveTab = ref('dashboard')
 const globalLoadingState = ref(false)
 const currentLoadingMessage = ref('')
 
+// Dans App.vue, remplacer la définition des onglets par :
+
+const tabs = [
+  { id: 'dashboard', label: '📊 Dashboard' },
+  { id: 'orders', label: '📋 Orders' },      // au lieu de 'commandes'
+  { id: 'employees', label: '👥 Employees' }, // au lieu de 'employés'
+  { id: 'planning', label: '📅 Planning' }   // au lieu de 'planification'
+]
+
 // Enhanced notification system
 const notificationSystem = ref<NotificationConfig>({
   show: false,
