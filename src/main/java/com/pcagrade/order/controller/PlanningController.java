@@ -1,468 +1,422 @@
-// ========== PlanningController.java - VERSION AVEC VRAIES DONNÉES ==========
-
 package com.pcagrade.order.controller;
-
-import com.pcagrade.order.service.EmployeeService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 
-/**
- * Planning Controller - Real Data Version
- * Generates planning using real orders from database
- */
+import com.pcagrade.order.service.EmployeeService;
+import com.pcagrade.order.service.OrderService;
+import com.pcagrade.order.service.PlanningService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
+import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/planning")
-@CrossOrigin(origins = {"http://localhost:3000", "http://127.0.0.1:3000"})
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
 public class PlanningController {
-
-    @Autowired
-    private EmployeeService employeeService;
 
     @Autowired
     private EntityManager entityManager;
 
-    private static final int DEFAULT_MINUTES_PER_CARD = 3;
-    private static final int MINIMUM_ORDER_DURATION = 30; // minutes
-    private static final int WORK_START_HOUR = 9;
-    private static final int WORK_END_HOUR = 17;
+    // Reuse existing French services that work
+    @Autowired
+    private OrderService orderService;
+
+    @Autowired
+    private EmployeeService employeeService;
 
     /**
-     * 🚀 GENERATE PLANNING WITH REAL DATA
-     * Endpoint: POST /api/planning/generate
+     * Debug endpoint - English version of French diagnostic
      */
-    @PostMapping("/generate")
-    @Transactional
-    public ResponseEntity<Map<String, Object>> generatePlanning(@RequestBody Map<String, Object> configData) {
-        System.out.println("🚀 === GENERATING PLANNING WITH REAL DATA ===");
+    @GetMapping("/debug-real")
+    public ResponseEntity<Map<String, Object>> debugReal() {
+        Map<String, Object> debug = new HashMap<>();
 
         try {
-            // Extract configuration
-            String dateDebut = extractStringValue(configData, "dateDebut");
-            Integer nombreEmployes = extractIntegerValue(configData, "nombreEmployes");
-            Integer tempsParCarte = extractIntegerValue(configData, "tempsParCarte");
+            // Reuse working French service logic
+            List<Map<String, Object>> activeEmployees = employeeService.getTousEmployesActifs();
+            debug.put("activeEmployees", activeEmployees.size());
 
-            // Set defaults
-            if (dateDebut == null || dateDebut.trim().isEmpty()) {
-                dateDebut = LocalDate.now().toString();
+            // Count orders since June 2025 as requested
+            String sqlCount = "SELECT COUNT(*) FROM `order` WHERE status IN (1, 2) AND date >= '2025-06-01'";
+            Query countQuery = entityManager.createNativeQuery(sqlCount);
+            Long availableOrders = ((Number) countQuery.getSingleResult()).longValue();
+            debug.put("availableOrders", availableOrders);
+
+            // Sample orders with English field names
+            String sqlOrders = """
+                SELECT HEX(o.id), o.num_commande, o.priority,
+                       COUNT(cco.card_certification_id) as card_count
+                FROM `order` o
+                LEFT JOIN card_certification_order cco ON o.id = cco.order_id
+                WHERE o.status IN (1, 2) AND o.date >= '2025-06-01'
+                GROUP BY o.id
+                ORDER BY o.date ASC
+                LIMIT 5
+            """;
+
+            Query ordersQuery = entityManager.createNativeQuery(sqlOrders);
+            @SuppressWarnings("unchecked")
+            List<Object[]> sampleOrders = ordersQuery.getResultList();
+
+            List<Map<String, Object>> ordersData = new ArrayList<>();
+            for (Object[] row : sampleOrders) {
+                Map<String, Object> order = new HashMap<>();
+                order.put("id", row[0]);
+                order.put("orderNumber", row[1]);
+                order.put("priority", row[2]);
+                order.put("cardCount", row[3]);
+                ordersData.add(order);
             }
-            if (tempsParCarte == null || tempsParCarte <= 0) {
-                tempsParCarte = DEFAULT_MINUTES_PER_CARD;
-            }
 
-            System.out.println("📋 Planning config: date=" + dateDebut + ", minutesPerCard=" + tempsParCarte);
+            debug.put("sampleOrders", ordersData);
+            debug.put("status", "SUCCESS");
+            debug.put("message", "English planning system using j_planning table");
 
-            // 1. Get active employees
-            List<Map<String, Object>> employees = employeeService.getAllActiveEmployees();
-            System.out.println("👥 Found " + employees.size() + " active employees");
-
-            if (employees.isEmpty()) {
-                return ResponseEntity.ok(createErrorResponse("No active employees found"));
-            }
-
-            // 2. Get real orders to plan
-            List<Map<String, Object>> orders = getRealOrdersForPlanning(dateDebut);
-            System.out.println("📦 Found " + orders.size() + " orders to plan");
-
-            // 3. Generate real planning
-            List<Map<String, Object>> planningData = generateRealPlanning(employees, orders, tempsParCarte);
-
-            // 4. Calculate real statistics
-            Map<String, Object> stats = calculateRealStats(planningData, orders);
-
-            // 5. Save planning to database (optional)
-            savePlanningToDatabase(planningData, dateDebut);
-
-            // 6. Build response
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Planning generated with real data");
-            response.put("dateDebut", dateDebut);
-            response.put("nombreEmployes", employees.size());
-            response.put("tempsParCarte", tempsParCarte);
-            response.put("planning", planningData);
-            response.put("stats", stats);
-            response.put("ordersProcessed", orders.size());
-            response.put("timestamp", LocalDateTime.now().toString());
-
-            System.out.println("✅ Real planning generated successfully");
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(debug);
 
         } catch (Exception e) {
-            System.err.println("❌ Error generating real planning: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(createErrorResponse("Error: " + e.getMessage()));
+            debug.put("error", e.getMessage());
+            debug.put("status", "ERROR");
+            return ResponseEntity.ok(debug);
         }
     }
 
     /**
-     * 📊 GET REAL ORDERS FOR PLANNING
+     * Generate planning - Translated from French system
      */
-    private List<Map<String, Object>> getRealOrdersForPlanning(String dateDebut) {
-        try {
-            System.out.println("📦 Loading real orders since: " + dateDebut);
+    @PostMapping("/generate")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> generatePlanning(
+            @RequestBody Map<String, Object> request) {
 
-            // SQL query to get real orders with card counts
-            String sql = """
-                SELECT 
-                    HEX(o.id) as order_id,
-                    o.num_commande as order_number,
-                    o.date as order_date,
-                    o.priorite_string as priority,
-                    o.status,
-                    COALESCE(o.temps_estime_minutes, 0) as estimated_minutes,
-                    COALESCE(o.prix_total, 0) as total_price,
-                    COALESCE(card_count.nb_cartes, 0) as card_count
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // English parameter names
+            String startDate = (String) request.get("startDate");
+            Integer numberOfEmployees = (Integer) request.get("numberOfEmployees");
+            Integer timePerCard = (Integer) request.get("timePerCard");
+
+            // Reuse existing French services that work
+            List<Map<String, Object>> employees = employeeService.getTousEmployesActifs();
+            if (employees.isEmpty()) {
+                result.put("success", false);
+                result.put("error", "No active employees found");
+                return ResponseEntity.ok(result);
+            }
+
+            // Limit to requested number of employees
+            if (numberOfEmployees != null && numberOfEmployees < employees.size()) {
+                employees = employees.subList(0, numberOfEmployees);
+            }
+
+            // Get orders since June 2025 with English column aliases
+            String sqlCommandes = """
+                SELECT HEX(o.id) as order_id, 
+                       o.num_commande as order_number,
+                       o.priority,
+                       o.estimated_time_minutes,
+                       o.date,
+                       COUNT(cco.card_certification_id) as card_count
                 FROM `order` o
-                LEFT JOIN (
-                    SELECT 
-                        cco.order_id,
-                        COUNT(cco.card_certification_id) as nb_cartes
-                    FROM card_certification_order cco
-                    GROUP BY cco.order_id
-                ) card_count ON o.id = card_count.order_id
-                WHERE o.date >= ?
-                    AND o.status IN (1, 2)
+                LEFT JOIN card_certification_order cco ON o.id = cco.order_id
+                WHERE o.status IN (1, 2)
+                  AND o.date >= '2025-06-01'
+                GROUP BY o.id
                 ORDER BY 
-                    CASE o.priorite_string 
-                        WHEN 'HAUTE' THEN 1 
-                        WHEN 'MOYENNE' THEN 2 
-                        ELSE 3 
+                    CASE o.priority 
+                        WHEN 'HIGH' THEN 1 
+                        WHEN 'MEDIUM' THEN 2 
+                        WHEN 'LOW' THEN 3 
+                        ELSE 4 
                     END,
-                    o.date ASC
-                LIMIT 50
+                    o.date ASC 
+                LIMIT 20
             """;
 
-            Query query = entityManager.createNativeQuery(sql);
-            query.setParameter(1, dateDebut);
+            Query commandesQuery = entityManager.createNativeQuery(sqlCommandes);
+            @SuppressWarnings("unchecked")
+            List<Object[]> orders = commandesQuery.getResultList();
+
+            if (orders.isEmpty()) {
+                result.put("success", false);
+                result.put("error", "No orders found since June 1st, 2025");
+                return ResponseEntity.ok(result);
+            }
+
+            // Planning algorithm (copied from working French system)
+            List<Map<String, Object>> plannings = new ArrayList<>();
+            LocalDate planDate = LocalDate.parse(startDate);
+            int employeeIndex = 0;
+            int savedPlannings = 0;
+            int startHour = 9;
+
+            for (Object[] order : orders) {
+                String orderId = (String) order[0];
+                String orderNumber = (String) order[1];
+                String priority = (String) order[2];
+                Integer estimatedTime = (Integer) order[3];
+                Object originalDate = order[4];
+                Long cardCount = ((Number) order[5]).longValue();
+
+                // Select employee (rotation)
+                Map<String, Object> employee = employees.get(employeeIndex % employees.size());
+                String employeeId = (String) employee.get("id");
+                String employeeName = employee.get("prenom") + " " + employee.get("nom");
+
+                // Calculate duration
+                int durationMinutes;
+                if (estimatedTime != null && estimatedTime > 0) {
+                    durationMinutes = estimatedTime;
+                } else {
+                    durationMinutes = Math.max(60, (int)(cardCount * timePerCard));
+                }
+
+                // Adjust by priority
+                if ("HIGH".equals(priority)) {
+                    durationMinutes = (int)(durationMinutes * 0.8);
+                } else if ("LOW".equals(priority)) {
+                    durationMinutes = (int)(durationMinutes * 1.2);
+                }
+
+                durationMinutes = Math.max(30, Math.min(480, durationMinutes));
+
+                // Calculate times
+                LocalDateTime startTime = planDate.atTime(startHour, 0);
+                LocalTime startTimeOnly = LocalTime.of(startHour, 0);
+
+                // Check day overflow
+                if (startHour + (durationMinutes / 60) >= 17) {
+                    planDate = planDate.plusDays(1);
+                    startHour = 9;
+                    startTime = planDate.atTime(startHour, 0);
+                    startTimeOnly = LocalTime.of(startHour, 0);
+                }
+
+                // Save to j_planning table (English structure)
+                try {
+                    String sqlInsert = """
+                        INSERT INTO j_planning (
+                            id, order_id, employee_id, planning_date, start_time, 
+                            duration_minutes, completed, created_at, updated_at
+                        ) VALUES (
+                            UNHEX(?), UNHEX(?), UNHEX(?), ?, ?, ?, 0, NOW(), NOW()
+                        )
+                    """;
+
+                    String planningId = UUID.randomUUID().toString().replace("-", "");
+
+                    Query insertQuery = entityManager.createNativeQuery(sqlInsert);
+                    insertQuery.setParameter(1, planningId);
+                    insertQuery.setParameter(2, orderId.replace("-", ""));
+                    insertQuery.setParameter(3, employeeId.replace("-", ""));
+                    insertQuery.setParameter(4, planDate);
+                    insertQuery.setParameter(5, startTimeOnly);
+                    insertQuery.setParameter(6, durationMinutes);
+
+                    int rowsAffected = insertQuery.executeUpdate();
+                    if (rowsAffected > 0) {
+                        savedPlannings++;
+                        System.out.println("✅ " + orderNumber + " → " + employeeName + " on " + planDate);
+                    }
+
+                } catch (Exception e) {
+                    System.err.println("❌ Error saving " + orderNumber + ": " + e.getMessage());
+                }
+
+                // Return data with English field names
+                Map<String, Object> planning = new HashMap<>();
+                planning.put("orderId", orderId);
+                planning.put("orderNumber", orderNumber);
+                planning.put("employeeId", employeeId);
+                planning.put("employeeName", employeeName);
+                planning.put("planningDate", planDate.toString());
+                planning.put("startTime", startTime.toString());
+                planning.put("durationMinutes", durationMinutes);
+                planning.put("priority", priority);
+                planning.put("cardCount", cardCount);
+                planning.put("originalDate", originalDate);
+
+                plannings.add(planning);
+
+                // Advance to next slot
+                employeeIndex++;
+                startHour += (durationMinutes / 60) + 1;
+
+                if (startHour >= 16) {
+                    planDate = planDate.plusDays(1);
+                    startHour = 9;
+                    employeeIndex = 0;
+                }
+            }
+
+            // Force save
+            entityManager.flush();
+
+            // English result format
+            result.put("success", true);
+            result.put("planningsCreated", plannings.size());
+            result.put("planningsSaved", savedPlannings);
+            result.put("ordersAnalyzed", orders.size());
+            result.put("activeEmployees", employees.size());
+            result.put("planningStartDate", startDate);
+            result.put("ordersPeriod", "Since June 1st, 2025");
+            result.put("tableUsed", "j_planning");
+            result.put("plannings", plannings);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    /**
+     * View planning - English version using j_planning table
+     */
+    @GetMapping("/view")
+    public ResponseEntity<List<Map<String, Object>>> viewPlanning(
+            @RequestParam(required = false) String date) {
+
+        try {
+            StringBuilder sql = new StringBuilder();
+            sql.append("SELECT ");
+            sql.append("    HEX(p.id) as planning_id,");
+            sql.append("    HEX(p.order_id) as order_id,");
+            sql.append("    HEX(p.employee_id) as employee_id,");
+            sql.append("    p.planning_date,");
+            sql.append("    p.start_time,");
+            sql.append("    p.duration_minutes,");
+            sql.append("    p.completed,");
+            sql.append("    o.num_commande as order_number,");
+            sql.append("    o.priority,");
+            sql.append("    CONCAT(e.prenom, ' ', e.nom) as employee_name ");
+            sql.append("FROM j_planning p ");
+            sql.append("JOIN `order` o ON p.order_id = o.id ");
+            sql.append("JOIN j_employee e ON p.employee_id = e.id ");
+
+            if (date != null) {
+                sql.append("WHERE p.planning_date = ? ");
+            }
+
+            sql.append("ORDER BY p.planning_date, p.start_time");
+
+            Query query = entityManager.createNativeQuery(sql.toString());
+            if (date != null) {
+                query.setParameter(1, java.sql.Date.valueOf(LocalDate.parse(date)));
+            }
 
             @SuppressWarnings("unchecked")
             List<Object[]> results = query.getResultList();
 
-            List<Map<String, Object>> orders = new ArrayList<>();
-
+            List<Map<String, Object>> planning = new ArrayList<>();
             for (Object[] row : results) {
-                Map<String, Object> order = new HashMap<>();
-                order.put("id", (String) row[0]);
-                order.put("numeroCommande", (String) row[1]);
-                order.put("date", row[2]);
-                order.put("priorite", normalizePriority((String) row[3]));
-                order.put("status", row[4]);
-                order.put("estimatedMinutes", ((Number) row[5]).intValue());
-                order.put("totalPrice", row[6] != null ? ((Number) row[6]).doubleValue() : 0.0);
-                order.put("cardCount", ((Number) row[7]).intValue());
-
-                orders.add(order);
+                Map<String, Object> item = new HashMap<>();
+                item.put("planningId", row[0]);
+                item.put("orderId", row[1]);
+                item.put("employeeId", row[2]);
+                item.put("planningDate", row[3]);
+                item.put("startTime", row[4]);
+                item.put("durationMinutes", row[5]);
+                item.put("completed", ((Number) row[6]).intValue() == 1);
+                item.put("orderNumber", row[7]);
+                item.put("priority", row[8]);
+                item.put("employeeName", row[9]);
+                planning.add(item);
             }
 
-            System.out.println("✅ Loaded " + orders.size() + " real orders");
-            return orders;
+            return ResponseEntity.ok(planning);
 
         } catch (Exception e) {
-            System.err.println("❌ Error loading real orders: " + e.getMessage());
-            return new ArrayList<>();
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(new ArrayList<>());
         }
     }
 
     /**
-     * 🎯 GENERATE REAL PLANNING DISTRIBUTION
+     * Get planning statistics - English version
      */
-    private List<Map<String, Object>> generateRealPlanning(
-            List<Map<String, Object>> employees,
-            List<Map<String, Object>> orders,
-            int minutesPerCard) {
-
-        List<Map<String, Object>> planningData = new ArrayList<>();
-
-        // Track employee workload
-        Map<String, Integer> employeeWorkload = new HashMap<>();
-        Map<String, Integer> employeeOrderCount = new HashMap<>();
-
-        // Initialize employee data
-        for (Map<String, Object> employee : employees) {
-            String employeeId = (String) employee.get("id");
-            employeeWorkload.put(employeeId, 0);
-            employeeOrderCount.put(employeeId, 0);
-
-            Map<String, Object> employeeData = new HashMap<>();
-            employeeData.put("id", employeeId);
-            employeeData.put("nom", employee.get("fullName"));
-            employeeData.put("email", employee.get("email"));
-            employeeData.put("commandes", new ArrayList<Map<String, Object>>());
-            employeeData.put("tempsTotal", 0);
-            employeeData.put("totalCartes", 0);
-
-            planningData.add(employeeData);
-        }
-
-        // Distribute orders using round-robin with workload balancing
-        int employeeIndex = 0;
-        LocalTime currentTime = LocalTime.of(WORK_START_HOUR, 0);
-
-        for (Map<String, Object> order : orders) {
-            // Find employee with least workload
-            String bestEmployeeId = null;
-            int minWorkload = Integer.MAX_VALUE;
-            int bestEmployeeIndex = 0;
-
-            for (int i = 0; i < employees.size(); i++) {
-                String empId = (String) employees.get(i).get("id");
-                int workload = employeeWorkload.get(empId);
-                if (workload < minWorkload) {
-                    minWorkload = workload;
-                    bestEmployeeId = empId;
-                    bestEmployeeIndex = i;
-                }
-            }
-
-            if (bestEmployeeId != null) {
-                // Calculate order duration
-                int cardCount = (Integer) order.get("cardCount");
-                int estimatedMinutes = (Integer) order.get("estimatedMinutes");
-
-                int duration = calculateOrderDuration(cardCount, estimatedMinutes, minutesPerCard);
-
-                // Create order entry
-                Map<String, Object> orderEntry = new HashMap<>();
-                orderEntry.put("id", order.get("id"));
-                orderEntry.put("numeroCommande", order.get("numeroCommande"));
-                orderEntry.put("priorite", order.get("priorite"));
-                orderEntry.put("nombreCartes", cardCount);
-                orderEntry.put("dureeEstimee", duration);
-
-                // Calculate time slots
-                LocalTime startTime = currentTime.plusMinutes(employeeOrderCount.get(bestEmployeeId) * 15); // 15min buffer
-                LocalTime endTime = startTime.plusMinutes(duration);
-
-                // Reset to next day if exceeding work hours
-                if (endTime.getHour() >= WORK_END_HOUR) {
-                    startTime = LocalTime.of(WORK_START_HOUR, 0);
-                    endTime = startTime.plusMinutes(duration);
-                }
-
-                orderEntry.put("heureDebut", startTime.toString());
-                orderEntry.put("heureFin", endTime.toString());
-                orderEntry.put("type", "Real Order");
-
-                // Add to employee's orders
-                Map<String, Object> employeeData = planningData.get(bestEmployeeIndex);
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> employeeOrders = (List<Map<String, Object>>) employeeData.get("commandes");
-                employeeOrders.add(orderEntry);
-
-                // Update employee totals
-                int currentTotal = (Integer) employeeData.get("tempsTotal");
-                int currentCards = (Integer) employeeData.get("totalCartes");
-                employeeData.put("tempsTotal", currentTotal + duration);
-                employeeData.put("totalCartes", currentCards + cardCount);
-
-                // Update tracking
-                employeeWorkload.put(bestEmployeeId, employeeWorkload.get(bestEmployeeId) + duration);
-                employeeOrderCount.put(bestEmployeeId, employeeOrderCount.get(bestEmployeeId) + 1);
-            }
-        }
-
-        // Calculate efficiency for each employee
-        for (Map<String, Object> employeeData : planningData) {
-            int totalMinutes = (Integer) employeeData.get("tempsTotal");
-            int efficiency = calculateEfficiency(totalMinutes);
-            employeeData.put("efficacite", efficiency);
-        }
-
-        return planningData;
-    }
-
-    /**
-     * Calculate order duration based on multiple factors
-     */
-    private int calculateOrderDuration(int cardCount, int estimatedMinutes, int minutesPerCard) {
-        // Priority 1: Use estimated minutes if available and reasonable
-        if (estimatedMinutes > 0 && estimatedMinutes <= 8 * 60) { // Max 8 hours
-            return estimatedMinutes;
-        }
-
-        // Priority 2: Calculate from card count
-        if (cardCount > 0) {
-            return Math.max(MINIMUM_ORDER_DURATION, cardCount * minutesPerCard);
-        }
-
-        // Fallback: default duration
-        return 60; // 1 hour default
-    }
-
-    /**
-     * Save planning to database
-     */
-    @Transactional
-    private void savePlanningToDatabase(List<Map<String, Object>> planningData, String dateDebut) {
-        try {
-            System.out.println("💾 Saving planning to database...");
-
-            // Clear existing planning for the date
-            String sqlDelete = "DELETE FROM j_planning WHERE DATE(date_planification) = ?";
-            Query deleteQuery = entityManager.createNativeQuery(sqlDelete);
-            deleteQuery.setParameter(1, dateDebut);
-            int deletedRows = deleteQuery.executeUpdate();
-            System.out.println("🗑️ Deleted " + deletedRows + " existing planning entries");
-
-            // Insert new planning entries
-            int savedCount = 0;
-            for (Map<String, Object> employee : planningData) {
-                String employeeId = (String) employee.get("id");
-
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> orders = (List<Map<String, Object>>) employee.get("commandes");
-
-                for (Map<String, Object> order : orders) {
-                    String sqlInsert = """
-                        INSERT INTO j_planning 
-                        (id, order_id, employe_id, date_planification, heure_debut, duree_minutes, terminee, date_creation)
-                        VALUES (UNHEX(REPLACE(UUID(), '-', '')), UNHEX(?), UNHEX(?), ?, TIME(?), ?, 0, NOW())
-                    """;
-
-                    Query insertQuery = entityManager.createNativeQuery(sqlInsert);
-                    insertQuery.setParameter(1, ((String) order.get("id")).replace("-", ""));
-                    insertQuery.setParameter(2, employeeId.replace("-", ""));
-                    insertQuery.setParameter(3, dateDebut);
-                    insertQuery.setParameter(4, order.get("heureDebut"));
-                    insertQuery.setParameter(5, order.get("dureeEstimee"));
-
-                    insertQuery.executeUpdate();
-                    savedCount++;
-                }
-            }
-
-            System.out.println("✅ Saved " + savedCount + " planning entries to database");
-
-        } catch (Exception e) {
-            System.err.println("❌ Error saving planning to database: " + e.getMessage());
-            // Don't throw - planning generation can continue without saving
-        }
-    }
-
-    // ========== UTILITY METHODS ==========
-
-    private String normalizePriority(String priority) {
-        if (priority == null) return "MEDIUM";
-        return switch (priority.toUpperCase()) {
-            case "HAUTE", "HIGH" -> "HIGH";
-            case "MOYENNE", "MEDIUM" -> "MEDIUM";
-            case "BASSE", "LOW" -> "LOW";
-            default -> "MEDIUM";
-        };
-    }
-
-    private Map<String, Object> calculateRealStats(List<Map<String, Object>> planningData, List<Map<String, Object>> orders) {
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getStats() {
         Map<String, Object> stats = new HashMap<>();
 
-        int totalCommandes = orders.size();
-        int totalCartes = orders.stream().mapToInt(o -> (Integer) o.get("cardCount")).sum();
-        int tempsTotal = planningData.stream()
-                .mapToInt(emp -> (Integer) emp.get("tempsTotal"))
-                .sum();
+        try {
+            // Total plannings
+            String sqlTotal = "SELECT COUNT(*) FROM j_planning";
+            Query totalQuery = entityManager.createNativeQuery(sqlTotal);
+            Long totalPlannings = ((Number) totalQuery.getSingleResult()).longValue();
 
-        stats.put("totalCommandes", totalCommandes);
-        stats.put("totalCartes", totalCartes);
-        stats.put("tempsTotal", tempsTotal);
-        stats.put("tempsMoyenParCommande", totalCommandes > 0 ? tempsTotal / totalCommandes : 0);
-        stats.put("cartesParHeure", tempsTotal > 0 ? (totalCartes * 60) / tempsTotal : 0);
-        stats.put("employeesAssigned", planningData.size());
+            // By employee
+            String sqlByEmployee = """
+                SELECT CONCAT(e.prenom, ' ', e.nom) as employee_name, COUNT(*) as planning_count
+                FROM j_planning p
+                JOIN j_employee e ON p.employee_id = e.id
+                GROUP BY p.employee_id, e.prenom, e.nom
+                ORDER BY planning_count DESC
+            """;
 
-        return stats;
-    }
+            Query byEmployeeQuery = entityManager.createNativeQuery(sqlByEmployee);
+            @SuppressWarnings("unchecked")
+            List<Object[]> byEmployeeResults = byEmployeeQuery.getResultList();
 
-    private int calculateEfficiency(int totalMinutes) {
-        int maxDailyMinutes = 8 * 60; // 8 hours = 480 minutes
-        return Math.min(100, Math.round((float) totalMinutes / maxDailyMinutes * 100));
-    }
-
-    private String extractStringValue(Map<String, Object> config, String key) {
-        Object value = config.get(key);
-        return value != null ? value.toString() : null;
-    }
-
-    private Integer extractIntegerValue(Map<String, Object> config, String key) {
-        Object value = config.get(key);
-        if (value == null) return null;
-        if (value instanceof Integer) return (Integer) value;
-        if (value instanceof String) {
-            try {
-                return Integer.parseInt((String) value);
-            } catch (NumberFormatException e) {
-                return null;
+            List<Map<String, Object>> employeeStats = new ArrayList<>();
+            for (Object[] row : byEmployeeResults) {
+                Map<String, Object> emp = new HashMap<>();
+                emp.put("employeeName", row[0]);
+                emp.put("planningCount", row[1]);
+                employeeStats.add(emp);
             }
-        }
-        if (value instanceof Number) return ((Number) value).intValue();
-        return null;
-    }
 
-    private Map<String, Object> createErrorResponse(String message) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("success", false);
-        error.put("message", message);
-        error.put("timestamp", LocalDateTime.now().toString());
-        return error;
+            stats.put("totalPlannings", totalPlannings);
+            stats.put("employeeStats", employeeStats);
+            stats.put("status", "SUCCESS");
+
+            return ResponseEntity.ok(stats);
+
+        } catch (Exception e) {
+            stats.put("error", e.getMessage());
+            stats.put("status", "ERROR");
+            return ResponseEntity.ok(stats);
+        }
     }
 
     /**
-     * 🔍 DEBUG REAL DATA
-     * Endpoint: GET /api/planning/debug-real
+     * Delete old plannings - Cleanup utility
      */
-    @GetMapping("/debug-real")
-    public ResponseEntity<Map<String, Object>> debugRealData() {
-        Map<String, Object> debug = new HashMap<>();
+    @DeleteMapping("/cleanup")
+    public ResponseEntity<Map<String, Object>> cleanupOldPlannings() {
+        Map<String, Object> result = new HashMap<>();
 
         try {
-            // Check orders
-            String sqlOrders = "SELECT COUNT(*) FROM `order` WHERE status IN (1, 2)";
-            Query queryOrders = entityManager.createNativeQuery(sqlOrders);
-            Number orderCount = (Number) queryOrders.getSingleResult();
-            debug.put("availableOrders", orderCount.intValue());
-
-            // Check employees
-            List<Map<String, Object>> employees = employeeService.getAllActiveEmployees();
-            debug.put("activeEmployees", employees.size());
-
-            // Sample orders
-            String sqlSample = """
-                SELECT HEX(o.id), o.num_commande, o.priorite_string, 
-                       COALESCE(COUNT(cco.card_certification_id), 0) as card_count
-                FROM `order` o
-                LEFT JOIN card_certification_order cco ON o.id = cco.order_id
-                WHERE o.status IN (1, 2) AND o.date >= CURDATE() - INTERVAL 30 DAY
-                GROUP BY o.id
-                LIMIT 5
+            // Delete plannings older than 30 days and completed
+            String sqlDelete = """
+                DELETE FROM j_planning 
+                WHERE planning_date < CURDATE() - INTERVAL 30 DAY
+                  AND completed = 1
             """;
-            Query querySample = entityManager.createNativeQuery(sqlSample);
-            @SuppressWarnings("unchecked")
-            List<Object[]> sampleData = querySample.getResultList();
 
-            List<Map<String, Object>> sampleOrders = new ArrayList<>();
-            for (Object[] row : sampleData) {
-                Map<String, Object> order = new HashMap<>();
-                order.put("id", row[0]);
-                order.put("numero", row[1]);
-                order.put("priorite", row[2]);
-                order.put("cardCount", ((Number) row[3]).intValue());
-                sampleOrders.add(order);
-            }
-            debug.put("sampleOrders", sampleOrders);
+            Query deleteQuery = entityManager.createNativeQuery(sqlDelete);
+            int deleted = deleteQuery.executeUpdate();
 
-            debug.put("timestamp", LocalDateTime.now().toString());
-            debug.put("ready", orderCount.intValue() > 0 && employees.size() > 0);
+            result.put("success", true);
+            result.put("deletedCount", deleted);
+            result.put("message", deleted + " old plannings deleted");
+
+            return ResponseEntity.ok(result);
 
         } catch (Exception e) {
-            debug.put("error", e.getMessage());
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(result);
         }
-
-        return ResponseEntity.ok(debug);
     }
 }
