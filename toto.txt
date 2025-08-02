@@ -26,3 +26,4 @@ F+ (2 jours) → HIGH - Haute priorité
 F (2 semaines) → MEDIUM - Priorité moyenne
 E (1 semaine) → LOW - Basse priorité
 C (1 mois) → NORMAL - Priorité normale
+
