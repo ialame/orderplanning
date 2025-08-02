@@ -1,0 +1,28 @@
+Je ne cherche qu'à traduire le projet (en français) Planification ci joint dans
+ Connaissances du projet dans ialame/planification, en le projet (en anglais)
+ ialame/orderplanning.
+Le premier marche très bien, le deuxième non encore achevé et ne tourne pas bien.
+La traduction doit être complète: variables, commentaires et affichage en frontend :
+CommandeResponse ==> OrderResponse
+CarteResponse ==> CardResponse
+....
+
+C'est le champs "delai" qui donne la priorité , les délais possibles sont:
+
+C   (29656 fois dans la base) : 1mois
+
+E   (757 fois) : une semaine
+
+F  (5819 fois): deux semaine
+
+F+  (1286 fois): deux jours
+
+X  (52 fois): un jour
+
+1. Mapping Correct des Priorités
+
+X (1 jour) → URGENT - Le plus critique
+F+ (2 jours) → HIGH - Haute priorité
+F (2 semaines) → MEDIUM - Priorité moyenne
+E (1 semaine) → LOW - Basse priorité
+C (1 mois) → NORMAL - Priorité normale

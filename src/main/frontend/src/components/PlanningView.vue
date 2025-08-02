@@ -273,69 +273,20 @@ const stats = ref<Stats | null>(null)
 
 // Methods
 const generatePlanning = async () => {
-  loading.value = true
-  try {
-    console.log('🚀 Generating planning with config:', config.value)
-
-    // Ensure proper data types
-    const requestData = {
-      dateDebut: config.value.dateDebut,
-      nombreEmployes: parseInt(config.value.nombreEmployes), // Convert to number
-      tempsParCarte: parseInt(config.value.tempsParCarte)     // Convert to number
-    }
-
-    console.log('📤 Sending request data:', requestData)
-
-    const response = await fetch('/api/planning/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(requestData)
+  const response = await fetch('/api/planning/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      startDate: config.value.dateDebut,
+      numberOfEmployees: parseInt(config.value.nombreEmployes),
+      timePerCard: parseInt(config.value.tempsParCarte),
+      endDate: "2025-07-04"
     })
+  })
 
-    console.log('📥 Response status:', response.status)
-
-    if (!response.ok) {
-      // Get error details
-      const errorText = await response.text()
-      console.error('❌ Response error:', errorText)
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`)
-    }
-
-    const data = await response.json()
-    console.log('✅ Planning data received:', data)
-
-    if (data.success) {
-      // Update planning data
-      planning.value = data.planning || []
-      stats.value = data.stats || null
-
-      console.log('✅ Planning generated successfully:', {
-        employees: planning.value.length,
-        totalOrders: stats.value?.totalCommandes || 0
-      })
-
-      // Show success message (if you have notifications)
-      // showNotification?.('Planning generated successfully!', 'success')
-
-    } else {
-      throw new Error(data.message || 'Planning generation failed')
-    }
-
-  } catch (error) {
-    console.error('❌ Error generating planning:', error)
-
-    // Clear previous data
-    planning.value = []
-    stats.value = null
-
-    // Show error message (you might want to add a reactive error state)
-    alert('Error generating planning: ' + error.message)
-
-  } finally {
-    loading.value = false
+  const data = await response.json()
+  if (data.success) {
+    console.log(`✅ ${data.planningsSaved} planifications créées !`)
   }
 }
 
