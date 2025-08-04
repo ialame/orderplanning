@@ -1,152 +1,278 @@
 <template>
-  <div id="app" class="min-h-screen bg-gray-100">
-    <!-- Main Navigation -->
-    <nav class="bg-blue-600 text-white shadow-lg">
-      <div class="max-w-7xl mx-auto px-4">
-        <div class="flex justify-between items-center h-16">
-          <!-- Logo and Title -->
-          <div class="flex items-center">
-            <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                <span class="text-2xl">🃏</span>
+  <div id="app" class="pokemon-order-planning-app">
+    <!-- Loading Screen -->
+    <div
+      v-if="isLoading"
+      class="loading-screen fixed inset-0 bg-white flex items-center justify-center z-50"
+    >
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <h2 class="text-2xl font-semibold text-gray-900 mb-2">🃏 Pokemon Order Planning</h2>
+        <p class="text-gray-600">{{ loadingMessage || 'Loading application...' }}</p>
+      </div>
+    </div>
+
+    <!-- Main Application -->
+    <div v-else class="app-container min-h-screen bg-gray-50">
+      <!-- Top Navigation Bar -->
+      <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex justify-between items-center h-16">
+            <!-- Logo and Title -->
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <h1 class="text-2xl font-bold text-blue-600">🃏 Pokemon Planning</h1>
               </div>
-              <div>
-                <h1 class="text-xl font-bold">OrderPlanning</h1>
-                <p class="text-xs text-blue-200">Card Order Management System</p>
+            </div>
+
+            <!-- Status Indicator -->
+            <div class="flex items-center space-x-4">
+              <div class="flex items-center text-sm text-gray-500">
+                <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                System Online
+              </div>
+              <div class="text-sm text-gray-500">
+                {{ new Date().toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              }) }}
               </div>
             </div>
           </div>
+        </div>
+      </header>
 
-          <!-- Navigation Menu -->
-          <div class="flex space-x-1">
+      <!-- Navigation Tabs -->
+      <nav class="bg-white border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex space-x-8">
             <button
-              v-for="tab in navigationTabs"
+              v-for="tab in tabs"
               :key="tab.id"
-              @click="switchToTab(tab.id)"
+              @click="switchTab(tab.id)"
               :class="[
-                'px-4 py-2 rounded-md transition-all duration-200 font-medium',
-                currentActiveTab === tab.id
-                  ? 'bg-blue-700 text-white shadow-lg transform scale-105'
-                  : 'text-blue-100 hover:text-white hover:bg-blue-500'
+                'py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200',
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
             >
               {{ tab.label }}
             </button>
           </div>
+        </div>
+      </nav>
 
-          <!-- Status Indicator -->
-          <div class="flex items-center space-x-3">
-            <div class="flex items-center space-x-2 text-blue-200">
-              <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span class="text-sm">Online</span>
+      <!-- Main Content Area -->
+      <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+          <!-- Notification System -->
+          <div
+            v-if="notification.show"
+            :class="[
+              'mb-6 p-4 rounded-lg border-l-4 transition-all duration-300',
+              notification.type === 'success' ? 'bg-green-50 border-green-400' :
+              notification.type === 'error' ? 'bg-red-50 border-red-400' :
+              notification.type === 'warning' ? 'bg-yellow-50 border-yellow-400' :
+              'bg-blue-50 border-blue-400'
+            ]"
+          >
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg
+                  v-if="notification.type === 'success'"
+                  class="h-5 w-5 text-green-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+                <svg
+                  v-else-if="notification.type === 'error'"
+                  class="h-5 w-5 text-red-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                </svg>
+                <svg
+                  v-else-if="notification.type === 'warning'"
+                  class="h-5 w-5 text-yellow-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <svg
+                  v-else
+                  class="h-5 w-5 text-blue-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div class="ml-3 flex-1">
+                <p :class="[
+                  'text-sm font-medium',
+                  notification.type === 'success' ? 'text-green-800' :
+                  notification.type === 'error' ? 'text-red-800' :
+                  notification.type === 'warning' ? 'text-yellow-800' :
+                  'text-blue-800'
+                ]">
+                  {{ notification.message }}
+                </p>
+                <p
+                  v-if="notification.details"
+                  :class="[
+                    'mt-1 text-sm',
+                    notification.type === 'success' ? 'text-green-700' :
+                    notification.type === 'error' ? 'text-red-700' :
+                    notification.type === 'warning' ? 'text-yellow-700' :
+                    'text-blue-700'
+                  ]"
+                >
+                  {{ notification.details }}
+                </p>
+              </div>
+              <div class="ml-auto pl-3">
+                <button
+                  @click="closeNotification"
+                  :class="[
+                    'inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2',
+                    notification.type === 'success' ? 'text-green-500 hover:bg-green-100 focus:ring-green-600' :
+                    notification.type === 'error' ? 'text-red-500 hover:bg-red-100 focus:ring-red-600' :
+                    notification.type === 'warning' ? 'text-yellow-500 hover:bg-yellow-100 focus:ring-yellow-600' :
+                    'text-blue-500 hover:bg-blue-100 focus:ring-blue-600'
+                  ]"
+                >
+                  <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Component Loading -->
+          <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+              <!-- Dashboard View -->
+              <OrderDashboard
+                v-if="activeTab === 'dashboard'"
+                @show-notification="handleShowNotification"
+                @set-loading="setLoading"
+              />
+
+              <!-- Order Planning View -->
+              <OrderPlanningView
+                v-else-if="activeTab === 'planning'"
+                @show-notification="handleShowNotification"
+                @set-loading="setLoading"
+              />
+
+              <!-- Order List View -->
+              <OrderListView
+                v-else-if="activeTab === 'orders'"
+                @show-notification="handleShowNotification"
+                @set-loading="setLoading"
+              />
+
+              <!-- Employee List View -->
+              <EmployeeListView
+                v-else-if="activeTab === 'employees'"
+                @show-notification="handleShowNotification"
+                @set-loading="setLoading"
+              />
+
+              <!-- Fallback for unknown tabs -->
+              <div v-else class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.441.935-6 2.456"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">Feature Coming Soon</h3>
+                <p class="mt-1 text-sm text-gray-500">This section is under development.</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </nav>
+      </main>
 
-    <!-- Main Content Area -->
-    <main class="max-w-7xl mx-auto px-4 py-6">
-      <!-- Dashboard Component -->
-      <DashboardView
-        v-if="currentActiveTab === 'dashboard'"
-        @go-to-tab="switchToTab"
-      />
-
-      <!-- Orders Management Component -->
-      <OrdersView
-        v-if="currentActiveTab === 'orders'"
-      />
-
-      <!-- Employees Management Component (with integrated planning) -->
-      <EmployeesView
-        v-if="currentActiveTab === 'employees'"
-      />
-
-      <!-- Planning Component -->
-      <PlanningView
-        v-if="currentActiveTab === 'planning'"
-      />
-    </main>
-
-    <!-- Enhanced Notification System -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition-all duration-300 ease-out"
-        leave-active-class="transition-all duration-200 ease-in"
-        enter-from-class="opacity-0 translate-y-2 scale-95"
-        enter-to-class="opacity-100 translate-y-0 scale-100"
-        leave-from-class="opacity-100 translate-y-0 scale-100"
-        leave-to-class="opacity-0 translate-y-2 scale-95"
-      >
-        <div
-          v-if="notificationSystem.show"
-          :class="[
-            'fixed top-4 right-4 p-4 rounded-lg shadow-2xl transition-all z-50 max-w-md',
-            notificationSystem.type === 'success' ? 'bg-green-500 text-white' :
-            notificationSystem.type === 'error' ? 'bg-red-500 text-white' :
-            notificationSystem.type === 'warning' ? 'bg-yellow-500 text-white' :
-            'bg-blue-500 text-white'
-          ]"
-        >
-          <div class="flex items-center space-x-3">
-            <div class="flex-shrink-0">
-              <span v-if="notificationSystem.type === 'success'">✅</span>
-              <span v-else-if="notificationSystem.type === 'error'">❌</span>
-              <span v-else-if="notificationSystem.type === 'warning'">⚠️</span>
-              <span v-else>ℹ️</span>
+      <!-- Footer -->
+      <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+              © 2025 Pokemon Order Planning System - Version 1.0.0
             </div>
-            <div class="flex-1">
-              <p class="font-medium">{{ notificationSystem.message }}</p>
-              <p v-if="notificationSystem.details" class="text-sm opacity-90 mt-1">
-                {{ notificationSystem.details }}
-              </p>
+            <div class="flex space-x-6 text-sm text-gray-500">
+              <span>🚀 Built with Vue 3 + TypeScript</span>
+              <span>⚡ Powered by Spring Boot</span>
             </div>
-            <button
-              @click="closeNotification"
-              class="flex-shrink-0 text-white hover:text-gray-200 transition-colors"
-            >
-              <span class="sr-only">Close</span>
-              ✕
-            </button>
           </div>
         </div>
-      </Transition>
-    </Teleport>
-
-    <!-- Global Loading Overlay -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-300"
-        leave-active-class="transition-opacity duration-300"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-if="globalLoadingState"
-          class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-        >
-          <div class="bg-white rounded-lg p-6 flex items-center space-x-4 shadow-2xl">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span class="text-gray-700 font-medium">{{ currentLoadingMessage || 'Loading...' }}</span>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+      </footer>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, provide, onMounted, onErrorCaptured } from 'vue'
-import DashboardView from './components/DashboardView.vue'
-import OrdersView from './components/OrdersView.vue'
-import EmployeesView from './components/EmployeesView.vue'
-import PlanningView from './components/PlanningView.vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
-// ========== TYPE DEFINITIONS ==========
-interface NotificationConfig {
+// Import only existing components - use async imports to avoid errors
+const OrderDashboard = defineAsyncComponent(() => import('./components/OrderDashboard.vue'))
+const OrderPlanningView = defineAsyncComponent(() => import('./components/OrderPlanningView.vue'))
+
+// Create simple placeholder components for missing ones
+const OrderListView = defineAsyncComponent(() =>
+  import('./components/OrderListView.vue').catch(() => {
+    console.warn('OrderListView not found, using placeholder')
+    return Promise.resolve({
+      template: `
+        <div class="p-8 text-center">
+          <h2 class="text-2xl font-bold text-gray-900 mb-4">📋 Order List</h2>
+          <p class="text-gray-600 mb-4">Order management feature coming soon!</p>
+          <button
+            @click="$emit('show-notification', { message: 'Order List feature is under development', type: 'info' })"
+            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Coming Soon
+          </button>
+        </div>
+      `,
+      emits: ['show-notification']
+    })
+  })
+)
+
+const EmployeeListView = defineAsyncComponent(() =>
+  import('./components/EmployeeListView.vue').catch(() => {
+    console.warn('EmployeeListView not found, using placeholder')
+    return Promise.resolve({
+      template: `
+        <div class="p-8 text-center">
+          <h2 class="text-2xl font-bold text-gray-900 mb-4">👥 Employee Management</h2>
+          <p class="text-gray-600 mb-4">Employee management feature coming soon!</p>
+          <button
+            @click="$emit('show-notification', { message: 'Employee management feature is under development', type: 'info' })"
+            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+          >
+            Coming Soon
+          </button>
+        </div>
+      `,
+      emits: ['show-notification']
+    })
+  })
+)
+
+// Import defineAsyncComponent
+import { defineAsyncComponent } from 'vue'
+
+// ========== INTERFACES ==========
+interface NotificationMessage {
   show: boolean
   message: string
   details?: string
@@ -159,98 +285,102 @@ interface NavigationTab {
 }
 
 // ========== APPLICATION STATE ==========
-const currentActiveTab = ref('dashboard')
-const globalLoadingState = ref(false)
-const currentLoadingMessage = ref('')
+const isLoading = ref(true)
+const loadingMessage = ref('Initializing Pokemon Order Planning System...')
+const activeTab = ref('dashboard')
 
-// Dans App.vue, remplacer la définition des onglets par :
-
-const tabs = [
-  { id: 'dashboard', label: '📊 Dashboard' },
-  { id: 'orders', label: '📋 Orders' },      // au lieu de 'commandes'
-  { id: 'employees', label: '👥 Employees' }, // au lieu de 'employés'
-  { id: 'planning', label: '📅 Planning' }   // au lieu de 'planification'
-]
-
-// Enhanced notification system
-const notificationSystem = ref<NotificationConfig>({
+// Notification system
+const notification = ref<NotificationMessage>({
   show: false,
   message: '',
   details: '',
   type: 'success'
 })
 
-// Timer for auto-closing notifications
-let notificationAutoCloseTimer: NodeJS.Timeout | null = null
+// Auto-close timer for notifications
+let notificationTimer: NodeJS.Timeout | null = null
 
-// ========== APPLICATION CONFIGURATION ==========
-const navigationTabs: NavigationTab[] = [
+// ========== NAVIGATION CONFIGURATION ==========
+const tabs: NavigationTab[] = [
   { id: 'dashboard', label: '📊 Dashboard' },
-  { id: 'orders', label: '📋 Orders' },
-  { id: 'employees', label: '👥 Employees' },
-  { id: 'planning', label: '📅 Planning' }
+  { id: 'planning', label: '📅 Order Planning' },
+  { id: 'orders', label: '📋 Order List' },
+  { id: 'employees', label: '👥 Employees' }
 ]
 
 // ========== NAVIGATION METHODS ==========
 
 /**
- * Switch to a different tab/section
- * @param tabId - The ID of the tab to switch to
+ * Switch between application tabs
  */
-const switchToTab = (tabId: string) => {
-  console.log(`[App] Switching to tab: ${tabId}`)
-  currentActiveTab.value = tabId
+const switchTab = (tabId: string) => {
+  console.log(`🔄 Switching to tab: ${tabId}`)
+  activeTab.value = tabId
 
   // Close any open notifications when switching tabs
   closeNotification()
+
+  // Update document title based on active tab
+  updateDocumentTitle(tabId)
+}
+
+/**
+ * Update browser document title based on current tab
+ */
+const updateDocumentTitle = (tabId: string) => {
+  const tabLabel = tabs.find(tab => tab.id === tabId)?.label || 'Pokemon Planning'
+  document.title = `${tabLabel} - Pokemon Order Planning`
 }
 
 // ========== NOTIFICATION SYSTEM ==========
 
 /**
- * Display a notification message to the user
- * @param message - The main notification message
- * @param type - Type of notification (success, error, warning, info)
- * @param details - Optional additional details
- * @param autoCloseDuration - Duration in ms before auto-close (0 = no auto-close)
+ * Handle show notification event from child components
  */
-const displayNotification = (
-  message: string,
-  type: 'success' | 'error' | 'warning' | 'info' = 'success',
-  details?: string,
-  autoCloseDuration: number = 5000
-) => {
-  // Clear any existing timer
-  if (notificationAutoCloseTimer) {
-    clearTimeout(notificationAutoCloseTimer)
+const handleShowNotification = (config: any) => {
+  showNotification(config)
+}
+
+/**
+ * Display a notification message
+ */
+const showNotification = (config: {
+  message: string
+  details?: string
+  type?: 'success' | 'error' | 'warning' | 'info'
+  duration?: number
+}) => {
+  // Clear existing timer
+  if (notificationTimer) {
+    clearTimeout(notificationTimer)
   }
 
   // Set notification content
-  notificationSystem.value = {
+  notification.value = {
     show: true,
-    message,
-    details,
-    type
+    message: config.message,
+    details: config.details,
+    type: config.type || 'success'
   }
 
-  // Set auto-close timer if duration > 0
-  if (autoCloseDuration > 0) {
-    notificationAutoCloseTimer = setTimeout(() => {
-      closeNotification()
-    }, autoCloseDuration)
-  }
+  // Auto-close after specified duration (default 5 seconds for success, 10 for errors)
+  const duration = config.duration || (config.type === 'error' ? 10000 : 5000)
 
-  console.log(`[App] Notification displayed: ${type} - ${message}`)
+  notificationTimer = setTimeout(() => {
+    closeNotification()
+  }, duration)
+
+  console.log(`📢 Notification: ${config.type} - ${config.message}`)
 }
 
 /**
  * Close the current notification
  */
 const closeNotification = () => {
-  notificationSystem.value.show = false
-  if (notificationAutoCloseTimer) {
-    clearTimeout(notificationAutoCloseTimer)
-    notificationAutoCloseTimer = null
+  notification.value.show = false
+  if (notificationTimer) {
+    clearTimeout(notificationTimer)
+    notificationTimer = null
   }
 }
 
@@ -258,248 +388,205 @@ const closeNotification = () => {
 
 /**
  * Control global loading state
- * @param isLoading - Whether to show loading overlay
- * @param message - Optional loading message
  */
-const setGlobalLoadingState = (isLoading: boolean, message?: string) => {
-  globalLoadingState.value = isLoading
-  currentLoadingMessage.value = message || ''
-  console.log(`[App] Global loading state: ${isLoading} - ${message || 'No message'}`)
+const setLoading = (loading: boolean, message?: string) => {
+  isLoading.value = loading
+  if (message) {
+    loadingMessage.value = message
+  }
 }
 
-// ========== ERROR HANDLING ==========
+// ========== APPLICATION LIFECYCLE ==========
 
 /**
- * Handle global application errors
- * @param error - The error that occurred
- * @param errorContext - Context where the error occurred
+ * Initialize the application
  */
-const handleApplicationError = (error: Error, errorContext: string = 'Application') => {
-  console.error(`[App] Error in ${errorContext}:`, error)
-  displayNotification(
-    'An error occurred',
-    'error',
-    error.message,
-    0 // Don't auto-close error notifications
-  )
-  setGlobalLoadingState(false)
+const initializeApp = async () => {
+  console.log('🚀 Starting Pokemon Order Planning System...')
+
+  try {
+    // Simulate application initialization
+    setLoading(true, 'Loading system configuration...')
+    await new Promise(resolve => setTimeout(resolve, 800))
+
+    setLoading(true, 'Connecting to backend services...')
+    await new Promise(resolve => setTimeout(resolve, 600))
+
+    setLoading(true, 'Preparing user interface...')
+    await new Promise(resolve => setTimeout(resolve, 400))
+
+    // Application is ready
+    setLoading(false)
+
+    // Welcome notification
+    showNotification({
+      message: '🎉 Welcome to Pokemon Order Planning System!',
+      details: 'System is ready for managing your Pokemon card orders.',
+      type: 'success'
+    })
+
+    console.log('✅ Application initialized successfully')
+
+  } catch (error) {
+    console.error('❌ Application initialization failed:', error)
+    setLoading(false)
+    showNotification({
+      message: 'Application initialization failed',
+      details: error instanceof Error ? error.message : 'Unknown error occurred',
+      type: 'error'
+    })
+  }
 }
 
-// ========== DEPENDENCY INJECTION ==========
-// Provide functions for child components to use
-provide('showNotification', displayNotification)
-provide('changeTab', switchToTab)
-provide('setGlobalLoading', setGlobalLoadingState)
-provide('handleGlobalError', handleApplicationError)
+/**
+ * Handle browser tab visibility changes
+ */
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    console.log('📱 Application tab hidden')
+  } else {
+    console.log('📱 Application tab visible')
+    // Optionally refresh data when user returns to tab
+  }
+}
 
-// ========== ERROR CAPTURE ==========
-onErrorCaptured((error: Error, componentInstance, errorInfo) => {
-  handleApplicationError(error, `Vue Component (${errorInfo})`)
-  return false // Prevent error propagation
-})
+/**
+ * Handle keyboard shortcuts
+ */
+const handleKeyboardShortcuts = (event: KeyboardEvent) => {
+  // Ctrl/Cmd + Number keys for tab switching
+  if ((event.ctrlKey || event.metaKey) && event.key >= '1' && event.key <= '4') {
+    event.preventDefault()
+    const tabIndex = parseInt(event.key) - 1
+    if (tabs[tabIndex]) {
+      switchTab(tabs[tabIndex].id)
+    }
+  }
+
+  // Escape key to close notifications
+  if (event.key === 'Escape' && notification.value.show) {
+    closeNotification()
+  }
+}
 
 // ========== LIFECYCLE HOOKS ==========
-onMounted(() => {
-  console.log('[App] OrderPlanning application initialized successfully')
 
-  // Display welcome notification
-  setTimeout(() => {
-    displayNotification(
-      'Welcome to OrderPlanning!',
-      'success',
-      'Card order management system ready',
-      3000
-    )
-  }, 1000)
+onMounted(async () => {
+  console.log('🔧 App.vue mounted')
 
-  // Set up global error handling for unhandled promise rejections
-  window.addEventListener('unhandledrejection', (event) => {
-    console.error('[App] Unhandled promise rejection:', event.reason)
-    handleApplicationError(
-      new Error(event.reason?.message || 'Network error occurred'),
-      'Network Request'
-    )
-  })
+  // Add event listeners
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('keydown', handleKeyboardShortcuts)
 
-  // Set up global error handling for uncaught exceptions
-  window.addEventListener('error', (event) => {
-    console.error('[App] Uncaught error:', event.error)
-    handleApplicationError(
-      event.error || new Error('Unknown error occurred'),
-      'JavaScript Runtime'
-    )
-  })
+  // Initialize the application
+  await initializeApp()
+})
+
+onUnmounted(() => {
+  console.log('🧹 App.vue unmounted')
+
+  // Cleanup event listeners
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('keydown', handleKeyboardShortcuts)
+
+  // Clear notification timer
+  if (notificationTimer) {
+    clearTimeout(notificationTimer)
+  }
 })
 </script>
 
 <style scoped>
-/* ========== CUSTOM ANIMATIONS ========== */
-@keyframes slideInFromTop {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.pokemon-order-planning-app {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-@keyframes pulseAnimation {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+.loading-screen {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
-/* ========== VISUAL ENHANCEMENTS ========== */
-nav {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.animate-pulse {
-  animation: pulseAnimation 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+main {
+  flex: 1;
 }
 
-/* ========== RESPONSIVE DESIGN ========== */
-@media (max-width: 768px) {
-  .max-w-7xl {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  nav .flex.space-x-1 {
-    gap: 0.25rem;
-  }
-
-  nav button {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-  }
-
-  /* Stack navigation vertically on very small screens */
-  @media (max-width: 480px) {
-    nav .flex.justify-between {
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0;
-    }
-
-    nav .h-16 {
-      height: auto;
-      min-height: 4rem;
-    }
-  }
+/* Smooth transitions for tab switching */
+.tab-content {
+  transition: all 0.3s ease-in-out;
 }
 
-/* ========== ACCESSIBILITY IMPROVEMENTS ========== */
-@media (prefers-reduced-motion: reduce) {
-  .transition-all,
-  .animate-spin,
-  .animate-pulse {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-/* ========== FOCUS STATES FOR ACCESSIBILITY ========== */
-button:focus-visible {
-  outline: 2px solid #ffffff;
-  outline-offset: 2px;
-}
-
-/* ========== LOADING SPINNER ANIMATION ========== */
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-</style>
-
-<style>
-/* ========== GLOBAL APPLICATION STYLES ========== */
-#app {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-  'Helvetica Neue', Arial, sans-serif;
-  line-height: 1.6;
-  color: #1f2937;
-  background-color: #f9fafb;
-}
-
-/* ========== CUSTOM SCROLLBAR STYLES ========== */
+/* Custom scrollbar for better UX */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #f1f1f1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #c1c1c1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a1a1a1;
 }
 
-/* ========== FOCUS VISIBLE FOR ACCESSIBILITY ========== */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+/* Responsive design adjustments */
+@media (max-width: 768px) {
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab-button {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+/* Animation for notifications */
+.notification-enter-active,
+.notification-leave-active {
+  transition: all 0.3s ease;
+}
+
+.notification-enter-from {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.notification-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+/* Focus states for accessibility */
+button:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
 }
 
-/* ========== UTILITY CLASSES ========== */
-.text-shadow {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.glass-effect {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* ========== SMOOTH SCROLLING ========== */
-html {
-  scroll-behavior: smooth;
-}
-
-/* ========== SELECTION STYLING ========== */
-::selection {
-  background-color: #3b82f6;
-  color: white;
-}
-
-/* ========== PRINT STYLES ========== */
+/* Print styles */
 @media print {
-  .no-print {
+  .loading-screen,
+  header,
+  nav,
+  footer {
     display: none !important;
   }
 
-  #app {
-    background: white;
-  }
-
-  nav {
-    background: #3b82f6 !important;
-    -webkit-print-color-adjust: exact;
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
   }
 }
 </style>
