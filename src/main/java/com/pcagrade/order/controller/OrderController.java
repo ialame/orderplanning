@@ -22,6 +22,23 @@ public class OrderController {
     @Autowired
     private EntityManager entityManager;
 
+    /**
+     * GET /api/orders - Main endpoint for orders (expected by frontend)
+     */
+    @GetMapping("")
+    public ResponseEntity<List<Map<String, Object>>> getAllOrdersMain() {
+        try {
+            System.out.println("📋 Main orders endpoint - getting recent orders");
+            List<Map<String, Object>> orders = orderService.getRecentOrdersAsMap();
+            System.out.println("✅ " + orders.size() + " orders returned from main endpoint");
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            System.err.println("❌ Error in main orders endpoint: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(new ArrayList<>());
+        }
+    }
+
     @GetMapping("/frontend/orders")
     public ResponseEntity<List<Map<String, Object>>> getOrdersFrontend() {
         try {

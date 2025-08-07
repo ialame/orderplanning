@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -19,6 +20,9 @@ import org.springframework.validation.annotation.Validated;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -246,52 +250,139 @@ public class OrderService {
     }
 
     /**
-     * Get orders that need planning from a specific date
+     * Get orders that need planning from a specific date - FIXED VERSION WITHOUT DUPLICATES
+     * Excludes orders that are already planned in j_planning table
      * @param day day of the month
      * @param month month (1-12)
      * @param year year
-     * @return list of orders as maps for compatibility
+     * @return list of orders as maps for compatibility (excluding already planned)
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getOrdersForPlanning(int day, int month, int year) {
         try {
-            LocalDate fromDate = LocalDate.of(year, month, day);
+            log.info("📋 Loading orders for planning since {}/{}/{} (excluding already planned)", day, month, year);
 
-            String jpql = """
-                SELECT o FROM Order o 
-                WHERE o.orderDate >= :fromDate 
-                ORDER BY o.priority DESC, o.orderDate ASC
-                """;
+            String fromDate = String.format("%04d-%02d-%02d", year, month, day);
 
-            Query query = entityManager.createQuery(jpql, Order.class);
-            query.setParameter("fromDate", fromDate);
+            String sql = """
+            SELECT DISTINCT
+                HEX(o.id) as id,
+                o.num_commande as orderNumber,
+                o.date as orderDate,
+                COALESCE(o.delai, 'MEDIUM') as deadline,
+                COALESCE(
+                    (SELECT COUNT(*) FROM card_certification_order cco 
+                     WHERE cco.order_id = o.id), 10
+                ) as cardCount,
+                CASE 
+                    WHEN o.delai = 'X' THEN 'URGENT'
+                    WHEN o.delai = 'F+' THEN 'HIGH'
+                    WHEN o.delai = 'F' THEN 'HIGH'
+                    WHEN o.delai = 'E' THEN 'MEDIUM'
+                    WHEN o.delai = 'C' THEN 'LOW'
+                    ELSE 'MEDIUM'
+                END as priority,
+                o.status,
+                o.prix_total as totalPrice
+            FROM `order` o
+            WHERE o.date >= ?
+            AND o.status IN (1, 2)
+            AND COALESCE(o.annulee, 0) = 0
+            AND NOT EXISTS (
+                SELECT 1 FROM j_planning jp 
+                WHERE jp.order_id = o.id
+            )
+            ORDER BY o.date ASC
+            LIMIT 100
+            """;
+
+            Query query = entityManager.createNativeQuery(sql);
+            query.setParameter(1, fromDate);
 
             @SuppressWarnings("unchecked")
-            List<Order> orders = query.getResultList();
+            List<Object[]> results = query.getResultList();
 
-            List<Map<String, Object>> result = new ArrayList<>();
-            for (Order order : orders) {
-                Map<String, Object> orderMap = new HashMap<>();
-                orderMap.put("id", order.getId().toString());
-                orderMap.put("numeroCommande", order.getOrderNumber());
-                orderMap.put("date", order.getOrderDate());
-                orderMap.put("delai", calculateDeadlineLabel(order));
-                orderMap.put("nombreCartes", order.getCardCount());
-                orderMap.put("priorite", order.getPriority().name());
-                orderMap.put("prixTotal", order.getTotalPrice());
-                orderMap.put("status", order.getStatus().ordinal());
-                orderMap.put("dateCreation", order.getCreationDate());
-                orderMap.put("dateModification", order.getModificationDate());
+            List<Map<String, Object>> orders = new ArrayList<>();
 
-                result.add(orderMap);
+            for (Object[] row : results) {
+                Map<String, Object> order = new HashMap<>();
+                order.put("id", (String) row[0]);
+                order.put("orderNumber", (String) row[1]);
+                order.put("numeroCommande", (String) row[1]);
+                order.put("orderDate", row[2]);
+                order.put("date", row[2]);
+                order.put("deadline", (String) row[3]);
+                order.put("delai", (String) row[3]);
+                order.put("cardCount", ((Number) row[4]).intValue());
+                order.put("nombreCartes", ((Number) row[4]).intValue());
+                order.put("priority", (String) row[5]);
+                order.put("priorite", (String) row[5]);
+                order.put("status", row[6]);
+                order.put("totalPrice", row[7]);
+                order.put("prixTotal", row[7]);
+
+                orders.add(order);
             }
 
-            log.info("✅ {} orders loaded from {}/{}/{}", result.size(), day, month, year);
-            return result;
+            log.info("✅ {} orders loaded for planning (excluding already planned)", orders.size());
+
+            // Debug stats if no orders found
+            if (orders.isEmpty()) {
+                String countSql = "SELECT COUNT(*) FROM `order` o WHERE o.date >= ? AND o.status IN (1, 2)";
+                Query countQuery = entityManager.createNativeQuery(countSql);
+                countQuery.setParameter(1, fromDate);
+                Number totalOrders = (Number) countQuery.getSingleResult();
+
+                String plannedSql = "SELECT COUNT(DISTINCT jp.order_id) FROM j_planning jp JOIN `order` o ON jp.order_id = o.id WHERE o.date >= ?";
+                Query plannedQuery = entityManager.createNativeQuery(plannedSql);
+                plannedQuery.setParameter(1, fromDate);
+                Number plannedOrders = (Number) plannedQuery.getSingleResult();
+
+                log.info("📊 Orders stats: Total={}, Planned={}, Remaining={}",
+                        totalOrders, plannedOrders, totalOrders.intValue() - plannedOrders.intValue());
+            }
+
+            return orders;
 
         } catch (Exception e) {
-            log.error("❌ Error loading orders: {}", e.getMessage(), e);
+            log.error("❌ Error loading orders for planning: {}", e.getMessage(), e);
             return new ArrayList<>();
+        }
+    }
+
+
+    /**
+     * Get count of already planned orders for diagnostics
+     * @return count of orders that already have planning entries
+     */
+    @Transactional(readOnly = true)
+    public long getAlreadyPlannedOrdersCount() {
+        try {
+            String sql = "SELECT COUNT(DISTINCT jp.order_id) FROM j_planning jp";
+            Query query = entityManager.createNativeQuery(sql);
+            return ((Number) query.getSingleResult()).longValue();
+        } catch (Exception e) {
+            log.error("Error counting planned orders: {}", e.getMessage());
+            return 0L;
+        }
+    }
+
+    /**
+     * Check if a specific order is already planned
+     * @param orderId the order ID to check
+     * @return true if order is already planned
+     */
+    @Transactional(readOnly = true)
+    public boolean isOrderAlreadyPlanned(String orderId) {
+        try {
+            String sql = "SELECT COUNT(*) FROM j_planning WHERE HEX(order_id) = ?";
+            Query query = entityManager.createNativeQuery(sql);
+            query.setParameter(1, orderId.replace("-", ""));
+            Number count = (Number) query.getSingleResult();
+            return count.intValue() > 0;
+        } catch (Exception e) {
+            log.error("Error checking if order is planned: {}", e.getMessage());
+            return false;
         }
     }
 

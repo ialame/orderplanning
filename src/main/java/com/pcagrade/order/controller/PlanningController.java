@@ -633,4 +633,78 @@ public class PlanningController {
 
         return ResponseEntity.ok(result);
     }
+
+
+    /**
+     * English equivalent of /api/planifications/planifications-avec-details
+     */
+    @GetMapping("/plannings-with-details")
+    public ResponseEntity<List<Map<String, Object>>> getPlanningsWithDetails(
+            @RequestParam(required = false) String date) {
+
+        List<Map<String, Object>> plannings = new ArrayList<>();
+
+        try {
+            String targetDate = date != null ? date : LocalDate.now().toString();
+
+            String sql = """
+            SELECT 
+                HEX(p.id) as planning_id,
+                HEX(p.order_id) as order_id,
+                HEX(p.employee_id) as employee_id,
+                p.planning_date,
+                p.start_time,
+                p.end_time,
+                p.estimated_duration_minutes,
+                p.priority,
+                p.status,
+                p.completed,
+                p.card_count,
+                p.notes,
+                CONCAT(COALESCE(e.first_name, e.prenom), ' ', COALESCE(e.last_name, e.nom)) as employee_name,
+                o.num_commande as order_number
+            FROM j_planning p
+            LEFT JOIN employee e ON p.employee_id = e.id
+            LEFT JOIN employe e2 ON p.employee_id = e2.id  
+            LEFT JOIN `order` o ON p.order_id = o.id
+            WHERE p.planning_date = ?
+            ORDER BY p.start_time
+            """;
+
+            Query query = entityManager.createNativeQuery(sql);
+            query.setParameter(1, targetDate);
+
+            @SuppressWarnings("unchecked")
+            List<Object[]> results = query.getResultList();
+
+            for (Object[] row : results) {
+                Map<String, Object> planning = new HashMap<>();
+                planning.put("id", row[0]);
+                planning.put("orderId", row[1]);
+                planning.put("employeeId", row[2]);
+                planning.put("planningDate", row[3]);
+                planning.put("startTime", row[4]);
+                planning.put("endTime", row[5]);
+                planning.put("durationMinutes", row[6]);
+                planning.put("priority", row[7]);
+                planning.put("status", row[8]);
+                planning.put("completed", row[9]);
+                planning.put("cardCount", row[10]);
+                planning.put("notes", row[11]);
+                planning.put("employeeName", row[12]);
+                planning.put("orderNumber", row[13]);
+
+                plannings.add(planning);
+            }
+
+            System.out.println("✅ Retrieved " + plannings.size() + " detailed plannings for " + targetDate);
+
+        } catch (Exception e) {
+            System.err.println("❌ Error retrieving detailed plannings: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return ResponseEntity.ok(plannings);
+    }
+
 }

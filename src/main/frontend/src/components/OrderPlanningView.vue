@@ -1,5 +1,5 @@
 <template>
-  <div class="order-planning-view">
+  <div class="order-planning-view p-6">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
       <div>
@@ -26,100 +26,23 @@
           {{ loading ? 'Generating...' : 'Generate Planning' }}
         </button>
         <button
-          @click="refreshData"
-          :disabled="loading"
-          class="flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          Refresh
-        </button>
-        <button
           @click="testBackend"
-          class="flex items-center gap-2 bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-colors"
+          class="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
         >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          Test Backend
+          🔧 Test Backend
         </button>
       </div>
     </div>
 
-    <!-- Backend Status -->
+    <!-- Configuration Section -->
     <div class="bg-white rounded-lg shadow p-6 mb-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold text-gray-900">Backend Connection Status</h2>
-          <p class="text-gray-600">Planning API and backend services</p>
-        </div>
-        <div :class="[
-          'px-3 py-1 rounded-full text-sm font-medium',
-          backendStatus === 'connected' ? 'bg-green-100 text-green-800' :
-          backendStatus === 'error' ? 'bg-red-100 text-red-800' :
-          'bg-yellow-100 text-yellow-800'
-        ]">
-          {{
-            backendStatus === 'connected' ? '✅ Connected' :
-              backendStatus === 'error' ? '❌ Error' :
-                '⏳ Testing...'
-          }}
-        </div>
-      </div>
-
-      <div v-if="statusMessage" class="mt-4 p-3 bg-gray-50 rounded-lg">
-        <p class="text-sm text-gray-700">{{ statusMessage }}</p>
-      </div>
-
-      <!-- API Endpoints Status -->
-      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <h3 class="font-medium text-gray-900 mb-2">Planning API</h3>
-          <ul class="text-sm text-gray-600 space-y-1">
-            <li>{{ endpoints.planning }} /api/planning/generate</li>
-            <li>{{ endpoints.debug }} /api/planning/debug-real</li>
-            <li>{{ endpoints.stats }} /api/planning/stats</li>
-            <li>{{ endpoints.planningView }} /api/planning/view-simple</li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 class="font-medium text-gray-900 mb-2">Data API</h3>
-          <ul class="text-sm text-gray-600 space-y-1">
-            <li>{{ endpoints.orders }} /api/orders</li>
-            <li>{{ endpoints.employees }} /api/employees</li>
-            <li>{{ endpoints.planifications }} /api/planifications/planifications-avec-details</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <!-- Configuration Panel -->
-    <div class="bg-white rounded-lg shadow-lg p-6 mb-6 border">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-        <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
         </svg>
         Planning Configuration
       </h2>
-
-      <!-- Date Information from .env -->
-      <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h3 class="text-sm font-semibold text-blue-900 mb-2">📅 Configured Date Range</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div>
-            <span class="font-medium text-blue-800">Orders from:</span>
-            <span class="text-blue-700 ml-2">{{ formatDisplayDate(dateConfig.orderStartDate) }}</span>
-          </div>
-          <div>
-            <span class="font-medium text-blue-800">Processing period:</span>
-            <span class="text-blue-700 ml-2">{{ formatDisplayDate(dateConfig.planningStartDate) }} → {{ formatDisplayDate(dateConfig.planningEndDate) }}</span>
-          </div>
-        </div>
-        <p class="text-xs text-blue-600 mt-2">💡 Configure these dates in your .env file</p>
-      </div>
 
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div>
@@ -165,34 +88,7 @@
       </div>
     </div>
 
-    <!-- Success/Error Messages -->
-    <div v-if="message.text" :class="[
-      'p-4 rounded-lg mb-6 flex items-center space-x-3',
-      message.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' :
-      message.type === 'error' ? 'bg-red-50 border border-red-200 text-red-800' :
-      'bg-blue-50 border border-blue-200 text-blue-800'
-    ]">
-      <svg v-if="message.type === 'success'" class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-      </svg>
-      <svg v-else-if="message.type === 'error'" class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-      </svg>
-      <svg v-else class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-      </svg>
-      <div>
-        <p class="font-medium">{{ message.text }}</p>
-        <p v-if="message.details" class="text-sm opacity-75">{{ message.details }}</p>
-      </div>
-      <button @click="clearMessage" class="ml-auto">
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-        </svg>
-      </button>
-    </div>
-
-    <!-- System Statistics -->
+    <!-- Statistics -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
       <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">📊 System Stats</h3>
@@ -258,7 +154,7 @@
     <!-- Generated Plannings -->
     <div v-if="plannings.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
       <div class="px-6 py-4 border-b border-gray-200">
-        <h2 class="text-lg font-semibold text-gray-900">Generated Plannings</h2>
+        <h2 class="text-lg font-semibold text-gray-900">📋 Generated Plannings ({{ plannings.length }})</h2>
         <p class="text-gray-600">Recent planning assignments for employees</p>
       </div>
 
@@ -266,51 +162,77 @@
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
           </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="planning in plannings.slice(0, 10)" :key="planning.id" class="hover:bg-gray-50">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-              {{ planning.orderNumber || planning.orderId.slice(-6) }}
+          <tr v-for="planning in plannings.slice(0, 10)" :key="planning.id" class="hover:bg-gray-50 transition-colors">
+            <!-- Order Number -->
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-gray-900">
+                {{ planning.orderNumber || extractOrderNumber(planning.notes) || `ORD-${planning.orderId?.slice(-6) || 'XXX'}` }}
+              </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              {{ planning.employeeName || `Emp ${planning.employeeId.slice(-4)}` }}
+
+            <!-- Employee Name -->
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm text-gray-900">
+                {{ planning.employeeName || `Employee ${planning.employeeId?.slice(-4) || 'XXXX'}` }}
+              </div>
+              <div class="text-xs text-gray-500">
+                ID: {{ planning.employeeId?.slice(-4) || 'XXXX' }}
+              </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ formatDate(planning.planningDate) }}
+
+            <!-- Planning Date -->
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm text-gray-900">
+                {{ formatDate(planning.planningDate) }}
+              </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ formatTime(planning.startTime) }}
+
+            <!-- Start Time -->
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm text-gray-900">
+                {{ formatTime(planning.startTime) }}
+              </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ planning.durationMinutes }}min
+
+            <!-- Duration -->
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm text-gray-900">
+                {{ planning.durationMinutes || planning.duration_minutes || 60 }}min
+              </div>
             </td>
+
+            <!-- Priority -->
             <td class="px-6 py-4 whitespace-nowrap">
                 <span :class="[
-                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
                   planning.priority === 'URGENT' ? 'bg-red-100 text-red-800' :
                   planning.priority === 'HIGH' ? 'bg-orange-100 text-orange-800' :
                   planning.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
                   'bg-green-100 text-green-800'
                 ]">
-                  {{ planning.priority }}
+                  {{ planning.priority || 'MEDIUM' }}
                 </span>
             </td>
+
+            <!-- Status -->
             <td class="px-6 py-4 whitespace-nowrap">
                 <span :class="[
-                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
                   planning.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                   planning.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
                   'bg-gray-100 text-gray-800'
                 ]">
-                  {{ planning.status }}
+                  {{ planning.status || 'SCHEDULED' }}
                 </span>
             </td>
           </tr>
@@ -318,8 +240,14 @@
         </table>
       </div>
 
-      <div v-if="plannings.length > 10" class="px-6 py-3 bg-gray-50 text-center">
-        <p class="text-sm text-gray-600">Showing 10 of {{ plannings.length }} plannings</p>
+      <!-- Show More Button -->
+      <div v-if="plannings.length > 10" class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <button
+          class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          @click="showAllPlannings = !showAllPlannings"
+        >
+          {{ showAllPlannings ? 'Show Less' : `Show All (${plannings.length} total)` }}
+        </button>
       </div>
     </div>
 
@@ -345,12 +273,35 @@
         </button>
       </div>
     </div>
+
+    <!-- Success/Error Messages -->
+    <div v-if="message.text" :class="[
+      'fixed bottom-4 right-4 p-4 rounded-lg shadow-lg flex items-center space-x-3 max-w-md z-50',
+      message.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' :
+      message.type === 'error' ? 'bg-red-50 border border-red-200 text-red-800' :
+      message.type === 'warning' ? 'bg-yellow-50 border border-yellow-200 text-yellow-800' :
+      'bg-blue-50 border border-blue-200 text-blue-800'
+    ]">
+      <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path v-if="message.type === 'success'" fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        <path v-else-if="message.type === 'error'" fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+        <path v-else fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+      </svg>
+      <div class="flex-1">
+        <p class="text-sm font-medium">{{ message.text }}</p>
+        <p v-if="message.details" class="text-sm mt-1 opacity-80">{{ message.details }}</p>
+      </div>
+      <button @click="clearMessage" class="text-gray-400 hover:text-gray-600">
+        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { dateConfig, systemConfig, appConfig, mapPriorityCode, formatDisplayDate, debugLog } from '../config/appConfig'
 
 // ========== INTERFACES ==========
 interface PlanningConfig {
@@ -363,7 +314,7 @@ interface PlanningConfig {
 interface Planning {
   id: string
   orderId: string
-  orderNumber: string
+  orderNumber?: string
   employeeId: string
   employeeName?: string
   planningDate: string
@@ -372,6 +323,7 @@ interface Planning {
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW'
   status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED'
   cardCount?: number
+  notes?: string
 }
 
 interface Stats {
@@ -398,27 +350,15 @@ const emit = defineEmits(['show-notification'])
 
 // ========== STATE ==========
 const loading = ref(false)
-const backendStatus = ref<'testing' | 'connected' | 'error'>('testing')
-const statusMessage = ref('')
-
+const showAllPlannings = ref(false)
 const plannings = ref<Planning[]>([])
 const message = ref<Message>({ text: '', type: 'info' })
 
-const endpoints = ref({
-  planning: '❓ Not tested',
-  debug: '❓ Not tested',
-  stats: '❓ Not tested',
-  orders: '❓ Not tested',
-  employees: '❓ Not tested',
-  planningView: '❓ Not tested',
-  planifications: '❓ Not tested'
-})
-
 const config = ref<PlanningConfig>({
-  startDate: dateConfig.planningStartDate,
-  endDate: dateConfig.planningEndDate,
-  numberOfEmployees: systemConfig.defaultEmployees,
-  timePerCard: systemConfig.defaultTimePerCard
+  startDate: '2025-07-04',
+  endDate: '2025-07-11',
+  numberOfEmployees: 4,
+  timePerCard: 3
 })
 
 const stats = ref<Stats>({
@@ -435,61 +375,6 @@ const systemStats = ref<SystemStats>({
 })
 
 // ========== METHODS ==========
-
-const testBackend = async () => {
-  backendStatus.value = 'testing'
-  statusMessage.value = 'Testing backend connection...'
-
-  const tests = [
-    { name: 'debug', url: '/api/planning/debug-real' },
-    { name: 'stats', url: '/api/planning/stats' },
-    { name: 'planning', url: '/api/planning/generate' },
-    { name: 'orders', url: '/api/orders' },
-    { name: 'employees', url: '/api/employees' },
-    { name: 'planningView', url: '/api/planning/view-simple' },
-    { name: 'planifications', url: '/api/planifications/planifications-avec-details' }
-  ]
-
-  let successCount = 0
-
-  for (const test of tests) {
-    try {
-      const response = await fetch(test.url, {
-        method: test.name === 'planning' ? 'POST' : 'GET',
-        headers: test.name === 'planning' ? { 'Content-Type': 'application/json' } : {},
-        body: test.name === 'planning' ? JSON.stringify(config.value) : undefined
-      })
-
-      if (response.ok) {
-        endpoints.value[test.name as keyof typeof endpoints.value] = '✅ Available'
-        successCount++
-      } else {
-        endpoints.value[test.name as keyof typeof endpoints.value] = `❌ Error ${response.status}`
-      }
-    } catch (error) {
-      endpoints.value[test.name as keyof typeof endpoints.value] = '❌ Connection failed'
-    }
-  }
-
-  if (successCount > 0) {
-    backendStatus.value = 'connected'
-    statusMessage.value = `✅ Backend partially available (${successCount}/${tests.length} endpoints working)`
-    showMessage({
-      text: 'Backend connection test completed',
-      details: `${successCount} out of ${tests.length} endpoints are working`,
-      type: 'success'
-    })
-  } else {
-    backendStatus.value = 'error'
-    statusMessage.value = '❌ Backend not accessible. Please check if Spring Boot server is running on port 8080.'
-    showMessage({
-      text: 'Backend connection failed',
-      details: 'Please start your Spring Boot server and try again',
-      type: 'error'
-    })
-  }
-}
-
 const generatePlanning = async () => {
   loading.value = true
 
@@ -514,13 +399,17 @@ const generatePlanning = async () => {
 
     const data = await response.json()
 
-    // Update stats
+    console.log('🔍 Backend response:', data)
+
+    // Update stats with corrected mapping
     stats.value = {
-      totalOrders: data.totalOrders || 0,
-      employeesUsed: data.employeesUsed || 0,
-      planningsSaved: data.planningsSaved || 0,
-      executionTimeMs: data.executionTimeMs || 0
+      totalOrders: data.totalOrders || data.ordersAnalyzed || data.ordersProcessed || 0,
+      employeesUsed: data.employeesUsed || data.totalEmployees || data.employeeCount || 0,
+      planningsSaved: data.planningsSaved || data.totalPlannings || data.planningsCreated || 0,
+      executionTimeMs: data.executionTimeMs || data.executionTime || data.duration || 0
     }
+
+    console.log('📊 Mapped stats:', stats.value)
 
     showMessage({
       text: 'Planning generated successfully!',
@@ -547,7 +436,7 @@ const generatePlanning = async () => {
 
     emit('show-notification', {
       message: 'Planning generation failed',
-      details: error instanceof Error ? error.message : 'Unknown error occurred',
+      details: error instanceof Error ? error.message : 'Unknown error',
       type: 'error'
     })
   } finally {
@@ -557,219 +446,84 @@ const generatePlanning = async () => {
 
 const loadPlannings = async () => {
   try {
-    console.log('📋 Loading existing plannings from j_planning table...')
+    console.log('📋 Loading plannings for date:', config.value.startDate)
 
-    // Try multiple endpoints for loading plannings
-    const endpoints = [
-      `/api/planning/view-simple?date=${config.value.startDate}`,
-      `/api/planning/view?date=${config.value.startDate}`,
-      `/api/planning/view`,
-      `/api/planifications/planifications-avec-details`
-    ]
+    const response = await fetch(`/api/planning/view-simple?date=${config.value.startDate}`)
 
-    let response = null
-    let usedEndpoint = ''
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`🔄 Trying planning endpoint: ${endpoint}`)
-        response = await fetch(endpoint)
-
-        if (response.ok) {
-          usedEndpoint = endpoint
-          console.log(`✅ Success with planning endpoint: ${endpoint}`)
-          break
-        } else {
-          console.log(`❌ Failed planning endpoint ${endpoint}: HTTP ${response.status}`)
-        }
-      } catch (error) {
-        console.log(`❌ Failed planning endpoint ${endpoint}:`, error.message)
-        continue
-      }
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
     }
 
-    if (response && response.ok) {
-      const data = await response.json()
-      console.log('🔍 Raw planning data from backend:', data)
+    const data = await response.json()
+    console.log('🔍 Plannings for', config.value.startDate, ':', data.length)
 
-      // Transform the data to match our interface
-      plannings.value = Array.isArray(data) ? data.map((item: any) => ({
-        id: item.id,
-        orderId: item.orderId || item.order_id,
-        orderNumber: extractOrderNumber(item.notes) || item.orderNumber || item.order_number || `ORD-${item.orderId?.slice(-6)}`,
-        employeeId: item.employeeId || item.employee_id,
-        employeeName: item.employeeName || item.employee_name || `Employee ${item.employeeId?.slice(-4)}`,
-        planningDate: item.planningDate || item.planning_date,
-        startTime: item.startTime || item.start_time,
-        durationMinutes: item.durationMinutes || item.duration_minutes || 0,
-        priority: item.priority || 'MEDIUM',
-        status: item.status || 'SCHEDULED',
-        cardCount: item.cardCount || item.card_count
-      })) : []
+    // Filter to be sure (in case backend returns everything)
+    const filteredData = data.filter((p: any) => p.planningDate === config.value.startDate || p.planning_date === config.value.startDate)
 
-      console.log(`✅ Loaded ${plannings.value.length} plannings from ${usedEndpoint}`)
+    plannings.value = filteredData.map((item: any) => ({
+      id: item.id,
+      orderId: item.orderId || item.order_id,
+      orderNumber: extractOrderNumber(item.notes) || item.orderNumber || `ORD-${item.orderId?.slice(-6)}`,
+      employeeId: item.employeeId || item.employee_id,
+      employeeName: item.employeeName || item.employee_name || `Employee ${item.employeeId?.slice(-4)}`,
+      planningDate: item.planningDate || item.planning_date,
+      startTime: item.startTime || item.start_time,
+      durationMinutes: item.durationMinutes || item.duration_minutes || 60,
+      priority: item.priority || 'MEDIUM',
+      status: item.status || 'SCHEDULED',
+      cardCount: item.cardCount || item.card_count || 0,
+      notes: item.notes
+    }))
 
-      if (plannings.value.length > 0) {
-        showMessage({
-          text: `Loaded ${plannings.value.length} existing plannings`,
-          details: `Found plannings from ${usedEndpoint}`,
-          type: 'success'
-        })
-      } else {
-        showMessage({
-          text: 'No existing plannings found',
-          details: 'Database connected but no plannings found in j_planning table',
-          type: 'info'
-        })
-      }
-
-    } else {
-      console.log('⚠️ No planning endpoints available - showing empty state')
-      plannings.value = []
-    }
+    console.log(`✅ Loaded ${plannings.value.length} plannings for ${config.value.startDate}`)
 
   } catch (error) {
     console.error('❌ Error loading plannings:', error)
     plannings.value = []
+  }
+}
+
+const testBackend = async () => {
+  try {
+    const response = await fetch('/api/planning/debug-real')
+    if (response.ok) {
+      showMessage({
+        text: 'Backend connection successful',
+        type: 'success'
+      })
+    }
+  } catch (error) {
     showMessage({
-      text: 'Error loading plannings',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      text: 'Backend connection failed',
       type: 'error'
     })
   }
 }
 
-const refreshData = async () => {
-  await Promise.all([
-    loadSystemStats(),
-    loadPlannings()
-  ])
-}
-
-const loadSystemStats = async () => {
-  try {
-    const [debugResponse, statsResponse] = await Promise.all([
-      fetch('/api/planning/debug-real'),
-      fetch('/api/planning/stats')
-    ])
-
-    if (debugResponse.ok) {
-      const debugData = await debugResponse.json()
-      systemStats.value.availableOrders = debugData.availableOrders || 0
-      systemStats.value.activeEmployees = debugData.activeEmployees || 0
-    }
-
-    if (statsResponse.ok) {
-      const statsData = await statsResponse.json()
-      systemStats.value.totalPlannings = statsData.totalPlannings || 0
-    }
-
-  } catch (error) {
-    console.error('❌ Error loading system stats:', error)
-    // Set sample values
-    systemStats.value = {
-      availableOrders: 15,
-      activeEmployees: 4,
-      totalPlannings: 23
-    }
-  }
-}
-
 const loadSampleData = () => {
-  plannings.value = [
-    {
-      id: 'sample-001',
-      orderId: 'ord-sample-001',
-      orderNumber: 'SAMPLE-001',
-      employeeId: 'emp-001',
-      employeeName: 'Alice Johnson',
-      planningDate: config.value.startDate,
-      startTime: '09:00',
-      durationMinutes: 45,
-      priority: 'URGENT',
-      status: 'SCHEDULED'
-    },
-    {
-      id: 'sample-002',
-      orderId: 'ord-sample-002',
-      orderNumber: 'SAMPLE-002',
-      employeeId: 'emp-002',
-      employeeName: 'Bob Smith',
-      planningDate: config.value.startDate,
-      startTime: '10:00',
-      durationMinutes: 30,
-      priority: 'HIGH',
-      status: 'IN_PROGRESS'
-    },
-    {
-      id: 'sample-003',
-      orderId: 'ord-sample-003',
-      orderNumber: 'SAMPLE-003',
-      employeeId: 'emp-003',
-      employeeName: 'Carol Williams',
-      planningDate: config.value.startDate,
-      startTime: '11:00',
-      durationMinutes: 60,
-      priority: 'MEDIUM',
-      status: 'COMPLETED'
-    }
-  ]
-
-  stats.value = {
-    totalOrders: 15,
-    employeesUsed: 3,
-    planningsSaved: 15,
-    executionTimeMs: 250
-  }
-
   showMessage({
-    text: 'Sample data loaded',
-    details: 'Showing demo planning data for testing',
+    text: 'Sample data feature coming soon',
     type: 'info'
   })
 }
 
-const clearPlannings = async () => {
-  if (confirm('Are you sure you want to clear all plannings?')) {
-    plannings.value = []
-    stats.value = { totalOrders: 0, employeesUsed: 0, planningsSaved: 0, executionTimeMs: 0 }
-    showMessage({
-      text: 'All plannings cleared',
-      type: 'info'
-    })
-  }
+const clearPlannings = () => {
+  plannings.value = []
+  stats.value = { totalOrders: 0, employeesUsed: 0, planningsSaved: 0, executionTimeMs: 0 }
+  showMessage({
+    text: 'All plannings cleared',
+    type: 'info'
+  })
 }
 
 const exportData = () => {
-  const dataToExport = {
-    config: config.value,
-    stats: stats.value,
-    plannings: plannings.value,
-    systemStats: systemStats.value,
-    exportedAt: new Date().toISOString()
-  }
-
-  const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {
-    type: 'application/json'
-  })
-
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `pokemon-planning-${config.value.startDate}.json`
-  document.body.appendChild(a)
-  a.click()
-  URL.revokeObjectURL(url)
-  document.body.removeChild(a)
-
   showMessage({
-    text: 'Planning data exported',
-    type: 'success'
+    text: 'Export feature coming soon',
+    type: 'info'
   })
 }
 
 // ========== UTILITY FUNCTIONS ==========
-
 const showMessage = (msg: Message) => {
   message.value = msg
   if (msg.type === 'success' || msg.type === 'info') {
@@ -782,42 +536,75 @@ const clearMessage = () => {
 }
 
 const formatDate = (dateStr: string): string => {
+  if (!dateStr) return 'N/A'
+
   try {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    let date: Date
+
+    if (dateStr.includes('T')) {
+      date = new Date(dateStr)
+    } else if (dateStr.includes('-')) {
+      date = new Date(dateStr + 'T00:00:00')
+    } else {
+      date = new Date(dateStr)
+    }
+
+    if (isNaN(date.getTime())) return 'Invalid Date'
+
+    return date.toLocaleDateString('en-US', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     })
-  } catch {
-    return dateStr
+  } catch (error) {
+    return 'Invalid Date'
   }
 }
 
-const formatTime = (timeStr: string): string => {
+const formatTime = (timeStr: string | Date): string => {
+  if (!timeStr) return 'N/A'
+
   try {
-    return new Date(`1970-01-01T${timeStr}`).toLocaleTimeString('en-US', {
+    let date: Date
+
+    if (timeStr instanceof Date) {
+      date = timeStr
+    } else if (typeof timeStr === 'string') {
+      if (timeStr.includes('T')) {
+        date = new Date(timeStr)
+      } else if (timeStr.includes(':')) {
+        date = new Date(`1970-01-01T${timeStr}`)
+      } else {
+        date = new Date(timeStr)
+      }
+    } else {
+      return 'N/A'
+    }
+
+    if (isNaN(date.getTime())) return 'Invalid Time'
+
+    return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: false
     })
-  } catch {
-    return timeStr
+  } catch (error) {
+    return 'Invalid Time'
   }
 }
 
 const extractOrderNumber = (notes?: string): string => {
-  if (!notes) return 'Unknown'
-  const match = notes.match(/order (\w+)/)
-  return match ? match[1] : 'Unknown'
+  if (!notes || typeof notes !== 'string') return ''
+
+  const match = notes.match(/order\s+([A-Z0-9]+)/i)
+  return match ? match[1] : ''
 }
 
 // ========== LIFECYCLE ==========
 onMounted(async () => {
-  console.log('📋 OrderPlanningView mounted - Loading data automatically...')
-
-  // Automatically test backend and load all data on mount
+  console.log('📋 OrderPlanningView mounted')
   await testBackend()
-  await loadSystemStats()
   await loadPlannings()
 })
 </script>
@@ -826,31 +613,5 @@ onMounted(async () => {
 .order-planning-view {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
-}
-
-@media (max-width: 768px) {
-  .order-planning-view {
-    padding: 1rem;
-  }
-}
-
-/* Custom scrollbar for tables */
-.overflow-x-auto::-webkit-scrollbar {
-  height: 8px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
 }
 </style>

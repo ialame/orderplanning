@@ -1,17 +1,78 @@
 // ============= ENGLISH ROUTER CONFIGURATION =============
 // Configuration du routeur pour l'interface anglaise
-// Traduction complète du routeur français
+// Corrigé pour n'importer que les composants existants
 
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { defineComponent, h } from 'vue'
 
-// ========== LAZY LOADED COMPONENTS ==========
+// ========== EXISTING COMPONENTS ==========
 const OrderDashboard = () => import('@/components/OrderDashboard.vue')
 const OrderPlanningView = () => import('@/components/OrderPlanningView.vue')
-const OrderListView = () => import('@/components/OrderListView.vue')
 const EmployeeListView = () => import('@/components/EmployeeListView.vue')
-const PlanningCalendarView = () => import('@/components/PlanningCalendarView.vue')
-const SystemSettingsView = () => import('@/components/SystemSettingsView.vue')
+const EmployeeDetailView = () => import('@/components/EmployeeDetailView.vue')
+
+// ========== PLACEHOLDER COMPONENTS FOR MISSING ONES ==========
+const PlaceholderComponent = defineComponent({
+  props: {
+    title: { type: String, required: true },
+    message: { type: String, required: true }
+  },
+  setup(props) {
+    return () => h('div', { class: 'flex items-center justify-center min-h-screen bg-gray-50' }, [
+      h('div', { class: 'text-center p-8' }, [
+        h('div', { class: 'text-6xl mb-4' }, '🚧'),
+        h('h1', { class: 'text-2xl font-bold text-gray-900 mb-2' }, props.title),
+        h('p', { class: 'text-gray-600 mb-4' }, props.message),
+        h('p', { class: 'text-sm text-gray-500' }, 'This component will be implemented soon.')
+      ])
+    ])
+  }
+})
+
+// Create specific placeholder components
+const OrderListView = defineComponent({
+  setup() {
+    return () => h(PlaceholderComponent, {
+      title: 'Orders Management',
+      message: 'Order list and management features are coming soon.'
+    })
+  }
+})
+
+const PlanningCalendarView = defineComponent({
+  setup() {
+    return () => h(PlaceholderComponent, {
+      title: 'Planning Calendar',
+      message: 'Calendar view for planning will be available soon.'
+    })
+  }
+})
+
+const SystemSettingsView = defineComponent({
+  setup() {
+    return () => h(PlaceholderComponent, {
+      title: 'System Settings',
+      message: 'System configuration panel is under development.'
+    })
+  }
+})
+
+const NotFoundView = defineComponent({
+  setup() {
+    return () => h('div', { class: 'flex items-center justify-center min-h-screen bg-gray-50' }, [
+      h('div', { class: 'text-center p-8' }, [
+        h('div', { class: 'text-6xl mb-4' }, '404'),
+        h('h1', { class: 'text-2xl font-bold text-gray-900 mb-2' }, 'Page Not Found'),
+        h('p', { class: 'text-gray-600 mb-4' }, 'The page you are looking for does not exist.'),
+        h('button', {
+          class: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700',
+          onClick: () => window.location.href = '/'
+        }, 'Go Home')
+      ])
+    ])
+  }
+})
 
 // ========== ROUTE DEFINITIONS ==========
 const routes: Array<RouteRecordRaw> = [
@@ -60,17 +121,6 @@ const routes: Array<RouteRecordRaw> = [
       requiresAuth: false
     }
   },
-  {
-    path: '/orders/:id',
-    name: 'OrderDetail',
-    component: () => import('@/components/OrderDetailView.vue'),
-    props: true,
-    meta: {
-      title: 'Order Details',
-      description: 'Detailed view of a specific order',
-      requiresAuth: false
-    }
-  },
 
   // ========== EMPLOYEE MANAGEMENT ==========
   {
@@ -86,7 +136,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/employees/:id',
     name: 'EmployeeDetail',
-    component: () => import('@/components/EmployeeDetailView.vue'),
+    component: EmployeeDetailView,
     props: true,
     meta: {
       title: 'Employee Details',
@@ -106,48 +156,15 @@ const routes: Array<RouteRecordRaw> = [
       requiresAuth: true
     }
   },
-  {
-    path: '/debug',
-    name: 'SystemDebug',
-    component: () => import('@/components/SystemDebugView.vue'),
-    meta: {
-      title: 'System Debug',
-      description: 'Debug and monitoring tools',
-      requiresAuth: true,
-      debugOnly: true
-    }
-  },
-
-  // ========== API DOCUMENTATION ==========
-  {
-    path: '/api-docs',
-    name: 'ApiDocumentation',
-    component: () => import('@/components/ApiDocumentationView.vue'),
-    meta: {
-      title: 'API Documentation',
-      description: 'Complete API documentation for developers',
-      requiresAuth: false
-    }
-  },
 
   // ========== ERROR PAGES ==========
   {
     path: '/404',
     name: 'NotFound',
-    component: () => import('@/components/NotFoundView.vue'),
+    component: NotFoundView,
     meta: {
       title: 'Page Not Found',
       description: 'The requested page could not be found',
-      requiresAuth: false
-    }
-  },
-  {
-    path: '/error',
-    name: 'ErrorPage',
-    component: () => import('@/components/ErrorView.vue'),
-    meta: {
-      title: 'System Error',
-      description: 'An error occurred while processing your request',
       requiresAuth: false
     }
   },
@@ -186,7 +203,6 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
   scrollBehavior(to, from, savedPosition) {
-    // Always scroll to top when changing routes
     if (savedPosition) {
       return savedPosition
     } else {
@@ -196,10 +212,6 @@ const router = createRouter({
 })
 
 // ========== NAVIGATION GUARDS ==========
-
-/**
- * Global before guard for authentication and meta handling
- */
 router.beforeEach(async (to, from, next) => {
   console.log(`🧭 [ROUTER] Navigating from ${from.path} to ${to.path}`)
 
@@ -219,64 +231,18 @@ router.beforeEach(async (to, from, next) => {
     metaDescription.setAttribute('content', String(to.meta.description))
   }
 
-  // Check if route requires authentication (if implemented)
-  if (to.meta.requiresAuth) {
-    // For now, we'll just log this - implement your auth logic here
-    console.log('🔐 [ROUTER] Route requires authentication')
-    // const isAuthenticated = await checkAuthentication()
-    // if (!isAuthenticated) {
-    //   return next('/login')
-    // }
-  }
-
-  // Check if route is debug-only in production
-  if (to.meta.debugOnly && import.meta.env.PROD) {
-    console.warn('🚫 [ROUTER] Debug route accessed in production')
-    return next('/404')
-  }
-
   next()
 })
 
-/**
- * Global after guard for logging and analytics
- */
 router.afterEach((to, from) => {
   console.log(`✅ [ROUTER] Navigation completed: ${to.path}`)
-
-  // Here you could add analytics tracking
-  // analytics.track('page_view', { path: to.path, name: to.name })
 })
 
-/**
- * Error handling for navigation failures
- */
 router.onError((error) => {
   console.error('❌ [ROUTER] Navigation error:', error)
-
-  // Redirect to error page on navigation failure
-  router.push('/error')
 })
 
 // ========== ROUTER UTILITIES ==========
-
-/**
- * Check if current route matches given path
- */
-export const isCurrentRoute = (path: string): boolean => {
-  return router.currentRoute.value.path === path
-}
-
-/**
- * Get current route name
- */
-export const getCurrentRouteName = (): string | null | undefined => {
-  return router.currentRoute.value.name?.toString()
-}
-
-/**
- * Navigate to route with error handling
- */
 export const navigateTo = async (path: string): Promise<boolean> => {
   try {
     await router.push(path)
@@ -287,25 +253,7 @@ export const navigateTo = async (path: string): Promise<boolean> => {
   }
 }
 
-/**
- * Get route parameters
- */
-export const getRouteParams = (): Record<string, string | string[]> => {
-  return router.currentRoute.value.params
-}
-
-/**
- * Get query parameters
- */
-export const getQueryParams = (): Record<string, string | string[]> => {
-  return router.currentRoute.value.query
-}
-
-// ========== ROUTE DEFINITIONS FOR COMPONENTS ==========
-
-/**
- * Navigation menu structure for frontend components
- */
+// ========== NAVIGATION MENU ==========
 export const navigationMenu = [
   {
     name: 'Dashboard',
@@ -339,78 +287,14 @@ export const navigationMenu = [
   }
 ]
 
-/**
- * Admin menu items
- */
 export const adminMenu = [
   {
     name: 'Settings',
     path: '/settings',
     icon: 'cog',
     description: 'System configuration'
-  },
-  {
-    name: 'Debug',
-    path: '/debug',
-    icon: 'bug',
-    description: 'System debugging tools'
-  },
-  {
-    name: 'API Docs',
-    path: '/api-docs',
-    icon: 'code',
-    description: 'API documentation'
   }
 ]
 
 // ========== EXPORT ==========
 export default router
-
-// ========== TYPE DEFINITIONS ==========
-export interface NavigationItem {
-  name: string
-  path: string
-  icon: string
-  description: string
-}
-
-export interface RouteMetaData {
-  title?: string
-  description?: string
-  requiresAuth?: boolean
-  debugOnly?: boolean
-}
-
-// ========== ROUTE NAMES ENUM ==========
-export enum RouteNames {
-  Dashboard = 'Dashboard',
-  OrderPlanning = 'OrderPlanning',
-  PlanningCalendar = 'PlanningCalendar',
-  OrderList = 'OrderList',
-  OrderDetail = 'OrderDetail',
-  EmployeeList = 'EmployeeList',
-  EmployeeDetail = 'EmployeeDetail',
-  SystemSettings = 'SystemSettings',
-  SystemDebug = 'SystemDebug',
-  ApiDocumentation = 'ApiDocumentation',
-  NotFound = 'NotFound',
-  ErrorPage = 'ErrorPage'
-}
-
-// ========== API ENDPOINTS FOR REFERENCE ==========
-export const API_ENDPOINTS = {
-  // Planning endpoints
-  generatePlanning: '/api/planning/generate',
-  viewPlannings: '/api/planning/view-simple',
-  viewPlanningsWithJoins: '/api/planning/view',
-
-  // System endpoints
-  systemInfo: '/api/planning/system/info',
-  systemStats: '/api/planning/system/stats',
-
-  // Legacy French endpoints (for compatibility)
-  legacy: {
-    planifierAutomatique: '/api/planifications/planifier-automatique',
-    voirPlanifications: '/api/planifications/voir'
-  }
-} as const
