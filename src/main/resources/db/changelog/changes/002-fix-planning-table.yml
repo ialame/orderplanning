@@ -1,0 +1,293 @@
+databaseChangeLog:
+
+  # =========================================================================
+  # Changeset 1: Supprimer j_planification et ses contraintes
+  # =========================================================================
+  - changeSet:
+      id: 005-drop-j_planification-table
+      author: ibrahim
+      comment: "Suppression de j_planification pour utiliser j_planning"
+      changes:
+        # Supprimer les vues qui dépendent de j_planification
+        - sql:
+            sql: "DROP VIEW IF EXISTS v_planifications_details"
+
+        # Supprimer les clés étrangères si elles existent
+        - sql:
+            sql: |
+              SET FOREIGN_KEY_CHECKS = 0;
+              DROP TABLE IF EXISTS j_planification;
+              SET FOREIGN_KEY_CHECKS = 1;
+
+  # =========================================================================
+  # Changeset 2: Créer la table j_planning avec la structure correcte
+  # =========================================================================
+  - changeSet:
+      id: 006-create-j_planning-table
+      author: ibrahim
+      comment: "Création de la table j_planning avec structure anglaise cohérente"
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS j_planning (
+                id BINARY(16) NOT NULL PRIMARY KEY,
+                order_id BINARY(16) NOT NULL,
+                employee_id BINARY(16) NOT NULL,
+                planning_date DATE NOT NULL,
+                start_time DATETIME NOT NULL,
+                end_time DATETIME NULL,
+                estimated_duration_minutes INT NOT NULL,
+                estimated_end_time DATETIME NULL,
+                priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+                status VARCHAR(20) NOT NULL DEFAULT 'SCHEDULED',
+                completed BOOLEAN NOT NULL DEFAULT FALSE,
+                progress_percentage INT NOT NULL DEFAULT 0,
+                card_count INT NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                notes TEXT NULL,
+              
+                CONSTRAINT fk_planning_order 
+                    FOREIGN KEY (order_id) REFERENCES `order`(id) ON DELETE CASCADE,
+                CONSTRAINT fk_planning_employee 
+                    FOREIGN KEY (employee_id) REFERENCES j_employee(id) ON DELETE CASCADE,
+              
+                INDEX idx_planning_order (order_id),
+                INDEX idx_planning_employee (employee_id),
+                INDEX idx_planning_date (planning_date),
+                INDEX idx_planning_status (status),
+                INDEX idx_planning_completed (completed),
+                INDEX idx_planning_employee_date_time (employee_id, planning_date, start_time),
+                UNIQUE INDEX idx_planning_unique (order_id, employee_id, planning_date, start_time)
+              )
+            columns:
+              # ID principal avec ULID
+              - column:
+                  name: id
+                  type: BINARY(16)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+
+              # Références vers les autres tables
+              - column:
+                  name: order_id
+                  type: BINARY(16)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: employee_id
+                  type: BINARY(16)
+                  constraints:
+                    nullable: false
+
+              # Planning temporel
+              - column:
+                  name: planning_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: start_time
+                  type: DATETIME
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: end_time
+                  type: DATETIME
+                  constraints:
+                    nullable: true
+
+              - column:
+                  name: estimated_duration_minutes
+                  type: INT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: estimated_end_time
+                  type: DATETIME
+                  constraints:
+                    nullable: true
+
+              # Statut et priorité
+              - column:
+                  name: priority
+                  type: VARCHAR(20)
+                  defaultValue: "MEDIUM"
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: "SCHEDULED"
+                  constraints:
+                    nullable: false
+
+              # État de completion
+              - column:
+                  name: completed
+                  type: BOOLEAN
+                  defaultValue: false
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: progress_percentage
+                  type: INT
+                  defaultValue: 0
+                  constraints:
+                    nullable: false
+
+              # Détails sur les cartes
+              - column:
+                  name: card_count
+                  type: INT
+                  defaultValue: 1
+                  constraints:
+                    nullable: false
+
+              # Métadonnées
+              - column:
+                  name: created_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: DATETIME
+                  defaultValueComputed: CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              # Notes optionnelles
+              - column:
+                  name: notes
+                  type: TEXT
+                  constraints:
+                    nullable: true
+
+        # Clés étrangères
+        - addForeignKeyConstraint:
+            baseTableName: j_planning
+            baseColumnNames: order_id
+            referencedTableName: order
+            referencedColumnNames: id
+            constraintName: fk_planning_order
+            onDelete: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: j_planning
+            baseColumnNames: employee_id
+            referencedTableName: j_employee
+            referencedColumnNames: id
+            constraintName: fk_planning_employee
+            onDelete: CASCADE
+
+        # Index pour optimiser les recherches
+        - createIndex:
+            tableName: j_planning
+            indexName: idx_planning_order
+            columns:
+              - column:
+                  name: order_id
+
+        - createIndex:
+            tableName: j_planning
+            indexName: idx_planning_employee
+            columns:
+              - column:
+                  name: employee_id
+
+        - createIndex:
+            tableName: j_planning
+            indexName: idx_planning_date
+            columns:
+              - column:
+                  name: planning_date
+
+        - createIndex:
+            tableName: j_planning
+            indexName: idx_planning_status
+            columns:
+              - column:
+                  name: status
+
+        - createIndex:
+            tableName: j_planning
+            indexName: idx_planning_completed
+            columns:
+              - column:
+                  name: completed
+
+        # Index composé pour éviter les doublons
+        - createIndex:
+            tableName: j_planning
+            indexName: idx_planning_unique
+            unique: true
+            columns:
+              - column:
+                  name: order_id
+              - column:
+                  name: employee_id
+              - column:
+                  name: planning_date
+              - column:
+                  name: start_time
+
+        # Index de performance pour les requêtes fréquentes
+        - createIndex:
+            tableName: j_planning
+            indexName: idx_planning_employee_date_time
+            columns:
+              - column:
+                  name: employee_id
+              - column:
+                  name: planning_date
+              - column:
+                  name: start_time
+
+  # =========================================================================
+  # Changeset 3: Recréer les vues avec j_planning
+  # =========================================================================
+  - changeSet:
+      id: 007-create-planning-views-updated
+      author: ibrahim
+      comment: "Création des vues pour j_planning"
+      changes:
+        # Vue des planifications avec détails
+        - createView:
+            viewName: v_planning_details
+            selectQuery: |
+              SELECT 
+                  HEX(p.id) as id,
+                  HEX(p.order_id) as order_id,
+                  HEX(p.employee_id) as employee_id,
+                  p.planning_date,
+                  p.start_time,
+                  p.end_time,
+                  p.estimated_duration_minutes,
+                  p.priority,
+                  p.status,
+                  p.completed,
+                  p.card_count,
+                  p.notes,
+                  p.created_at,
+                  p.updated_at,
+              
+                  o.num_commande as order_number,
+                  o.status as order_status,
+                  o.date as order_date,
+              
+                  CONCAT(e.prenom, ' ', e.nom) as employee_name,
+                  e.heures_travail_par_jour as employee_work_hours
+              
+              FROM j_planning p
+              LEFT JOIN `order` o ON p.order_id = o.id
+              LEFT JOIN j_employee e ON p.employee_id = e.id

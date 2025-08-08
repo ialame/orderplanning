@@ -20,7 +20,7 @@ import java.util.List;
  * Represents an employee in the Pokemon card processing system
  */
 @Entity
-@Table(name = "employee")
+@Table(name = "j_employee")
 @Data
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)

@@ -1,15 +1,9 @@
-# ============================================================================
-# Fichier principal Liquibase YAML - Inclut tous les changesets
-# ============================================================================
-
 databaseChangeLog:
 
   # Inclusion du fichier principal avec les tables
-  - include:
-      file: db/changelog/changes/001-create-tables.yml
+#  - include:
+#      file: db/changelog/changes/001-create-tables.yml
 
-  # Ici vous pourrez ajouter d'autres changesets dans le futur
+  # TEMPORAIREMENT DÉSACTIVÉ - Table j_planning créée manuellement
   # - include:
-  #     file: db/changelog/changes/002-add-new-features.yml
-  # - include:
-  #     file: db/changelog/changes/003-performance-improvements.yml
+  #     file: db/changelog/changes/002-fix-planning-table.yml
