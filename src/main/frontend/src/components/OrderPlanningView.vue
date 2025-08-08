@@ -302,6 +302,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { dateConfig, systemConfig } from '@/config/appConfig'
 
 // ========== INTERFACES ==========
 interface PlanningConfig {
@@ -355,11 +356,33 @@ const plannings = ref<Planning[]>([])
 const message = ref<Message>({ text: '', type: 'info' })
 
 const config = ref<PlanningConfig>({
-  startDate: '2025-07-04',
-  endDate: '2025-07-11',
-  numberOfEmployees: 4,
-  timePerCard: 3
+  // ✅ Utilise VITE_PLANNING_START_DATE au lieu de valeur hardcodée
+  startDate: dateConfig.planningStartDate,
+
+  // ✅ Utilise VITE_PLANNING_END_DATE au lieu de valeur hardcodée
+  endDate: dateConfig.planningEndDate,
+
+  // ✅ Utilise VITE_DEFAULT_EMPLOYEES au lieu de valeur hardcodée
+  numberOfEmployees: systemConfig.defaultEmployees,
+
+  // ✅ Utilise VITE_DEFAULT_TIME_PER_CARD au lieu de valeur hardcodée
+  timePerCard: systemConfig.defaultTimePerCard
 })
+
+// ========== MÉTHODE POUR DÉBUGGER LA CONFIGURATION ==========
+const debugConfig = () => {
+  console.log('🔧 Configuration actuelle:')
+  console.log('  📅 Date début planification:', config.value.startDate)
+  console.log('  📅 Date fin planification:', config.value.endDate)
+  console.log('  👥 Nombre d\'employés:', config.value.numberOfEmployees)
+  console.log('  ⏱️ Temps par carte:', config.value.timePerCard, 'minutes')
+
+  console.log('🌍 Variables d\'environnement:')
+  console.log('  VITE_PLANNING_START_DATE:', import.meta.env.VITE_PLANNING_START_DATE)
+  console.log('  VITE_PLANNING_END_DATE:', import.meta.env.VITE_PLANNING_END_DATE)
+  console.log('  VITE_DEFAULT_EMPLOYEES:', import.meta.env.VITE_DEFAULT_EMPLOYEES)
+  console.log('  VITE_DEFAULT_TIME_PER_CARD:', import.meta.env.VITE_DEFAULT_TIME_PER_CARD)
+}
 
 const stats = ref<Stats>({
   totalOrders: 0,

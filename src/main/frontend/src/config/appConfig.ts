@@ -13,6 +13,9 @@ export interface DateConfig {
   planningEndDate: string   // Processing end date
 }
 
+
+
+
 export interface SystemConfig {
   apiBaseUrl: string
   defaultEmployees: number
@@ -37,6 +40,8 @@ export interface PriorityMapping {
 // ===============================================
 // FONCTIONS UTILITAIRES
 // ===============================================
+
+
 
 /**
  * Parse une variable d'environnement en tableau
@@ -86,14 +91,13 @@ const getTodayString = (): string => {
 /**
  * Processing date configuration
  */
+
 export const dateConfig: DateConfig = {
-  // Start date for orders to process (from .env or June 1st, 2025)
+  // Commandes à partir du 1er juin 2025 (comme demandé)
   orderStartDate: import.meta.env.VITE_ORDER_START_DATE || '2025-06-01',
 
-  // Processing start date (from .env or today)
+  // Dates de planification depuis .env
   planningStartDate: import.meta.env.VITE_PLANNING_START_DATE || getTodayString(),
-
-  // Processing end date (from .env or 7 days after start)
   planningEndDate: import.meta.env.VITE_PLANNING_END_DATE ||
     addDays(import.meta.env.VITE_PLANNING_START_DATE || getTodayString(), 7)
 }

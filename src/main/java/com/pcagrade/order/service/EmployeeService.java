@@ -419,21 +419,54 @@ public class EmployeeService {
 
     /**
      * Legacy method for compatibility with existing code
-     * @deprecated Use getAllActiveEmployees() instead
-     */
-    @Deprecated
-    public List<Map<String, Object>> getTousEmployesActifs() {
-        log.warn("Using deprecated method getTousEmployesActifs(), please use getAllActiveEmployees()");
-        return getAllActiveEmployees();
-    }
-
-    /**
-     * Legacy method for compatibility with existing code
      * @deprecated Use createEmployee() instead
      */
     @Deprecated
     public Employee creerEmploye(Employee employee) {
         log.warn("Using deprecated method creerEmploye(), please use createEmployee()");
         return createEmployee(employee);
+    }
+
+    public List<Map<String, Object>> getTousEmployesActifs() {
+        try {
+            // ✅ UTILISER j_employee au lieu de employee
+            String sql = """
+            SELECT 
+                HEX(id) as id,
+                prenom as firstName,
+                nom as lastName,
+                email,
+                actif as active,
+                date_creation as dateCreation
+            FROM j_employee 
+            WHERE actif = 1
+            ORDER BY prenom, nom
+        """;
+
+            Query query = entityManager.createNativeQuery(sql);
+            @SuppressWarnings("unchecked")
+            List<Object[]> results = query.getResultList();
+
+            List<Map<String, Object>> employees = new ArrayList<>();
+            for (Object[] row : results) {
+                Map<String, Object> employee = new HashMap<>();
+                employee.put("id", row[0]);           // ID de j_employee
+                employee.put("prenom", row[1]);       // Prénom français
+                employee.put("nom", row[2]);          // Nom français
+                employee.put("firstName", row[1]);    // Alias anglais
+                employee.put("lastName", row[2]);     // Alias anglais
+                employee.put("email", row[3]);
+                employee.put("active", row[4]);
+                employee.put("dateCreation", row[5]);
+                employees.add(employee);
+            }
+
+            System.out.println("👥 Service employé: " + employees.size() + " employés actifs (j_employee)");
+            return employees;
+
+        } catch (Exception e) {
+            System.err.println("❌ Erreur service employé: " + e.getMessage());
+            return new ArrayList<>();
+        }
     }
 }
