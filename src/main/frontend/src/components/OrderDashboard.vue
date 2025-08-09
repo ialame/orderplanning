@@ -228,8 +228,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { englishApiService } from '@/services/englishApiService'
-import type { SystemDebugResponse, SystemStatsResponse } from '@/services/englishApiService'
+import { apiService } from '@/services/apiService.ts'
+import type { SystemDebugResponse, SystemStatsResponse } from '@/services/apiService.ts'
 
 // ========== ROUTER ==========
 const router = useRouter()
@@ -333,11 +333,11 @@ const loadSystemStats = async () => {
     console.log('📊 Loading system statistics...')
 
     // Load debug info for basic stats
-    const debugResponse = await englishApiService.getSystemInfo()
+    const debugResponse = await apiService.getSystemInfo()
     systemStats.value = debugResponse
 
     // Load planning stats
-    const statsResponse = await englishApiService.getSystemStats()
+    const statsResponse = await apiService.getSystemStats()
     planningStats.value = statsResponse
 
     console.log('✅ System stats loaded:', { debugResponse, statsResponse })

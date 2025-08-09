@@ -830,31 +830,47 @@ public class PlanningController {
     }
 
     /**
-     * ✅ GÉNÉRATION FINALE QUI MARCHE - ENUM CORRECTS
-     * Remplacez votre méthode generatePlanning par celle-ci
+     * ✅ MÉTHODE CORRIGÉE POUR ÉVITER LES DOUBLONS
+     * Remplace la méthode generatePlanning dans PlanningController.java
      */
     @PostMapping("/generate")
+    @Transactional
     public ResponseEntity<Map<String, Object>> generatePlanning(@RequestBody Map<String, Object> request) {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            System.out.println("=== POKEMON CARD ORDER PLANNING GENERATION ===");
+            System.out.println("=== GENERATION PLANIFICATION POKEMON (ANTI-DOUBLONS) ===");
 
             // ========== PARAMÈTRES ==========
             String startDate = "2025-06-01";
             Integer timePerCard = 3;
+            boolean cleanFirst = request.containsKey("cleanFirst") ? (Boolean) request.get("cleanFirst") : false;
+
+            // ========== NETTOYAGE PRÉVENTIF ==========
+            if (cleanFirst) {
+                System.out.println("🧹 Nettoyage préventif des doublons...");
+                String cleanupSql = """
+                DELETE p1 FROM j_planning p1
+                INNER JOIN j_planning p2 
+                WHERE p1.order_id = p2.order_id 
+                  AND p1.employee_id = p2.employee_id
+                  AND p1.planning_date = p2.planning_date
+                  AND p1.start_time = p2.start_time
+                  AND p1.created_at < p2.created_at
+            """;
+                int cleaned = entityManager.createNativeQuery(cleanupSql).executeUpdate();
+                System.out.println("✅ " + cleaned + " doublons supprimés");
+            }
 
             // ========== CHARGEMENT DES DONNÉES ==========
             List<Map<String, Object>> employees = employeService.getTousEmployesActifs();
-            System.out.println("✅ Employés: " + employees.size());
-
             if (employees.isEmpty()) {
                 result.put("success", false);
                 result.put("error", "Aucun employé actif");
                 return ResponseEntity.ok(result);
             }
 
-            // Commandes avec cartes réelles
+            // Commandes avec priorité
             String sqlOrders = """
             SELECT 
                 HEX(o.id) as id, 
@@ -874,7 +890,7 @@ public class PlanningController {
                     WHEN 'F' THEN 3 
                     ELSE 4 
                 END
-            LIMIT 15
+            LIMIT 20
         """;
 
             Query orderQuery = entityManager.createNativeQuery(sqlOrders);
@@ -883,8 +899,6 @@ public class PlanningController {
             @SuppressWarnings("unchecked")
             List<Object[]> orderResults = orderQuery.getResultList();
 
-            System.out.println("✅ Commandes avec cartes: " + orderResults.size());
-
             if (orderResults.isEmpty()) {
                 result.put("success", true);
                 result.put("message", "Aucune commande avec cartes depuis " + startDate);
@@ -892,44 +906,69 @@ public class PlanningController {
                 return ResponseEntity.ok(result);
             }
 
-            // ========== GÉNÉRATION DES PLANIFICATIONS ==========
+            // ========== GÉNÉRATION INTELLIGENTE ==========
             int planningsSaved = 0;
             List<Map<String, Object>> createdPlannings = new ArrayList<>();
+            LocalDate currentDate = LocalDate.parse("2025-09-01");
+            LocalTime currentTime = LocalTime.of(9, 0);
+            int employeeIndex = 0;
 
-            for (int i = 0; i < Math.min(orderResults.size(), 10); i++) {
+            for (Object[] row : orderResults) {
                 try {
-                    Object[] orderRow = orderResults.get(i);
-                    Map<String, Object> employee = employees.get(i % employees.size());
+                    String orderId = (String) row[0];
+                    String orderNumber = (String) row[1];
+                    String delaiCode = (String) row[2];
+                    Integer cardCount = ((Number) row[3]).intValue();
 
-                    String orderId = (String) orderRow[0];
-                    String orderNumber = (String) orderRow[1];
-                    String delaiCode = (String) orderRow[2];
-                    Integer cardCount = ((Number) orderRow[3]).intValue();
+                    // Calcul durée
+                    int durationMinutes = Math.max(15, cardCount * timePerCard);
 
+                    // Sélection employé (rotation)
+                    Map<String, Object> employee = employees.get(employeeIndex % employees.size());
                     String employeeId = (String) employee.get("id");
                     String employeeName = employee.get("prenom") + " " + employee.get("nom");
 
-                    // Calcul durée
-                    int durationMinutes = Math.max(cardCount * timePerCard, 30);
+                    // ========== VÉRIFICATION ANTI-DOUBLON ==========
+                    String checkExistsSql = """
+                    SELECT COUNT(*) FROM j_planning 
+                    WHERE order_id = UNHEX(?)
+                    AND employee_id = UNHEX(?)
+                    AND planning_date = ?
+                    AND start_time = ?
+                """;
 
-                    // Date et heure uniques
-                    LocalDate planningDate = LocalDate.now().plusDays(1 + (i / 5)); // Étaler sur plusieurs jours
-                    LocalTime startTime = LocalTime.of(9 + (i % 8), (i % 4) * 15); // Heures variées
-                    LocalDateTime startDateTime = LocalDateTime.of(planningDate, startTime);
+                    Query checkQuery = entityManager.createNativeQuery(checkExistsSql);
+                    checkQuery.setParameter(1, orderId);
+                    checkQuery.setParameter(2, employeeId);
+                    checkQuery.setParameter(3, currentDate);
+                    checkQuery.setParameter(4, LocalDateTime.of(currentDate, currentTime));
+
+                    Number existingCount = (Number) checkQuery.getSingleResult();
+
+                    if (existingCount.intValue() > 0) {
+                        System.out.println("⚠️ Planning déjà existant pour " + orderNumber + " - IGNORÉ");
+
+                        // Avancer le temps pour éviter les conflits
+                        currentTime = currentTime.plusMinutes(durationMinutes + 15);
+                        if (currentTime.isAfter(LocalTime.of(17, 0))) {
+                            currentDate = currentDate.plusDays(1);
+                            currentTime = LocalTime.of(9, 0);
+                            employeeIndex++;
+                        }
+                        continue;
+                    }
+
+                    // ========== INSERTION SÉCURISÉE ==========
+                    String planningId = UUID.randomUUID().toString().replace("-", "");
+                    LocalDateTime startDateTime = LocalDateTime.of(currentDate, currentTime);
                     LocalDateTime endDateTime = startDateTime.plusMinutes(durationMinutes);
 
-                    System.out.println("🔄 Planification " + (i+1) + ":");
-                    System.out.println("  📦 " + orderNumber + " (" + cardCount + " cartes)");
-                    System.out.println("  👤 " + employeeName);
-                    System.out.println("  📅 " + planningDate + " à " + startTime);
-
-                    // ✅ INSERTION AVEC ENUM CORRECTS
-                    String planningId = UUID.randomUUID().toString().replace("-", "");
                     String insertSql = """
-                INSERT INTO j_planning 
-                (id, order_id, employee_id, planning_date, start_time, end_time, 
-                 estimated_duration_minutes, priority, status, completed, card_count, notes, created_at, updated_at)
-                VALUES (UNHEX(?), UNHEX(?), UNHEX(?), ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    INSERT INTO j_planning 
+                    (id, order_id, employee_id, planning_date, start_time, end_time, 
+                     estimated_duration_minutes, estimated_end_time, priority, status, 
+                     completed, card_count, notes, progress_percentage, created_at, updated_at)
+                    VALUES (UNHEX(?), UNHEX(?), UNHEX(?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                 """;
 
                     try {
@@ -937,15 +976,17 @@ public class PlanningController {
                                 .setParameter(1, planningId)
                                 .setParameter(2, orderId)
                                 .setParameter(3, employeeId)
-                                .setParameter(4, planningDate)
+                                .setParameter(4, currentDate)
                                 .setParameter(5, startDateTime)
                                 .setParameter(6, endDateTime)
                                 .setParameter(7, durationMinutes)
-                                .setParameter(8, mapDelaiToPriorityEnum(delaiCode)) // ✅ ENUM valide
-                                .setParameter(9, "SCHEDULED") // ✅ ENUM valide
-                                .setParameter(10, false)
-                                .setParameter(11, cardCount)
-                                .setParameter(12, "🎮 Pokémon: " + orderNumber + " → " + employeeName + " (" + cardCount + " cartes)")
+                                .setParameter(8, endDateTime)
+                                .setParameter(9, mapDelaiToPriorityEnum(delaiCode))
+                                .setParameter(10, "SCHEDULED")
+                                .setParameter(11, false)
+                                .setParameter(12, cardCount)
+                                .setParameter(13, "🎮 Pokémon: " + orderNumber + " → " + employeeName + " (" + cardCount + " cartes)")
+                                .setParameter(14, 0)
                                 .executeUpdate();
 
                         if (rowsAffected > 0) {
@@ -957,14 +998,13 @@ public class PlanningController {
                             planning.put("employeeName", employeeName);
                             planning.put("cardCount", cardCount);
                             planning.put("durationMinutes", durationMinutes);
-                            planning.put("planningDate", planningDate.toString());
-                            planning.put("startTime", startTime.toString());
+                            planning.put("planningDate", currentDate.toString());
+                            planning.put("startTime", currentTime.toString());
                             planning.put("priority", mapDelaiToPriorityEnum(delaiCode));
                             createdPlannings.add(planning);
 
-                            System.out.println("  ✅ SUCCÈS !");
-                        } else {
-                            System.out.println("  ❌ 0 rows affected");
+                            System.out.println("  ✅ " + orderNumber + " → " + employeeName +
+                                    " (" + currentDate + " " + currentTime + ")");
                         }
 
                     } catch (Exception insertError) {
@@ -972,8 +1012,16 @@ public class PlanningController {
                         // Continuer avec les autres
                     }
 
+                    // ========== AVANCEMENT TEMPOREL ==========
+                    currentTime = currentTime.plusMinutes(durationMinutes + 15); // 15min de pause
+                    if (currentTime.isAfter(LocalTime.of(17, 0))) {
+                        currentDate = currentDate.plusDays(1);
+                        currentTime = LocalTime.of(9, 0);
+                        employeeIndex++;
+                    }
+
                 } catch (Exception e) {
-                    System.err.println("❌ Erreur commande " + (i+1) + ": " + e.getMessage());
+                    System.err.println("❌ Erreur commande: " + e.getMessage());
                 }
             }
 
@@ -986,47 +1034,40 @@ public class PlanningController {
                     .sum();
 
             result.put("success", true);
-            result.put("message", "🎮 Planification des commandes Pokémon terminée avec succès !");
+            result.put("message", "🎮 Planification Pokémon terminée - " + planningsSaved + " plannings créés");
             result.put("ordersAnalyzed", orderResults.size());
-            result.put("employeesUsed", employees.size());
+            result.put("employeesUsed", Math.min(employees.size(), employeeIndex + 1));
             result.put("planningsSaved", planningsSaved);
             result.put("totalCards", totalCards);
             result.put("totalMinutes", totalMinutes);
             result.put("totalHours", String.format("%.1f", totalMinutes / 60.0));
-            result.put("averageCardsPerOrder", totalCards / Math.max(planningsSaved, 1));
             result.put("createdPlannings", createdPlannings);
             result.put("timePerCardMinutes", timePerCard);
+            result.put("strategy", "ANTI_DUPLICATE_WITH_TIME_PROGRESSION");
 
-            System.out.println("🎉 GÉNÉRATION TERMINÉE !");
-            System.out.println("📊 Résultats: " + planningsSaved + " planifications créées");
-            System.out.println("📦 Total: " + totalCards + " cartes, " + totalMinutes + " minutes");
-
+            System.out.println("🎉 GÉNÉRATION TERMINÉE - " + planningsSaved + " plannings sauvés !");
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
-            System.err.println("❌ Erreur génération: " + e.getMessage());
+            System.err.println("❌ ERREUR GÉNÉRATION: " + e.getMessage());
             e.printStackTrace();
-
             result.put("success", false);
             result.put("error", e.getMessage());
-            result.put("planningsSaved", 0);
-            return ResponseEntity.ok(result);
+            return ResponseEntity.status(500).body(result);
         }
     }
 
     /**
-     * ✅ MAPPING CORRECT POUR LES ENUM DE PRIORITY
+     * ✅ MÉTHODE UTILITAIRE POUR MAPPER DÉLAI → PRIORITÉ
      */
-    private String mapDelaiToPriorityEnum(String delai) {
-        if (delai == null) return "MEDIUM";
+    private String mapDelaiToPriorityEnum(String delaiCode) {
+        if (delaiCode == null) return "MEDIUM";
 
-        switch (delai.toUpperCase()) {
-            case "X": return "URGENT";    // Urgent
-            case "F+": return "HIGH";     // Haute priorité
-            case "F": return "MEDIUM";    // Moyenne priorité
-            case "E": return "LOW";       // Basse priorité
-            case "C": return "MEDIUM";    // Moyenne par défaut
-            default: return "MEDIUM";
+        switch (delaiCode.toUpperCase()) {
+            case "X": return "URGENT";
+            case "F+": return "HIGH";
+            case "F": return "MEDIUM";
+            default: return "LOW";
         }
     }
 

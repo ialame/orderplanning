@@ -1,5 +1,5 @@
 // ============= TYPES TYPESCRIPT ANGLAIS =============
-// Fichier: src/main/frontend/src/types/english-english-api.ts
+// Fichier: src/main/frontend/src/types/english-api.ts
 
 // ========== CORE INTERFACES ==========
 

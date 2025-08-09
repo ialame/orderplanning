@@ -115,7 +115,7 @@ export interface ApiError extends Error {
 
 // ========== API SERVICE CLASS ==========
 
-export class EnglishApiService {
+export class ApiService {
   private readonly baseUrl = '/api/planning'
   private readonly headers = {
     'Content-Type': 'application/json',
@@ -467,7 +467,7 @@ export class EnglishApiService {
 }
 
 // ========== SINGLETON INSTANCE ==========
-export const englishApiService = new EnglishApiService()
+export const apiService = new EnglishApiService()
 
 // ========== CONVENIENCE FUNCTIONS ==========
 
@@ -475,19 +475,19 @@ export const englishApiService = new EnglishApiService()
  * Quick function to generate planning
  */
 export const generatePlanning = (config: OrderRequest) =>
-  englishApiService.generatePlanning(config)
+  apiService.generatePlanning(config)
 
 /**
  * Quick function to get today's plannings
  */
 export const getTodaysPlannings = () =>
-  englishApiService.getPlannings(new Date().toISOString().split('T')[0])
+  apiService.getPlannings(new Date().toISOString().split('T')[0])
 
 /**
  * Quick function to get system status
  */
 export const getSystemStatus = () =>
-  englishApiService.getSystemInfo()
+  apiService.getSystemInfo()
 
 /**
  * Format planning for display
