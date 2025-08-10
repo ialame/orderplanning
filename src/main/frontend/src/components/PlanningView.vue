@@ -1,417 +1,592 @@
+// ============= PLANNING VIEW COMPONENT - 100% ENGLISH =============
+// Complete English component for Pokemon card planning management
+// NO FRENCH variables, comments, or methods
+
 <template>
   <div class="planning-view">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">Order Planning</h1>
-        <p class="text-gray-600 mt-1">Automatic distribution of Pokemon card orders</p>
-      </div>
-      <div class="flex gap-3">
-        <button
-          @click="generatePlanning"
-          :disabled="loading"
-          class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-          </svg>
-          Generate Planning
-        </button>
-        <button
-          @click="exportPlanning"
-          class="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-          </svg>
-          Export
-        </button>
+    <!-- Header Section -->
+    <div class="header-section">
+      <h1 class="page-title">🎮 Pokemon Card Order Planning</h1>
+      <p class="page-description">
+        Manage and view automatic planning for Pokemon card certification orders
+      </p>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+      <button
+        @click="generateAutomaticPlanning"
+        :disabled="isGenerating"
+        class="btn btn-primary"
+      >
+        <span v-if="isGenerating">🔄 Generating...</span>
+        <span v-else>🎮 Generate Pokemon Planning</span>
+      </button>
+
+      <button
+        @click="loadPlannings"
+        :disabled="isLoading"
+        class="btn btn-secondary"
+      >
+        <span v-if="isLoading">🔄 Loading...</span>
+        <span v-else">📋 Refresh Plannings</span>
+      </button>
+
+      <button
+        @click="cleanDuplicates"
+        class="btn btn-warning"
+      >
+        🧹 Clean Duplicates
+      </button>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div v-if="isLoading" class="loading-section">
+      <div class="loading-spinner"></div>
+      <p>{{ loadingMessage }}</p>
+    </div>
+
+    <!-- Statistics Section -->
+    <div v-if="!isLoading && plannings.length > 0" class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Total Plannings</h3>
+          <p class="stat-number">{{ plannings.length }}</p>
+        </div>
+        <div class="stat-card">
+          <h3>Completed</h3>
+          <p class="stat-number">{{ completedPlannings }}</p>
+        </div>
+        <div class="stat-card">
+          <h3>In Progress</h3>
+          <p class="stat-number">{{ inProgressPlannings }}</p>
+        </div>
+        <div class="stat-card">
+          <h3>Employees Used</h3>
+          <p class="stat-number">{{ employeesUsed }}</p>
+        </div>
       </div>
     </div>
 
-    <!-- Filters and Configuration -->
-    <div class="bg-white rounded-lg shadow p-6 mb-6">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Planning Configuration</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-          <input
-            type="date"
-            v-model="config.dateDebut"
-            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    <!-- Plannings Table -->
+    <div v-if="!isLoading" class="plannings-section">
+      <h2>📋 Planning Overview</h2>
+
+      <div v-if="plannings.length === 0" class="empty-state">
+        <p>🎮 No Pokemon card plannings found.</p>
+        <p>Click "Generate Pokemon Planning" to create automatic plannings.</p>
+      </div>
+
+      <div v-else class="plannings-table-container">
+        <table class="plannings-table">
+          <thead>
+          <tr>
+            <th>Order Number</th>
+            <th>Employee</th>
+            <th>Date</th>
+            <th>Start Time</th>
+            <th>Duration</th>
+            <th>Cards</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr
+            v-for="planning in groupedPlannings"
+            :key="planning.id"
+            :class="{ 'completed': planning.completed }"
           >
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Number of Employees</label>
-          <select
-            v-model="config.nombreEmployes"
-            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="2">2 employees</option>
-            <option value="3">3 employees</option>
-            <option value="4">4 employees</option>
-            <option value="5">5 employees</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Processing Time per Card</label>
-          <select
-            v-model="config.tempsParCarte"
-            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="3">3 minutes</option>
-            <option value="4">4 minutes</option>
-            <option value="5">5 minutes</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Statistics Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" v-if="stats">
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-            </div>
-          </div>
-          <div class="ml-4">
-            <p class="text-2xl font-semibold text-gray-900">{{ stats.totalCommandes }}</p>
-            <p class="text-sm text-gray-500">Total Orders</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
-              </svg>
-            </div>
-          </div>
-          <div class="ml-4">
-            <p class="text-2xl font-semibold text-gray-900">{{ stats.totalCartes }}</p>
-            <p class="text-sm text-gray-500">Total Cards</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-              <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <div class="ml-4">
-            <p class="text-2xl font-semibold text-gray-900">{{ formatDuration(stats.tempsTotal) }}</p>
-            <p class="text-sm text-gray-500">Total Time</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <div class="ml-4">
-            <p class="text-2xl font-semibold text-gray-900">{{ config.nombreEmployes }}</p>
-            <p class="text-sm text-gray-500">Active Employees</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="loading" class="flex justify-center items-center py-12">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      <span class="ml-3 text-gray-600">Generating optimal planning...</span>
-    </div>
-
-    <!-- Employee Schedule -->
-    <div v-else-if="planning && planning.length > 0" class="space-y-6">
-      <h2 class="text-xl font-semibold text-gray-900">Employee Planning</h2>
-
-      <div class="grid gap-6">
-        <div
-          v-for="employee in planning"
-          :key="employee.id"
-          class="bg-white rounded-lg shadow-sm border border-gray-200"
-        >
-          <!-- Employee Header -->
-          <div class="p-6 border-b border-gray-200">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-4">
-                <div class="flex-shrink-0">
-                  <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span class="text-blue-600 font-medium">{{ getInitials(employee.nom) }}</span>
-                  </div>
-                </div>
-                <div>
-                  <h3 class="text-lg font-medium text-gray-900">{{ employee.nom }}</h3>
-                  <p class="text-sm text-gray-500">{{ employee.commandes.length }} orders assigned</p>
-                </div>
-              </div>
-              <div class="flex items-center space-x-4">
-                <div class="text-right">
-                  <p class="text-sm font-medium text-gray-900">{{ formatDuration(employee.tempsTotal) }}</p>
-                  <p class="text-xs text-gray-500">Total time</p>
-                </div>
-                <div class="text-right">
-                  <p class="text-sm font-medium text-gray-900">{{ employee.totalCartes }}</p>
-                  <p class="text-xs text-gray-500">Cards</p>
-                </div>
-                <div
-                  :class="[
-                    'px-2 py-1 rounded-full text-xs font-medium',
-                    employee.efficacite >= 90 ? 'bg-green-100 text-green-800' :
-                    employee.efficacite >= 70 ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  ]"
-                >
-                  {{ employee.efficacite }}% efficiency
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Orders List -->
-          <div class="p-6">
-            <div class="space-y-3">
-              <div
-                v-for="commande in employee.commandes"
-                :key="commande.id"
-                class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            <td class="order-number">
+              {{ planning.orderNumber }}
+            </td>
+            <td class="employee-name">
+              {{ planning.employeeName }}
+            </td>
+            <td class="planning-date">
+              {{ formatDate(planning.planningDate) }}
+            </td>
+            <td class="start-time">
+              {{ planning.startTime }}
+            </td>
+            <td class="duration">
+              {{ planning.durationMinutes }}min
+            </td>
+            <td class="card-count">
+              {{ planning.cardCount }} cards
+            </td>
+            <td class="priority">
+                <span :class="getPriorityClass(planning.priority)">
+                  {{ planning.priority }}
+                </span>
+            </td>
+            <td class="status">
+                <span :class="getStatusClass(planning.status)">
+                  {{ planning.status }}
+                </span>
+            </td>
+            <td class="actions">
+              <button
+                @click="viewPlanningDetails(planning)"
+                class="btn btn-small"
               >
-                <div class="flex items-center space-x-4">
-                  <div
-                    :class="[
-                      'w-3 h-3 rounded-full',
-                      commande.priorite === 'URGENTE' ? 'bg-red-500' :
-                      commande.priorite === 'HAUTE' ? 'bg-orange-500' :
-                      'bg-green-500'
-                    ]"
-                  ></div>
-                  <div>
-                    <p class="font-medium text-gray-900">Order #{{ commande.numeroCommande }}</p>
-                    <p class="text-sm text-gray-500">{{ commande.nombreCartes }} cards • {{ commande.priorite }}</p>
-                  </div>
-                </div>
-                <div class="text-right">
-                  <p class="text-sm font-medium text-gray-900">{{ formatDuration(commande.dureeEstimee) }}</p>
-                  <p class="text-xs text-gray-500">{{ commande.heureDebut }} - {{ commande.heureFin }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+                👁️ View
+              </button>
+            </td>
+          </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- Empty State -->
-    <div v-else class="text-center py-12">
-      <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-      </svg>
-      <h3 class="mt-2 text-sm font-medium text-gray-900">No planning generated</h3>
-      <p class="mt-1 text-sm text-gray-500">Click "Generate Planning" to start distributing orders</p>
+    <!-- Planning Details Modal -->
+    <div v-if="selectedPlanning" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <h3>Planning Details</h3>
+        <div class="planning-details">
+          <p><strong>Order:</strong> {{ selectedPlanning.orderNumber }}</p>
+          <p><strong>Employee:</strong> {{ selectedPlanning.employeeName }}</p>
+          <p><strong>Date:</strong> {{ formatDate(selectedPlanning.planningDate) }}</p>
+          <p><strong>Time:</strong> {{ selectedPlanning.startTime }} - {{ selectedPlanning.endTime }}</p>
+          <p><strong>Duration:</strong> {{ selectedPlanning.durationMinutes }} minutes</p>
+          <p><strong>Cards:</strong> {{ selectedPlanning.cardCount }}</p>
+          <p><strong>Priority:</strong> {{ selectedPlanning.priority }}</p>
+          <p><strong>Status:</strong> {{ selectedPlanning.status }}</p>
+          <p v-if="selectedPlanning.notes"><strong>Notes:</strong> {{ selectedPlanning.notes }}</p>
+        </div>
+        <button @click="closeModal" class="btn btn-secondary">Close</button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
+import { apiService } from '../services/api'
+import type { Planning } from '../services/api'
 
-// Types
-interface Order {
-  id: string
-  numeroCommande: string
-  priorite: string
-  nombreCartes: number
-  dureeEstimee: number
-  heureDebut: string
-  heureFin: string
-}
+// ========== REACTIVE DATA ==========
+const plannings = ref<Planning[]>([])
+const isLoading = ref(false)
+const isGenerating = ref(false)
+const loadingMessage = ref('')
+const selectedPlanning = ref<Planning | null>(null)
 
-interface Employee {
-  id: string
-  nom: string
-  commandes: Order[]
-  tempsTotal: number
-  totalCartes: number
-  efficacite: number
-}
+// ========== INJECTED FUNCTIONS ==========
+const showNotification = inject('showNotification') as (message: string, type?: 'success' | 'error' | 'info') => void
 
-interface Config {
-  dateDebut: string
-  nombreEmployes: number
-  tempsParCarte: number
-}
-
-interface Stats {
-  totalCommandes: number
-  totalCartes: number
-  tempsTotal: number
-}
-
-// Reactive data
-const loading = ref(false)
-const planning = ref<Employee[]>([])
-const stats = ref<Stats | null>(null)
-
-// Methods
-const generatePlanning = async () => {
-  const response = await fetch('/api/planning/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      startDate: config.value.dateDebut,
-      numberOfEmployees: parseInt(config.value.nombreEmployes),
-      timePerCard: parseInt(config.value.tempsParCarte),
-      endDate: "2025-07-04"
+// ========== COMPUTED PROPERTIES ==========
+const groupedPlannings = computed(() => {
+  return plannings.value
+    .sort((a, b) => {
+      const dateA = new Date(`${a.planningDate} ${a.startTime}`)
+      const dateB = new Date(`${b.planningDate} ${b.startTime}`)
+      return dateA.getTime() - dateB.getTime()
     })
-  })
-
-  const data = await response.json()
-  if (data.success) {
-    console.log(`✅ ${data.planningsSaved} planifications créées !`)
-  }
-}
-
-// ========== CORRECTION du config reactive ==========
-const config = ref({
-  dateDebut: new Date().toISOString().split('T')[0],
-  nombreEmployes: 3,  // Number instead of string
-  tempsParCarte: 3    // Number instead of string
 })
 
-// ========== AJOUT d'une méthode de test ==========
-const testBackendConnection = async () => {
+const completedPlannings = computed(() =>
+  plannings.value.filter(p => p.completed).length
+)
+
+const inProgressPlannings = computed(() =>
+  plannings.value.filter(p => !p.completed).length
+)
+
+const employeesUsed = computed(() =>
+  new Set(plannings.value.map(p => p.employeeId).filter(Boolean)).size
+)
+
+// ========== METHODS ==========
+
+/**
+ * Load all plannings from backend
+ */
+const loadPlannings = async () => {
+  isLoading.value = true
+  loadingMessage.value = 'Loading plannings...'
+
   try {
-    console.log('🔍 Testing backend connection...')
+    console.log('🔍 Loading Pokemon card plannings...')
 
-    const response = await fetch('/api/planning/debug')
-    const data = await response.json()
+    // Use the English API service
+    const loadedPlannings = await apiService.getPlannings()
 
-    console.log('✅ Backend test result:', data)
+    plannings.value = loadedPlannings
+    console.log('✅ Plannings loaded:', plannings.value.length)
 
-    if (data.controllerLoaded && data.employeeServiceWorking) {
-      console.log('✅ Backend is working correctly')
-      console.log(`Found ${data.employeeCount} employees`)
+    if (plannings.value.length === 0) {
+      showNotification?.('No plannings found', 'info')
     } else {
-      console.error('❌ Backend has issues:', data)
+      // Filter Pokemon plannings if possible
+      const pokemonPlannings = plannings.value.filter(p =>
+        p.notes?.includes('Pokemon') ||
+        p.notes?.includes('🎮') ||
+        p.orderNumber?.length > 5
+      )
+
+      if (pokemonPlannings.length > 0) {
+        console.log(`🎮 ${pokemonPlannings.length} Pokemon plannings found`)
+        showNotification?.(`${pokemonPlannings.length} Pokemon plannings loaded`, 'success')
+      } else {
+        console.log(`📋 ${plannings.value.length} plannings loaded (all types)`)
+        showNotification?.(`${plannings.value.length} plannings loaded`, 'success')
+      }
     }
 
-    return data
   } catch (error) {
-    console.error('❌ Backend connection failed:', error)
-    return null
+    console.error('❌ Error loading plannings:', error)
+    showNotification?.('Error loading plannings', 'error')
+    plannings.value = []
+  } finally {
+    isLoading.value = false
+    loadingMessage.value = ''
   }
 }
 
-// ========== AJOUT d'une méthode de debug ==========
-const debugPlanning = async () => {
-  console.log('🔍 Debug mode activated')
+/**
+ * Generate automatic Pokemon card planning
+ */
+const generateAutomaticPlanning = async () => {
+  if (isGenerating.value) return
 
-  // Test backend
-  await testBackendConnection()
+  isGenerating.value = true
+  loadingMessage.value = 'Generating Pokemon card plannings...'
 
-  // Test current config
-  console.log('Current config:', config.value)
-
-  // Test API call
   try {
-    const response = await fetch('/api/planning/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})  // Empty config for test
+    console.log('🎮 Starting Pokemon card planning generation...')
+
+    const result = await apiService.generatePokemonPlanning({
+      cleanFirst: false,
+      startDate: '2025-06-01',
+      timePerCard: 3
     })
 
-    const data = await response.json()
-    console.log('✅ Test API call result:', data)
+    console.log('✅ Generation result:', result)
 
-  } catch (error) {
-    console.error('❌ Test API call failed:', error)
-  }
-}
+    if (result.success) {
+      const planningsCreated = result.planningsSaved || 0
+      const totalCards = result.totalCards || 0
+      const totalHours = result.totalHours || '0'
 
-const exportPlanning = async () => {
-  try {
-    const response = await fetch('/api/planning/export', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ planning: planning.value, config: config.value })
-    })
+      showNotification?.(
+        `🎮 ${planningsCreated} Pokemon plannings created (${totalCards} cards, ${totalHours}h)`,
+        'success'
+      )
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      // Reload plannings to show new ones
+      await loadPlannings()
+    } else {
+      showNotification?.(`❌ Generation error: ${result.error || 'Unknown error'}`, 'error')
     }
 
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `planning-${config.value.dateDebut}.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-
-    console.log('✅ Planning exported successfully')
   } catch (error) {
-    console.error('❌ Error exporting planning:', error)
+    console.error('❌ Planning generation error:', error)
+    showNotification?.('Error during automatic planning generation', 'error')
+  } finally {
+    isGenerating.value = false
+    loadingMessage.value = ''
   }
 }
 
-const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
+/**
+ * Clean duplicate plannings
+ */
+const cleanDuplicates = async () => {
+  try {
+    console.log('🧹 Cleaning duplicate plannings...')
 
-const formatDuration = (minutes: number): string => {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
+    const result = await apiService.cleanDuplicatePlannings()
 
-  if (hours > 0) {
-    return `${hours}h${mins > 0 ? ` ${mins}m` : ''}`
+    if (result.success) {
+      showNotification?.(
+        `🧹 ${result.duplicatesRemoved || 0} duplicates cleaned`,
+        'success'
+      )
+      await loadPlannings()
+    } else {
+      showNotification?.('Error cleaning duplicates', 'error')
+    }
+
+  } catch (error) {
+    console.error('❌ Cleanup error:', error)
+    showNotification?.('Error cleaning duplicates', 'error')
   }
-  return `${mins}m`
 }
 
-// Lifecycle
-onMounted(() => {
-  console.log('📋 PlanningView mounted')
+/**
+ * View planning details
+ */
+const viewPlanningDetails = (planning: Planning) => {
+  selectedPlanning.value = planning
+}
+
+/**
+ * Close modal
+ */
+const closeModal = () => {
+  selectedPlanning.value = null
+}
+
+/**
+ * Format date for display
+ */
+const formatDate = (dateStr: string | undefined): string => {
+  if (!dateStr) return 'N/A'
+
+  try {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  } catch (error) {
+    return dateStr
+  }
+}
+
+/**
+ * Get CSS class for priority
+ */
+const getPriorityClass = (priority: string | undefined): string => {
+  switch (priority?.toUpperCase()) {
+    case 'URGENT': return 'priority-urgent'
+    case 'HIGH': return 'priority-high'
+    case 'MEDIUM': return 'priority-medium'
+    case 'LOW': return 'priority-low'
+    default: return 'priority-medium'
+  }
+}
+
+/**
+ * Get CSS class for status
+ */
+const getStatusClass = (status: string | undefined): string => {
+  switch (status?.toUpperCase()) {
+    case 'SCHEDULED': return 'status-scheduled'
+    case 'IN_PROGRESS': return 'status-in-progress'
+    case 'COMPLETED': return 'status-completed'
+    case 'CANCELLED': return 'status-cancelled'
+    default: return 'status-scheduled'
+  }
+}
+
+// ========== LIFECYCLE ==========
+onMounted(async () => {
+  console.log('🎮 PlanningView mounted - loading initial data...')
+  await loadPlannings()
 })
 </script>
 
 <style scoped>
+/* ========== COMPONENT STYLES ========== */
+
 .planning-view {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 20px;
 }
 
-@media (max-width: 768px) {
-  .planning-view {
-    padding: 1rem;
-  }
+.header-section {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.page-title {
+  font-size: 2.5rem;
+  color: #2563eb;
+  margin-bottom: 10px;
+}
+
+.page-description {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.action-bar {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  justify-content: center;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.loading-section {
+  text-align: center;
+  padding: 40px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.stats-section {
+  margin-bottom: 30px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #2563eb;
+  margin: 10px 0;
+}
+
+.plannings-section h2 {
+  margin-bottom: 20px;
+  color: #374151;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f9fafb;
+  border-radius: 12px;
+  color: #6b7280;
+}
+
+.plannings-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.plannings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.plannings-table th {
+  background: #f9fafb;
+  padding: 15px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.plannings-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.plannings-table tr:hover {
+  background: #f9fafb;
+}
+
+.plannings-table tr.completed {
+  opacity: 0.7;
+}
+
+.order-number {
+  font-family: monospace;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.priority-urgent { color: #dc2626; font-weight: 600; }
+.priority-high { color: #f59e0b; font-weight: 600; }
+.priority-medium { color: #059669; font-weight: 600; }
+.priority-low { color: #6b7280; font-weight: 600; }
+
+.status-scheduled { color: #2563eb; }
+.status-in-progress { color: #f59e0b; }
+.status-completed { color: #059669; }
+.status-cancelled { color: #dc2626; }
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.planning-details p {
+  margin: 8px 0;
 }
 </style>

@@ -1,110 +1,155 @@
+#!/bin/bash
+
 # ===============================================
-# 🔍 DIAGNOSTIC APPROFONDI : 0 PLANIFICATIONS SAUVÉES
+# 🚀 TEST RAPIDE DES SOLUTIONS
 # ===============================================
 
-echo "🔍 DIAGNOSTIC APPROFONDI DU PROBLÈME..."
+echo "🚀 TEST RAPIDE DES SOLUTIONS"
 
-# 1. Vérifier si le problème vient des IDs d'employés
-echo "=== 1. VÉRIFICATION DES IDS EMPLOYÉS ==="
-mysql -u ia -pfoufafou dev -e "
--- Comparer les IDs employés entre j_employee et employee
-SELECT 'IDs dans j_employee:' as info, COUNT(*) as count FROM j_employee WHERE actif = 1;
-SELECT 'IDs dans employee:' as info, COUNT(*) as count FROM employee WHERE active = 1;
+# ===============================================
+# 1. TEST AVEC DATES SPÉCIFIQUES
+# ===============================================
 
--- Voir les IDs réels
-SELECT 'Premiers IDs j_employee:' as info, HEX(id) as employee_id, CONCAT(prenom, ' ', nom) as nom
-FROM j_employee WHERE actif = 1 LIMIT 3;
+echo "=== 1. TEST AVEC DATES SPÉCIFIQUES ==="
 
-SELECT 'Premiers IDs employee:' as info, HEX(id) as employee_id, CONCAT(first_name, ' ', last_name) as nom
-FROM employee WHERE active = 1 LIMIT 3;
-"
+dates=("2025-09-01" "2025-09-02" "2025-09-03")
 
-# 2. Test d'insertion avec IDs réels du service employé
-echo "=== 2. TEST AVEC DEBUG-SAVE ENDPOINT ==="
-curl -X POST http://localhost:8080/api/planning/debug-save \
-  -H "Content-Type: application/json" \
-  -d '{}' | jq '.'
+for date in "${dates[@]}"; do
+    echo "📅 Test avec date: $date"
 
-# 3. Vérifier les dates utilisées dans la génération
-echo "=== 3. VÉRIFICATION DES DATES ==="
-mysql -u ia -pfoufafou dev -e "
--- Voir les planifications créées aujourd'hui
-SELECT
-    'Planifications créées aujourdhui:' as info,
-    COUNT(*) as count,
-    MIN(created_at) as premiere,
-    MAX(created_at) as derniere
-FROM j_planning
-WHERE DATE(created_at) = CURDATE();
+    response=$(curl -s "http://localhost:8080/api/planning/view-simple?date=$date")
+    count=$(echo "$response" | jq '. | length' 2>/dev/null || echo "ERROR")
 
--- Voir les dernières planifications créées
-SELECT
-    HEX(id) as id,
-    planning_date,
-    start_time,
-    notes,
-    created_at
-FROM j_planning
-ORDER BY created_at DESC
-LIMIT 5;
-"
+    echo "  📋 Planifications trouvées: $count"
 
-# 4. Test d'insertion simple via API
-echo "=== 4. TEST INSERTION SIMPLE VIA API ==="
-curl -X POST http://localhost:8080/api/planning/generate-force \
-  -H "Content-Type: application/json" \
-  -d '{}' | jq '.planningsSaved, .message'
+    if [ "$count" != "0" ] && [ "$count" != "ERROR" ]; then
+        echo "  ✅ SUCCÈS ! Données trouvées pour $date"
+        echo "  📊 Exemple de données:"
+        echo "$response" | jq '.[0]' 2>/dev/null | head -10
+        break
+    fi
+done
 
-# 5. Vérifier si c'est un problème de logique dans le code Java
-echo "=== 5. VÉRIFICATION LOGIQUE JAVA ==="
-echo "📋 Cherchez dans les logs Spring Boot:"
-echo "   - Messages 'Planning already exists'"
-echo "   - Messages d'erreur d'insertion"
-echo "   - Exceptions silencieuses"
-
-# 6. Test manuel d'insertion avec les mêmes paramètres que l'API
-echo "=== 6. TEST MANUEL AVEC PARAMÈTRES API ==="
-mysql -u ia -pfoufafou dev -e "
--- Simuler exactement ce que fait l'API
-SET @api_planning_id = UNHEX(REPLACE(UUID(), '-', ''));
-SET @api_order_id = (SELECT HEX(id) FROM \`order\` WHERE status IN (1,2,3) ORDER BY date DESC LIMIT 1);
-SET @api_employee_id = (SELECT HEX(id) FROM j_employee WHERE actif = 1 LIMIT 1);
-
--- Convertir back en BINARY pour l'insertion
-SET @api_order_binary = UNHEX(@api_order_id);
-SET @api_employee_binary = UNHEX(@api_employee_id);
-
-SELECT
-    'Test manual avec IDs API:' as info,
-    @api_order_id as order_hex,
-    @api_employee_id as employee_hex;
-
--- Vérifier si planification existe déjà pour DEMAIN (pas aujourd'hui)
-SELECT
-    'Planifications existantes pour demain:' as info,
-    COUNT(*) as count
-FROM j_planning
-WHERE order_id = @api_order_binary
-AND employee_id = @api_employee_binary
-AND planning_date = DATE_ADD(CURDATE(), INTERVAL 1 DAY);
-
--- Tentative d'insertion pour demain
-INSERT IGNORE INTO j_planning
-(id, order_id, employee_id, planning_date, start_time, end_time,
- estimated_duration_minutes, priority, status, completed, created_at, updated_at, card_count, notes)
-VALUES
-(@api_planning_id, @api_order_binary, @api_employee_binary,
- DATE_ADD(CURDATE(), INTERVAL 1 DAY), '14:00:00', '15:30:00',
- 90, 'HIGH', 'SCHEDULED', 0, NOW(), NOW(), 1, 'Test manuel API simulation');
-
-SELECT ROW_COUNT() as manual_insert_success;
-"
+# ===============================================
+# 2. TEST ENDPOINT DEBUG-PLANNINGS
+# ===============================================
 
 echo ""
-echo "==============================================="
-echo "🎯 PROCHAINES ÉTAPES SELON LES RÉSULTATS:"
-echo "==============================================="
-echo "1. 📋 Si debug-save fonctionne → Problème dans la logique principale"
-echo "2. 🔄 Si generate-force fonctionne → Problème avec vos IDs d'employés"
-echo "3. 📅 Si insertion manuelle fonctionne → Problème de dates/doublons"
-echo "4. 🚫 Si tout échoue → Problème de permissions/structure DB"
+echo "=== 2. TEST ENDPOINT DEBUG-PLANNINGS ==="
+
+debug_response=$(curl -s "http://localhost:8080/api/planning/debug-plannings")
+debug_count=$(echo "$debug_response" | jq '. | length' 2>/dev/null || echo "ERROR")
+
+echo "📊 Debug endpoint résultats: $debug_count items"
+
+if [ "$debug_count" != "0" ] && [ "$debug_count" != "ERROR" ]; then
+    echo "✅ Debug endpoint fonctionne !"
+    echo "📋 Échantillon de données debug:"
+    echo "$debug_response" | jq '.[0:2]' 2>/dev/null
+fi
+
+# ===============================================
+# 3. TEST SQL DIRECT POUR VÉRIFIER LES DATES
+# ===============================================
+
+echo ""
+echo "=== 3. VÉRIFICATION DATES EN BASE ==="
+
+mysql -u ia -pfoufafou dev << 'EOF'
+-- Voir toutes les dates de planification disponibles
+SELECT 'DATES DISPONIBLES:' as info;
+SELECT
+    planning_date,
+    COUNT(*) as count_plannings,
+    MIN(TIME(start_time)) as first_time,
+    MAX(TIME(start_time)) as last_time
+FROM j_planning
+GROUP BY planning_date
+ORDER BY planning_date;
+
+-- Voir aujourd'hui spécifiquement
+SELECT 'PLANIFICATIONS AUJOURD\'HUI (2025-08-10):' as info;
+SELECT COUNT(*) as count_today FROM j_planning WHERE planning_date = '2025-08-10';
+
+-- Voir les planifications récentes
+SELECT 'PLANIFICATIONS RÉCENTES:' as info;
+SELECT
+    planning_date,
+    COUNT(*) as count
+FROM j_planning
+WHERE planning_date >= '2025-09-01'
+GROUP BY planning_date;
+EOF
+
+# ===============================================
+# 4. SOLUTION TEMPORAIRE : APPEL AVEC DATE
+# ===============================================
+
+echo ""
+echo "=== 4. SOLUTION TEMPORAIRE FRONTEND ==="
+
+echo "💡 SOLUTION RAPIDE POUR LE FRONTEND :"
+echo ""
+echo "Dans votre composant Vue.js, remplacez l'appel API par :"
+echo ""
+echo "// Au lieu de :"
+echo "fetch('/api/planning/view-simple')"
+echo ""
+echo "// Utilisez :"
+echo "fetch('/api/planning/view-simple?date=2025-09-01')"
+echo "// ou"
+echo "fetch('/api/planning/debug-plannings')  // qui retourne tout"
+echo ""
+
+# ===============================================
+# 5. TEST SOLUTION TEMPORAIRE
+# ===============================================
+
+echo "=== 5. TEST SOLUTION TEMPORAIRE ==="
+
+echo "🧪 Test appel avec date spécifique..."
+
+temp_response=$(curl -s "http://localhost:8080/api/planning/view-simple?date=2025-09-01")
+temp_count=$(echo "$temp_response" | jq '. | length' 2>/dev/null || echo "ERROR")
+
+if [ "$temp_count" != "0" ] && [ "$temp_count" != "ERROR" ]; then
+    echo "✅ SOLUTION TEMPORAIRE FONCTIONNE !"
+    echo "📊 Avec date 2025-09-01: $temp_count planifications"
+    echo ""
+    echo "🎯 POUR RÉPARER IMMÉDIATEMENT LE FRONTEND :"
+    echo ""
+    echo "1. Dans votre api.ts, remplacez :"
+    echo "   fetch('/api/planning/view-simple')"
+    echo "   par :"
+    echo "   fetch('/api/planning/view-simple?date=2025-09-01')"
+    echo ""
+    echo "2. Ou utilisez l'endpoint debug :"
+    echo "   fetch('/api/planning/debug-plannings')"
+    echo ""
+else
+    echo "❌ Solution temporaire ne fonctionne pas"
+fi
+
+# ===============================================
+# 6. INSTRUCTIONS CORRECTIF BACKEND
+# ===============================================
+
+echo ""
+echo "=== 6. INSTRUCTIONS CORRECTIF BACKEND ==="
+
+echo ""
+echo "🔧 POUR CORRIGER DÉFINITIVEMENT LE BACKEND :"
+echo ""
+echo "1. Dans PlanningController.java, méthode viewPlanningsSimple():"
+echo "   - Remplacer la logique de date par défaut"
+echo "   - Au lieu de LocalDate.now(), ne pas filtrer par date"
+echo "   - Ou retourner les planifications des derniers 30 jours"
+echo ""
+echo "2. Code à changer :"
+echo "   String targetDate = date != null ? date : LocalDate.now().toString();"
+echo "   Par :"
+echo "   // Retourner toutes les planifications si pas de date"
+echo "   if (date != null) { /* filtrer */ } else { /* tout retourner */ }"
+echo ""
+
+echo "🎯 Test terminé à $(date)"

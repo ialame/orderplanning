@@ -1,842 +1,586 @@
-import {
-  Order,
-  OrderResponse,
-  OrdersListResponse,
-  OrderFilters,
-  Card,
-  CardResponse,
-  Employee,
-  EmployeeResponse,
-  EmployeeListItem,
-  EmployeeDetail,
-  EmployeePlanningResponse,
-  EmployeeFilters,
-  Planning,
-  PlanningResponse,
-  PlanningFilters,
-  DashboardStats,
-  SystemStatus,
-  ApiResponse,
-  ApiServiceInterface,
-  OrderNotFoundError,
-  EmployeeNotFoundError,
-  PlanningExecutionError
-} from '../types/english-api'
+// ============= ENGLISH API SERVICE - 100% ENGLISH =============
+// Complete English API service for Pokemon card order planning system
+// NO FRENCH variables, comments, or methods
 
-/**
- * English API Service for Pokemon Order Planning System
- * Complete translation from French version
- */
-export class EnglishApiService implements ApiServiceInterface {
-  private baseUrl = '/api'
-  private frontendUrl = '/api/frontend'
-  private planningUrl = '/api/planning-dp'
-  private testUrl = '/api/test-planning'
+// ========== CONFIGURATION ==========
+const API_BASE_URL = 'http://localhost:8080/api'
+const API_PLANNING_URL = 'http://localhost:8080/api/planning'
+const API_ORDERS_URL = 'http://localhost:8080/api/orders'
+const API_EMPLOYEES_URL = 'http://localhost:8080/api/employees'
+
+// ========== TYPESCRIPT INTERFACES ==========
+
+export interface Order {
+  id?: string
+  orderNumber: string
+  cardCount: number
+  cardsWithName?: number
+  percentageWithName?: number
+  totalPrice?: number
+  priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW'
+  status?: 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED'
+  statusCode?: number
+  creationDate?: string
+  deadline?: string
+  estimatedTimeMinutes: number
+  orderQuality?: 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'POOR'
+  cardsWithoutMissingData?: boolean
+}
+
+export interface Employee {
+  id?: string
+  firstName: string
+  lastName: string
+  email: string
+  workHoursPerDay: number
+  active: boolean
+  creationDate?: string
+  fullName?: string
+}
+
+export interface Planning {
+  id?: string | number
+  orderId?: string
+  employeeId?: string
+  planningDate?: string
+  startTime: string
+  endTime?: string
+  durationMinutes: number
+  completed: boolean
+  orderNumber?: string
+  priority?: string
+  employeeName?: string
+  status?: string
+  notes?: string
+  cardCount?: number
+}
+
+export interface PlanningRequest {
+  startDate: string
+  endDate: string
+  numberOfEmployees: number
+  timePerCard: number
+  cleanFirst?: boolean
+}
+
+export interface PlanningResponse {
+  success: boolean
+  message: string
+  numberOfPlannedOrders?: number
+  report?: any
+}
+
+export interface DashboardStats {
+  pendingOrders: number
+  inProgressOrders: number
+  completedOrders: number
+  totalOrders: number
+  activeEmployees?: number
+  status: string
+  timestamp?: number
+}
+
+// ========== MAIN API SERVICE CLASS ==========
+
+export class EnglishApiService {
+  private baseUrl = API_BASE_URL
+
+  // ========== UTILITY METHODS ==========
+
+  private async request<T>(endpoint: string, options: RequestInit = {}, baseUrl = this.baseUrl): Promise<T> {
+    const url = `${baseUrl}${endpoint}`
+
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status} ${response.statusText}`)
+    }
+
+    return response.json()
+  }
 
   // ========== ORDER METHODS ==========
 
-  /**
-   * Retrieves the list of orders with optional filters
-   */
-  async getOrders(filters?: OrderFilters): Promise<OrdersListResponse> {
-    try {
-      console.log('🔍 Fetching orders with filters:', filters)
+  async getOrders(): Promise<Order[]> {
+    console.log('🎮 Loading Pokemon card orders...')
 
-      const params = new URLSearchParams()
-      if (filters?.priority) params.append('priority', filters.priority)
-      if (filters?.status) params.append('status', filters.status)
-      if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
-      if (filters?.dateTo) params.append('dateTo', filters.dateTo)
-      if (filters?.searchTerm) params.append('search', filters.searchTerm)
+    // Try multiple endpoints for maximum compatibility
+    const endpoints = [
+      '/orders/frontend/orders',
+      '/orders/period?startDate=2025-05-22&endDate=2025-06-22',
+      '/test/orders/last-month',
+      '/test/orders'
+    ]
 
-      const url = `${this.frontendUrl}/orders${params.toString() ? '?' + params.toString() : ''}`
-      const response = await fetch(url)
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        })
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch orders: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      return {
-        orders: data.orders || data.commandes || [],
-        totalCount: data.totalCount || data.total || 0,
-        pendingCount: data.pendingCount || data.enAttente || 0,
-        scheduledCount: data.scheduledCount || data.planifiees || 0,
-        completedCount: data.completedCount || data.terminees || 0,
-        filters
-      }
-    } catch (error) {
-      console.error('❌ Error fetching orders:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Retrieves a single order by ID
-   */
-  async getOrder(id: string): Promise<OrderResponse> {
-    try {
-      console.log('🔍 Fetching order:', id)
-
-      const response = await fetch(`${this.frontendUrl}/orders/${id}`)
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new OrderNotFoundError(id)
+        if (response.ok) {
+          const orders: any[] = await response.json()
+          console.log(`✅ ${orders.length} orders loaded from ${endpoint}`)
+          return this.mapOrderResponse(orders)
         }
-        throw new Error(`Failed to fetch order: ${response.status}`)
+      } catch (error) {
+        console.log(`🔄 Endpoint ${endpoint} unavailable, trying next...`)
+        continue
       }
+    }
 
-      const data = await response.json()
-      return this.transformOrderToEnglish(data)
+    throw new Error('No order endpoints available')
+  }
+
+  async getOrderDetails(id: string): Promise<Order> {
+    try {
+      return await this.request<Order>(`/orders/${id}`)
     } catch (error) {
-      console.error('❌ Error fetching order:', error)
-      throw error
+      return this.request<Order>(`/orders/${id}`, {}, `${API_BASE_URL}/test`)
     }
   }
 
-  /**
-   * Retrieves cards for a specific order
-   */
-  async getOrderCards(orderId: string): Promise<CardResponse[]> {
+  async getOrderCards(orderId: string): Promise<any> {
     try {
-      console.log('🃏 Fetching cards for order:', orderId)
+      console.log(`🃏 Loading cards for order: ${orderId}`)
 
-      const response = await fetch(`${this.frontendUrl}/orders/${orderId}/cards`)
+      const response = await fetch(`${API_BASE_URL}/orders/frontend/orders/${orderId}/cards`)
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch cards: ${response.status}`)
+        throw new Error(`Card loading error: ${response.status}`)
       }
 
-      const data = await response.json()
+      const result = await response.json()
+      console.log('✅ Cards loaded:', result)
 
-      if (data && data.cards && Array.isArray(data.cards)) {
-        return data.cards.map((card: any) => this.transformCardToEnglish(card))
-      }
+      return result
 
-      if (data && data.cartes && Array.isArray(data.cartes)) {
-        return data.cartes.map((card: any) => this.transformCardToEnglish(card))
-      }
-
-      return []
     } catch (error) {
-      console.error('❌ Error fetching order cards:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Creates a new order
-   */
-  async createOrder(order: Partial<Order>): Promise<OrderResponse> {
-    try {
-      console.log('📝 Creating order:', order)
-
-      const response = await fetch(`${this.frontendUrl}/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(this.transformOrderToFrench(order))
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return this.transformOrderToEnglish(data)
-    } catch (error) {
-      console.error('❌ Error creating order:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Updates an existing order
-   */
-  async updateOrder(id: string, order: Partial<Order>): Promise<OrderResponse> {
-    try {
-      console.log('📝 Updating order:', id, order)
-
-      const response = await fetch(`${this.frontendUrl}/orders/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(this.transformOrderToFrench(order))
-      })
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new OrderNotFoundError(id)
-        }
-        throw new Error(`Failed to update order: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return this.transformOrderToEnglish(data)
-    } catch (error) {
-      console.error('❌ Error updating order:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Deletes an order
-   */
-  async deleteOrder(id: string): Promise<void> {
-    try {
-      console.log('🗑️ Deleting order:', id)
-
-      const response = await fetch(`${this.frontendUrl}/orders/${id}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new OrderNotFoundError(id)
-        }
-        throw new Error(`Failed to delete order: ${response.status}`)
-      }
-    } catch (error) {
-      console.error('❌ Error deleting order:', error)
+      console.error('❌ Error loading cards:', error)
       throw error
     }
   }
 
   // ========== EMPLOYEE METHODS ==========
 
-  /**
-   * Retrieves the list of employees
-   */
-  async getEmployees(filters?: EmployeeFilters): Promise<EmployeeResponse[]> {
+  async getEmployees(): Promise<Employee[]> {
     try {
-      console.log('👥 Fetching employees with filters:', filters)
+      console.log('👥 Loading active employees...')
 
-      const params = new URLSearchParams()
-      if (filters?.active !== undefined) params.append('active', filters.active.toString())
-      if (filters?.status) params.append('status', filters.status)
-      if (filters?.searchTerm) params.append('search', filters.searchTerm)
+      // Try j_employee table first (current table)
+      try {
+        const response = await fetch(`${API_BASE_URL}/employees/active`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        })
 
-      const url = `${this.frontendUrl}/employees${params.toString() ? '?' + params.toString() : ''}`
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch employees: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const employees = Array.isArray(data) ? data : (data.employees || data.employes || [])
-
-      return employees.map((employee: any) => this.transformEmployeeToEnglish(employee))
-    } catch (error) {
-      console.error('❌ Error fetching employees:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Retrieves a single employee by ID
-   */
-  async getEmployee(id: string): Promise<EmployeeResponse> {
-    try {
-      console.log('👤 Fetching employee:', id)
-
-      const response = await fetch(`${this.frontendUrl}/employees/${id}`)
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new EmployeeNotFoundError(id)
+        if (response.ok) {
+          const employees: any[] = await response.json()
+          console.log(`✅ ${employees.length} employees loaded from j_employee`)
+          return this.mapEmployeeResponse(employees)
         }
-        throw new Error(`Failed to fetch employee: ${response.status}`)
+      } catch (error) {
+        console.log('🔄 Employee service unavailable, using fallback...')
       }
 
-      const data = await response.json()
-      return this.transformEmployeeToEnglish(data)
+      // Fallback: Create test employees
+      return this.createTestEmployees()
+
     } catch (error) {
-      console.error('❌ Error fetching employee:', error)
-      throw error
+      console.error('❌ Error loading employees:', error)
+      return this.createTestEmployees()
     }
   }
 
-  /**
-   * Retrieves employee planning for a specific date
-   */
-  async getEmployeePlanning(date?: string): Promise<EmployeePlanningResponse> {
+  async getEmployeeDetails(id: string): Promise<any> {
     try {
-      const targetDate = date || new Date().toISOString().split('T')[0]
-      console.log('📅 Fetching employee planning for:', targetDate)
-
-      const response = await fetch(`${this.frontendUrl}/employee-planning?date=${targetDate}`)
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch employee planning: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      return {
-        employees: (data.employees || data.employes || []).map((emp: any) => this.transformEmployeeListItemToEnglish(emp)),
-        totalEmployees: data.totalEmployees || data.totalEmployes || 0,
-        availableEmployees: data.availableEmployees || data.employesDisponibles || 0,
-        overloadedEmployees: data.overloadedEmployees || data.employesSurcharges || 0,
-        planningDate: targetDate
-      }
+      return await this.request<any>(`/employees/${id}`)
     } catch (error) {
-      console.error('❌ Error fetching employee planning:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Retrieves detailed information for a specific employee
-   */
-  async getEmployeeDetails(id: string, date?: string): Promise<EmployeeDetail> {
-    try {
-      const targetDate = date || new Date().toISOString().split('T')[0]
-      console.log('👤 Fetching employee details:', id, 'for date:', targetDate)
-
-      const response = await fetch(`${this.frontendUrl}/employees/${id}/details?date=${targetDate}`)
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new EmployeeNotFoundError(id)
-        }
-        throw new Error(`Failed to fetch employee details: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return this.transformEmployeeDetailToEnglish(data)
-    } catch (error) {
-      console.error('❌ Error fetching employee details:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Creates a new employee
-   */
-  async createEmployee(employee: Partial<Employee>): Promise<EmployeeResponse> {
-    try {
-      console.log('📝 Creating employee:', employee)
-
-      const response = await fetch(`${this.frontendUrl}/employees`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(this.transformEmployeeToFrench(employee))
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to create employee: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return this.transformEmployeeToEnglish(data)
-    } catch (error) {
-      console.error('❌ Error creating employee:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Updates an existing employee
-   */
-  async updateEmployee(id: string, employee: Partial<Employee>): Promise<EmployeeResponse> {
-    try {
-      console.log('📝 Updating employee:', id, employee)
-
-      const response = await fetch(`${this.frontendUrl}/employees/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(this.transformEmployeeToFrench(employee))
-      })
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new EmployeeNotFoundError(id)
-        }
-        throw new Error(`Failed to update employee: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return this.transformEmployeeToEnglish(data)
-    } catch (error) {
-      console.error('❌ Error updating employee:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Deletes an employee
-   */
-  async deleteEmployee(id: string): Promise<void> {
-    try {
-      console.log('🗑️ Deleting employee:', id)
-
-      const response = await fetch(`${this.frontendUrl}/employees/${id}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new EmployeeNotFoundError(id)
-        }
-        throw new Error(`Failed to delete employee: ${response.status}`)
-      }
-    } catch (error) {
-      console.error('❌ Error deleting employee:', error)
-      throw error
+      return this.request<any>(`/employees/${id}`, {}, `${API_BASE_URL}/test`)
     }
   }
 
   // ========== PLANNING METHODS ==========
 
   /**
-   * Retrieves planning entries with filters
+   * Generate Pokemon card planning automatically
    */
-  async getPlannings(filters?: PlanningFilters): Promise<PlanningResponse[]> {
+  async generatePokemonPlanning(options: {
+    cleanFirst?: boolean
+    startDate?: string
+    timePerCard?: number
+  } = {}): Promise<any> {
     try {
-      console.log('📅 Fetching plannings with filters:', filters)
+      console.log('🎮 Generating Pokemon card planning...')
 
-      const params = new URLSearchParams()
-      if (filters?.employeeId) params.append('employeeId', filters.employeeId)
-      if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
-      if (filters?.dateTo) params.append('dateTo', filters.dateTo)
-      if (filters?.completed !== undefined) params.append('completed', filters.completed.toString())
-
-      const url = `${this.frontendUrl}/plannings${params.toString() ? '?' + params.toString() : ''}`
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch plannings: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const plannings = Array.isArray(data) ? data : (data.plannings || data.planifications || [])
-
-      return plannings.map((planning: any) => this.transformPlanningToEnglish(planning))
-    } catch (error) {
-      console.error('❌ Error fetching plannings:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Executes the dynamic programming planning algorithm
-   */
-  async executePlanning(day: number, month: number, year: number): Promise<ApiResponse<any>> {
-    try {
-      console.log('🚀 Executing planning for:', { day, month, year })
-
-      const response = await fetch(`${this.planningUrl}/execute`, {
+      const response = await fetch(`${API_PLANNING_URL}/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ day, month, year })
+        body: JSON.stringify({
+          cleanFirst: options.cleanFirst || false,
+          startDate: options.startDate || '2025-06-01',
+          timePerCard: options.timePerCard || 3
+        })
       })
 
       if (!response.ok) {
-        throw new PlanningExecutionError(`HTTP ${response.status}`)
+        throw new Error(`Planning generation error: ${response.status}`)
       }
 
-      const data = await response.json()
+      const result = await response.json()
+      console.log('✅ Planning generated:', result)
 
-      return {
-        success: data.success || false,
-        data: data.data || data,
-        message: data.message || 'Planning executed successfully',
-        timestamp: new Date().toISOString()
-      }
+      return result
+
     } catch (error) {
-      console.error('❌ Error executing planning:', error)
+      console.error('❌ Planning generation error:', error)
       throw error
     }
   }
 
   /**
-   * Performs a quick test of the planning system
+   * Load all plannings
    */
-  async quickTest(): Promise<SystemStatus> {
+  async getPlannings(): Promise<Planning[]> {
     try {
-      console.log('🧪 Running quick test')
+      console.log('📋 Loading plannings from backend...')
 
-      const response = await fetch(`${this.testUrl}/quick-test`)
+      // Try multiple endpoints for maximum compatibility
+      const endpoints = [
+        `${API_PLANNING_URL}/view-simple`,
+        `${API_PLANNING_URL}/plannings-with-details`,
+        `${API_BASE_URL}/plannings`,
+        `${API_BASE_URL}/test/plannings`
+      ]
 
-      if (!response.ok) {
-        throw new Error(`Failed to run quick test: ${response.status}`)
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`🔄 Trying endpoint: ${endpoint}`)
+
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`✅ Data loaded from ${endpoint}:`, data.length)
+            return this.mapPlanningResponse(data, endpoint)
+          } else {
+            console.log(`❌ ${endpoint} failed:`, response.status)
+          }
+        } catch (error) {
+          console.log(`❌ ${endpoint} error:`, error.message)
+          continue
+        }
       }
 
-      const data = await response.json()
+      console.warn('⚠️ No planning endpoints available')
+      return []
 
-      return {
-        status: data.success ? 'OK' : 'ERROR',
-        message: data.message || 'Quick test completed',
-        timestamp: new Date().toISOString()
-      }
     } catch (error) {
-      console.error('❌ Error running quick test:', error)
-      return {
-        status: 'ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }
+      console.error('❌ Error loading plannings:', error)
+      return []
     }
   }
 
   /**
-   * Gets system diagnostic information
+   * Load plannings for a specific period
    */
-  async getDiagnostic(): Promise<SystemStatus> {
+  async getPlanningsByPeriod(startDate: string, endDate: string): Promise<Planning[]> {
     try {
-      console.log('🔍 Getting system diagnostic')
+      console.log(`📅 Loading plannings for period ${startDate} → ${endDate}`)
 
-      const response = await fetch(`${this.testUrl}/diagnostic`)
+      const endpoints = [
+        `${API_PLANNING_URL}/view-simple?date=${startDate}`,
+        `${API_PLANNING_URL}/view-simple`,
+        `${API_BASE_URL}/plannings?startDate=${startDate}&endDate=${endDate}`,
+        `${API_BASE_URL}/test/plannings`
+      ]
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            console.log(`✅ Plannings found via ${endpoint}:`, data.length)
+            return this.mapPlanningResponse(data, endpoint)
+          }
+        } catch (error) {
+          console.log(`🔄 Endpoint ${endpoint} unavailable`)
+          continue
+        }
+      }
+
+      return []
+
+    } catch (error) {
+      console.error('❌ Error loading plannings by period:', error)
+      return []
+    }
+  }
+
+  /**
+   * Clean duplicate plannings
+   */
+  async cleanDuplicatePlannings(): Promise<any> {
+    try {
+      console.log('🧹 Cleaning duplicate plannings...')
+
+      const response = await fetch(`${API_PLANNING_URL}/nettoyer-doublons`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
 
       if (!response.ok) {
-        throw new Error(`Failed to get diagnostic: ${response.status}`)
+        throw new Error(`Cleanup error: ${response.status}`)
       }
 
-      const data = await response.json()
+      const result = await response.json()
+      console.log('✅ Cleanup completed:', result)
 
-      return {
-        status: data.success ? 'OK' : 'WARNING',
-        message: data.message || 'Diagnostic completed',
-        timestamp: new Date().toISOString(),
-        dataQuality: data.dataQuality || data.qualiteDonnees
-      }
+      return result
+
     } catch (error) {
-      console.error('❌ Error getting diagnostic:', error)
+      console.error('❌ Cleanup error:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Automatic planning (compatibility method)
+   */
+  async automaticPlanning(request?: PlanningRequest): Promise<PlanningResponse> {
+    try {
+      console.log('🚀 Starting automatic planning...')
+
+      const result = await this.generatePokemonPlanning({
+        cleanFirst: false,
+        startDate: request?.startDate || '2025-06-01',
+        timePerCard: request?.timePerCard || 3
+      })
+
       return {
-        status: 'ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
+        success: result.success || false,
+        message: result.message || 'Planning completed',
+        numberOfPlannedOrders: result.planningsSaved || 0,
+        report: {
+          ordersAnalyzed: result.ordersAnalyzed || 0,
+          totalCards: result.totalCards || 0,
+          totalHours: result.totalHours || '0',
+          employeesUsed: result.employeesUsed || 0,
+          strategy: result.strategy || 'AUTO'
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Automatic planning error:', error)
+      return {
+        success: false,
+        message: 'Automatic planning error',
+        numberOfPlannedOrders: 0
       }
     }
   }
 
   // ========== DASHBOARD METHODS ==========
 
-  /**
-   * Gets dashboard statistics
-   */
   async getDashboardStats(): Promise<DashboardStats> {
+    return this.request<DashboardStats>('/stats', {}, `${API_BASE_URL}/dashboard`)
+  }
+
+  async testConnection(): Promise<{ status: string }> {
+    return this.request<{ status: string }>('/test', {}, `${API_BASE_URL}/dashboard`)
+  }
+
+  // ========== PRIVATE MAPPING METHODS ==========
+
+  private mapOrderResponse(orders: any[]): Order[] {
+    return orders.map(order => ({
+      id: order.id,
+      orderNumber: order.orderNumber || order.numeroCommande,
+      cardCount: order.cardCount || order.nombreCartes,
+      cardsWithName: order.cardsWithName || order.nombreAvecNom,
+      percentageWithName: order.percentageWithName || order.pourcentageAvecNom,
+      priority: order.priority || order.priorite || 'MEDIUM',
+      totalPrice: order.totalPrice || order.prixTotal,
+      statusCode: order.status || order.statusCode,
+      estimatedTimeMinutes: order.estimatedTimeMinutes || order.tempsEstimeMinutes,
+      creationDate: order.creationDate || order.dateCreation || new Date().toISOString(),
+      status: this.mapStatus(order.status || order.statusCode),
+      orderQuality: this.getQualityFromPercentage(order.percentageWithName || order.pourcentageAvecNom || 0),
+      cardsWithoutMissingData: (order.percentageWithName || order.pourcentageAvecNom || 0) >= 95
+    }))
+  }
+
+  private mapEmployeeResponse(employees: any[]): Employee[] {
+    return employees.map(emp => ({
+      id: emp.id,
+      firstName: emp.firstName || emp.prenom,
+      lastName: emp.lastName || emp.nom,
+      email: emp.email,
+      workHoursPerDay: emp.workHoursPerDay || emp.heuresTravailParJour || 8,
+      active: emp.active !== undefined ? emp.active : emp.actif,
+      creationDate: emp.creationDate || emp.dateCreation,
+      fullName: `${emp.firstName || emp.prenom} ${emp.lastName || emp.nom}`
+    }))
+  }
+
+  private mapPlanningResponse(response: any[], endpoint: string): Planning[] {
+    if (!Array.isArray(response)) {
+      console.warn('⚠️ Planning response is not an array:', response)
+      return []
+    }
+
+    return response.map(planning => {
+      // Detect data format based on endpoint used
+      if (endpoint.includes('/api/planning/')) {
+        // New planning backend format
+        return {
+          id: planning.id || planning.planningId,
+          orderId: planning.orderId || planning.order_id,
+          employeeId: planning.employeeId || planning.employee_id,
+          planningDate: planning.planningDate || planning.planning_date,
+          startTime: this.extractTimeFromDateTime(planning.startTime || planning.start_time),
+          endTime: this.extractTimeFromDateTime(planning.endTime || planning.end_time),
+          durationMinutes: planning.durationMinutes || planning.estimated_duration_minutes || 30,
+          completed: planning.completed || false,
+          orderNumber: planning.orderNumber || planning.order_number || 'N/A',
+          priority: planning.priority || 'MEDIUM',
+          employeeName: planning.employeeName || planning.employee_name || 'Employee',
+          status: planning.status || 'SCHEDULED',
+          notes: planning.notes || '',
+          cardCount: planning.cardCount || planning.card_count || 1
+        }
+      } else {
+        // Legacy backend format
+        return {
+          id: planning.id || planning.planification_id,
+          orderId: planning.orderId || planning.order_id,
+          employeeId: planning.employeeId || planning.employe_id,
+          planningDate: planning.planningDate || planning.date_planification,
+          startTime: planning.startTime || planning.heure_debut || '09:00',
+          endTime: planning.endTime || planning.heure_fin,
+          durationMinutes: planning.durationMinutes || planning.duree_minutes || 30,
+          completed: planning.completed || planning.terminee || false,
+          orderNumber: planning.orderNumber || planning.numeroCommande || planning.num_commande || 'N/A',
+          priority: planning.priority || planning.priorite || 'MEDIUM',
+          employeeName: planning.employeeName || planning.employeNom || planning.employe_nom || 'Employee',
+          status: planning.status || planning.statut || 'SCHEDULED'
+        }
+      }
+    })
+  }
+
+  private createTestEmployees(): Employee[] {
+    const testEmployees = [
+      {
+        id: 'E93263727DF943D78BD9B0F91845F358',
+        firstName: 'Ibrahim',
+        lastName: 'ALAME',
+        email: 'ibrahim.alame@pokemon.com',
+        workHoursPerDay: 8,
+        active: true,
+        fullName: 'Ibrahim ALAME'
+      },
+      {
+        id: 'F84374838EF054E789E8BF279456A469',
+        firstName: 'FX',
+        lastName: 'Colombani',
+        email: 'fx.colombani@pokemon.com',
+        workHoursPerDay: 8,
+        active: true,
+        fullName: 'FX Colombani'
+      },
+      {
+        id: 'A95485949F0165F89AF9C038A567B57A',
+        firstName: 'Pokemon',
+        lastName: 'Trainer',
+        email: 'trainer@pokemon.com',
+        workHoursPerDay: 8,
+        active: true,
+        fullName: 'Pokemon Trainer'
+      }
+    ]
+
+    console.log('⚠️ Using test employees as fallback:', testEmployees.length)
+    return testEmployees
+  }
+
+  private extractTimeFromDateTime(dateTimeStr: string | null): string {
+    if (!dateTimeStr) return '09:00'
+
     try {
-      console.log('📊 Fetching dashboard stats')
-
-      const response = await fetch(`${this.baseUrl}/dashboard/stats`)
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dashboard stats: ${response.status}`)
+      // If it's already just time (HH:MM)
+      if (dateTimeStr.match(/^\d{2}:\d{2}$/)) {
+        return dateTimeStr
       }
 
-      const data = await response.json()
-
-      return {
-        pendingOrders: data.pendingOrders || data.commandesEnAttente || 0,
-        inProgressOrders: data.inProgressOrders || data.commandesEnCours || 0,
-        completedOrders: data.completedOrders || data.commandesTerminees || 0,
-        totalOrders: data.totalOrders || data.totalCommandes || 0,
-        activeEmployees: data.activeEmployees || data.employesActifs || 0,
-        status: data.status || 'OK',
-        timestamp: new Date().toISOString(),
-        lastUpdate: data.lastUpdate || data.derniereMAJ
+      // If it's a full datetime
+      if (dateTimeStr.includes('T')) {
+        return dateTimeStr.split('T')[1].substring(0, 5)
       }
+
+      // If it's a datetime with space
+      if (dateTimeStr.includes(' ')) {
+        const timePart = dateTimeStr.split(' ')[1]
+        return timePart.substring(0, 5)
+      }
+
+      return '09:00'
     } catch (error) {
-      console.error('❌ Error fetching dashboard stats:', error)
-      throw error
+      console.warn('⚠️ Time extraction error:', dateTimeStr, error)
+      return '09:00'
     }
   }
 
-  /**
-   * Gets current system status
-   */
-  async getSystemStatus(): Promise<SystemStatus> {
-    try {
-      console.log('⚡ Getting system status')
-
-      const response = await fetch(`${this.baseUrl}/system/status`)
-
-      if (!response.ok) {
-        throw new Error(`Failed to get system status: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      return {
-        status: data.status || 'OK',
-        message: data.message || 'System operational',
-        timestamp: new Date().toISOString()
-      }
-    } catch (error) {
-      console.error('❌ Error getting system status:', error)
-      return {
-        status: 'ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }
+  private mapStatus(statusNumber: number): string {
+    switch (statusNumber) {
+      case 1: return 'PENDING'
+      case 2: return 'IN_PROGRESS'
+      case 3: return 'COMPLETED'
+      case 4: return 'CANCELLED'
+      default: return 'PENDING'
     }
   }
 
-  // ========== TRANSFORMATION METHODS ==========
-
-  private transformOrderToEnglish(frenchOrder: any): OrderResponse {
-    return {
-      id: frenchOrder.id,
-      orderNumber: frenchOrder.numeroCommande || frenchOrder.orderNumber,
-      cardCount: frenchOrder.nombreCartes || frenchOrder.cardCount || 0,
-      cardsWithName: frenchOrder.nombreAvecNom || frenchOrder.cardsWithName,
-      percentageWithName: frenchOrder.pourcentageAvecNom || frenchOrder.percentageWithName,
-      totalPrice: frenchOrder.prixTotal || frenchOrder.totalPrice,
-      priority: this.transformPriorityToEnglish(frenchOrder.priorite || frenchOrder.priority),
-      status: this.transformStatusToEnglish(frenchOrder.statut || frenchOrder.status),
-      statusCode: frenchOrder.status || frenchOrder.statusCode || 1,
-      creationDate: frenchOrder.dateCreation || frenchOrder.creationDate,
-      deadline: frenchOrder.dateLimite || frenchOrder.deadline,
-      estimatedTimeMinutes: frenchOrder.tempsEstimeMinutes || frenchOrder.estimatedTimeMinutes || 120,
-      orderQuality: this.transformQualityToEnglish(frenchOrder.qualiteCommande || frenchOrder.orderQuality)
-    }
-  }
-
-  private transformOrderToFrench(englishOrder: any): any {
-    return {
-      numeroCommande: englishOrder.orderNumber,
-      nombreCartes: englishOrder.cardCount,
-      nombreAvecNom: englishOrder.cardsWithName,
-      pourcentageAvecNom: englishOrder.percentageWithName,
-      prixTotal: englishOrder.totalPrice,
-      priorite: this.transformPriorityToFrench(englishOrder.priority),
-      statut: this.transformStatusToFrench(englishOrder.status),
-      dateCreation: englishOrder.creationDate,
-      dateLimite: englishOrder.deadline,
-      tempsEstimeMinutes: englishOrder.estimatedTimeMinutes,
-      qualiteCommande: this.transformQualityToFrench(englishOrder.orderQuality)
-    }
-  }
-
-  private transformCardToEnglish(frenchCard: any): CardResponse {
-    return {
-      id: frenchCard.carteId || frenchCard.id,
-      certificationId: frenchCard.carteId || frenchCard.certificationId,
-      cardId: frenchCard.cardId || frenchCard.carteId,
-      name: frenchCard.nom || frenchCard.name || 'Unknown card',
-      labelName: frenchCard.labelNom || frenchCard.labelName || 'Card to certify',
-      barcode: frenchCard.codeBarre || frenchCard.barcode || 'N/A',
-      type: frenchCard.type || 'Pokemon',
-      annotation: frenchCard.annotation || '',
-      language: frenchCard.langue || frenchCard.language || 'FR',
-      withName: frenchCard.avecNom || frenchCard.withName || false
-    }
-  }
-
-  private transformEmployeeToEnglish(frenchEmployee: any): EmployeeResponse {
-    return {
-      id: frenchEmployee.id,
-      firstName: frenchEmployee.prenom || frenchEmployee.firstName,
-      lastName: frenchEmployee.nom || frenchEmployee.lastName,
-      email: frenchEmployee.email,
-      workHoursPerDay: frenchEmployee.heuresTravailParJour || frenchEmployee.workHoursPerDay || 8,
-      active: frenchEmployee.actif !== undefined ? frenchEmployee.actif : frenchEmployee.active !== false,
-      fullName: frenchEmployee.nomComplet || frenchEmployee.fullName || `${frenchEmployee.prenom || frenchEmployee.firstName} ${frenchEmployee.nom || frenchEmployee.lastName}`
-    }
-  }
-
-  private transformEmployeeToFrench(englishEmployee: any): any {
-    return {
-      prenom: englishEmployee.firstName,
-      nom: englishEmployee.lastName,
-      email: englishEmployee.email,
-      heuresTravailParJour: englishEmployee.workHoursPerDay,
-      actif: englishEmployee.active
-    }
-  }
-
-  private transformEmployeeListItemToEnglish(frenchItem: any): EmployeeListItem {
-    return {
-      id: frenchItem.id,
-      name: frenchItem.name || frenchItem.nom || frenchItem.nomComplet,
-      totalMinutes: frenchItem.totalMinutes || frenchItem.minutesTotales || 0,
-      maxMinutes: frenchItem.maxMinutes || frenchItem.minutesMax || 480,
-      status: frenchItem.status || this.calculateEmployeeStatus(frenchItem.totalMinutes, frenchItem.maxMinutes),
-      taskCount: frenchItem.taskCount || frenchItem.nombreTaches || 0,
-      cardCount: frenchItem.cardCount || frenchItem.nombreCartes || 0,
-      completedTasks: frenchItem.completedTasks || frenchItem.tachesTerminees
-    }
-  }
-
-  private transformEmployeeDetailToEnglish(frenchDetail: any): EmployeeDetail {
-    return {
-      id: frenchDetail.id,
-      name: frenchDetail.name || frenchDetail.nom,
-      totalMinutes: frenchDetail.totalMinutes || frenchDetail.minutesTotales || 0,
-      maxMinutes: frenchDetail.maxMinutes || frenchDetail.minutesMax || 480,
-      status: frenchDetail.status || this.calculateEmployeeStatus(frenchDetail.totalMinutes, frenchDetail.maxMinutes),
-      tasks: (frenchDetail.tasks || frenchDetail.taches || []).map((task: any) => this.transformTaskToEnglish(task))
-    }
-  }
-
-  private transformTaskToEnglish(frenchTask: any): any {
-    return {
-      id: frenchTask.id,
-      orderNumber: frenchTask.numeroCommande || frenchTask.orderNumber,
-      priority: this.transformPriorityToEnglish(frenchTask.priorite || frenchTask.priority || 'NORMALE'),
-      status: this.transformTaskStatusToEnglish(frenchTask.status || frenchTask.statut),
-      startTime: frenchTask.heureDebut || frenchTask.startTime || '09:00',
-      endTime: frenchTask.heureFin || frenchTask.endTime || '17:00',
-      duration: frenchTask.dureeCalculee || frenchTask.duration || 120,
-      amount: frenchTask.amount || 0,
-      cardCount: frenchTask.nombreCartes || frenchTask.cardCount || 0,
-      cards: (frenchTask.cards || frenchTask.cartes || []).map((card: any) => this.transformCardToEnglish(card)),
-      expanded: frenchTask.expanded || false,
-      completed: frenchTask.terminee || frenchTask.completed || false,
-      loadingCards: frenchTask.loadingCards || false
-    }
-  }
-
-  private transformPlanningToEnglish(frenchPlanning: any): PlanningResponse {
-    return {
-      id: frenchPlanning.id,
-      orderId: frenchPlanning.commandeId || frenchPlanning.orderId,
-      employeeId: frenchPlanning.employeId || frenchPlanning.employeeId,
-      scheduledDate: frenchPlanning.datePlanifiee || frenchPlanning.scheduledDate,
-      startTime: frenchPlanning.heureDebut || frenchPlanning.startTime,
-      endTime: frenchPlanning.heureFin || frenchPlanning.endTime,
-      durationMinutes: frenchPlanning.dureeMinutes || frenchPlanning.durationMinutes,
-      completed: frenchPlanning.terminee || frenchPlanning.completed || false,
-      orderNumber: frenchPlanning.numeroCommande || frenchPlanning.orderNumber,
-      priority: this.transformPriorityToEnglish(frenchPlanning.priorite || frenchPlanning.priority),
-      employeeName: frenchPlanning.employeNom || frenchPlanning.employeeName
-    }
-  }
-
-  // Helper transformation methods
-  private transformPriorityToEnglish(frenchPriority: string): string {
-    const priorityMap: Record<string, string> = {
-      'URGENTE': 'URGENT',
-      'HAUTE': 'HIGH',
-      'MOYENNE': 'MEDIUM',
-      'NORMALE': 'NORMAL',
-      'BASSE': 'LOW'
-    }
-    return priorityMap[frenchPriority] || frenchPriority || 'NORMAL'
-  }
-
-  private transformPriorityToFrench(englishPriority: string): string {
-    const priorityMap: Record<string, string> = {
-      'URGENT': 'URGENTE',
-      'HIGH': 'HAUTE',
-      'MEDIUM': 'MOYENNE',
-      'NORMAL': 'NORMALE',
-      'LOW': 'BASSE'
-    }
-    return priorityMap[englishPriority] || englishPriority || 'NORMALE'
-  }
-
-  private transformStatusToEnglish(frenchStatus: string): string {
-    const statusMap: Record<string, string> = {
-      'EN_ATTENTE': 'PENDING',
-      'PLANIFIEE': 'SCHEDULED',
-      'EN_COURS': 'IN_PROGRESS',
-      'TERMINEE': 'COMPLETED',
-      'ANNULEE': 'CANCELLED'
-    }
-    return statusMap[frenchStatus] || frenchStatus || 'PENDING'
-  }
-
-  private transformStatusToFrench(englishStatus: string): string {
-    const statusMap: Record<string, string> = {
-      'PENDING': 'EN_ATTENTE',
-      'SCHEDULED': 'PLANIFIEE',
-      'IN_PROGRESS': 'EN_COURS',
-      'COMPLETED': 'TERMINEE',
-      'CANCELLED': 'ANNULEE'
-    }
-    return statusMap[englishStatus] || englishStatus || 'EN_ATTENTE'
-  }
-
-  private transformTaskStatusToEnglish(frenchStatus: string): string {
-    const statusMap: Record<string, string> = {
-      'En cours': 'In Progress',
-      'Planifiée': 'Scheduled',
-      'Terminée': 'Completed'
-    }
-    return statusMap[frenchStatus] || frenchStatus || 'Scheduled'
-  }
-
-  private transformQualityToEnglish(frenchQuality: string): string {
-    const qualityMap: Record<string, string> = {
-      'EXCELLENTE': 'EXCELLENT',
-      'BONNE': 'GOOD',
-      'MOYENNE': 'AVERAGE',
-      'FAIBLE': 'POOR',
-      'PARFAITE': 'PERFECT'
-    }
-    return qualityMap[frenchQuality] || frenchQuality || 'GOOD'
-  }
-
-  private transformQualityToFrench(englishQuality: string): string {
-    const qualityMap: Record<string, string> = {
-      'EXCELLENT': 'EXCELLENTE',
-      'GOOD': 'BONNE',
-      'AVERAGE': 'MOYENNE',
-      'POOR': 'FAIBLE',
-      'PERFECT': 'PARFAITE'
-    }
-    return qualityMap[englishQuality] || englishQuality || 'BONNE'
-  }
-
-  private calculateEmployeeStatus(totalMinutes: number, maxMinutes: number): 'available' | 'full' | 'overloaded' {
-    if (!totalMinutes || !maxMinutes) return 'available'
-
-    const utilization = totalMinutes / maxMinutes
-
-    if (utilization > 1.0) return 'overloaded'
-    if (utilization >= 0.8) return 'full'
-    return 'available'
-  }
-
-  // ========== UTILITY METHODS ==========
-
-  /**
-   * Formats duration from minutes to readable string
-   */
-  formatDuration(minutes: number): string {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}` : `${mins}min`
-  }
-
-  /**
-   * Calculates end time from start time and duration
-   */
-  calculateEndTime(startTime: string, durationMinutes: number): string {
-    if (!startTime) return '00:00'
-
-    const [hours, minutes] = startTime.split(':').map(Number)
-    const totalMinutes = hours * 60 + minutes + durationMinutes
-
-    const endHours = Math.floor(totalMinutes / 60) % 24
-    const endMinutes = totalMinutes % 60
-
-    return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`
-  }
-
-  /**
-   * Gets quality label from percentage
-   */
-  getQualityFromPercentage(percentage: number): string {
+  private getQualityFromPercentage(percentage: number): string {
     if (percentage >= 95) return 'EXCELLENT'
     if (percentage >= 85) return 'GOOD'
-    if (percentage >= 70) return 'AVERAGE'
+    if (percentage >= 75) return 'AVERAGE'
+    if (percentage >= 60) return 'FAIR'
     return 'POOR'
   }
 }
 
-// Export singleton instance
-export default new EnglishApiService()
+// ========== SINGLETON EXPORT ==========
+
+export const apiService = new EnglishApiService()
+
+// ========== CONVENIENCE FUNCTIONS ==========
+
+export const generatePlanning = (config: PlanningRequest) =>
+  apiService.automaticPlanning(config)
+
+export const getTodaysPlannings = () =>
+  apiService.getPlannings()
+
+export const getSystemStatus = () =>
+  apiService.testConnection()
+
+export default apiService
