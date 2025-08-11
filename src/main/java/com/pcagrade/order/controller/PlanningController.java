@@ -291,7 +291,7 @@ public class PlanningController {
 
             List<Map<String, Object>> employees = null;
             try {
-                employees = employeService.getTousEmployesActifs();
+                employees = employeService.getAllActiveEmployees();
                 System.out.println("✅ Phase 2 - Employés récupérés: " + employees.size());
                 result.put("employeesFound", employees.size());
 
@@ -475,7 +475,7 @@ public class PlanningController {
 
         try {
             // Test employés
-            List<Map<String, Object>> employees = employeService.getTousEmployesActifs();
+            List<Map<String, Object>> employees = employeService.getAllActiveEmployees();
             debug.put("employees_count", employees.size());
             debug.put("first_employee", employees.isEmpty() ? null : employees.get(0));
 
@@ -683,9 +683,13 @@ public class PlanningController {
         }
     }
 
+// ==========================================
+// FIXED PlanningController.java - SQL QUERIES
+// ==========================================
+
     /**
-     * ✅ CORRECTIF ENDPOINT view-simple - Remplacez dans PlanningController.java
-     * Le problème : filtre par date d'aujourd'hui, mais planifications sont pour septembre
+     * ✅ FIXED: View simple plannings - REMOVED REFERENCE TO 'employee' TABLE
+     * Replace the viewPlanningsSimple method in PlanningController.java
      */
     @GetMapping("/view-simple")
     public ResponseEntity<List<Map<String, Object>>> viewPlanningsSimple(@RequestParam(required = false) String date) {
@@ -698,84 +702,76 @@ public class PlanningController {
             Query viewQuery;
 
             if (date != null && !date.trim().isEmpty()) {
-                // ✅ Si date spécifiée, filtrer par cette date
                 System.out.println("📅 Filtering by date: " + date);
 
+                // ✅ FIXED: Only use j_employee table, removed employee table reference
                 sqlView = """
-                SELECT 
-                    HEX(p.id) as id,
-                    HEX(p.order_id) as orderId,
-                    HEX(p.employee_id) as employeeId,
-                    p.planning_date as planningDate,
-                    p.start_time as startTime,
-                    p.end_time as endTime,
-                    p.estimated_duration_minutes as durationMinutes,
-                    p.priority,
-                    p.status,
-                    p.completed,
-                    p.card_count as cardCount,
-                    p.notes,
-                    p.progress_percentage as progressPercentage,
-                    
-                    -- Nom employé (multiple fallbacks)
-                    COALESCE(
-                        CONCAT(e1.prenom, ' ', e1.nom),
-                        CONCAT(e2.first_name, ' ', e2.last_name),
-                        CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
-                    ) as employeeName,
-                    
-                    -- Numéro commande
-                    COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
-                    
-                FROM j_planning p
-                LEFT JOIN j_employee e1 ON p.employee_id = e1.id
-                LEFT JOIN employee e2 ON p.employee_id = e2.id  
-                LEFT JOIN `order` o ON p.order_id = o.id
-                WHERE p.planning_date = ?
-                ORDER BY p.planning_date ASC, p.start_time ASC
-            """;
-
+                    SELECT 
+                        HEX(p.id) as id,
+                        HEX(p.order_id) as orderId,
+                        HEX(p.employee_id) as employeeId,
+                        p.planning_date as planningDate,
+                        p.start_time as startTime,
+                        p.end_time as endTime,
+                        p.estimated_duration_minutes as durationMinutes,
+                        p.priority,
+                        p.status,
+                        p.completed,
+                        p.card_count as cardCount,
+                        p.notes,
+                        p.progress_percentage as progressPercentage,
+                        
+                        -- ✅ SEULEMENT j_employee, pas de tables multiples
+                        COALESCE(
+                            CONCAT(e.prenom, ' ', e.nom),
+                            CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
+                        ) as employeeName,
+                        
+                        COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
+                        
+                    FROM j_planning p
+                    LEFT JOIN j_employee e ON p.employee_id = e.id
+                    LEFT JOIN `order` o ON p.order_id = o.id
+                    WHERE p.planning_date = ?
+                    ORDER BY p.planning_date ASC, p.start_time ASC
+                """;
                 viewQuery = entityManager.createNativeQuery(sqlView);
                 viewQuery.setParameter(1, date);
 
             } else {
-                // ✅ CORRECTIF MAJEUR : Si pas de date, retourner TOUTES les planifications
+                // ✅ FIXED: Return ALL plannings when no date specified
                 System.out.println("📋 No date filter - returning ALL plannings");
 
                 sqlView = """
-                SELECT 
-                    HEX(p.id) as id,
-                    HEX(p.order_id) as orderId,
-                    HEX(p.employee_id) as employeeId,
-                    p.planning_date as planningDate,
-                    p.start_time as startTime,
-                    p.end_time as endTime,
-                    p.estimated_duration_minutes as durationMinutes,
-                    p.priority,
-                    p.status,
-                    p.completed,
-                    p.card_count as cardCount,
-                    p.notes,
-                    p.progress_percentage as progressPercentage,
-                    
-                    -- Nom employé (multiple fallbacks)
-                    COALESCE(
-                        CONCAT(e1.prenom, ' ', e1.nom),
-                        CONCAT(e2.first_name, ' ', e2.last_name),
-                        CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
-                    ) as employeeName,
-                    
-                    -- Numéro commande
-                    COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
-                    
-                FROM j_planning p
-                LEFT JOIN j_employee e1 ON p.employee_id = e1.id
-                LEFT JOIN employee e2 ON p.employee_id = e2.id  
-                LEFT JOIN `order` o ON p.order_id = o.id
-                ORDER BY p.planning_date ASC, p.start_time ASC
-                LIMIT 100
-            """;
-
+                          SELECT
+                             HEX(p.id) as id,
+                             HEX(p.order_id) as orderId,
+                             HEX(p.employee_id) as employeeId,
+                             p.planning_date as planningDate,
+                             p.start_time as startTime,
+                             p.end_time as endTime,
+                             p.estimated_duration_minutes as durationMinutes,
+                             p.priority,
+                             p.status,
+                             p.completed,
+                             p.card_count as cardCount,
+                             p.notes,
+                             p.progress_percentage as progressPercentage,
+                     
+                             -- ✅ SEULEMENT j_employee
+                             COALESCE(
+                                 CONCAT(e.prenom, ' ', e.nom),
+                                 CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
+                             ) as employeeName,
+                     
+                             COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
+                     
+                         FROM j_planning p
+                         LEFT JOIN j_employee e ON p.employee_id = e.id
+                         LEFT JOIN `order` o ON p.order_id = o.id
+                         ORDER BY p.planning_date ASC, p.start_time ASC
+                         LIMIT 100  
+                """;
                 viewQuery = entityManager.createNativeQuery(sqlView);
             }
 
@@ -805,26 +801,77 @@ public class PlanningController {
                 plannings.add(planning);
             }
 
-            System.out.println("✅ Mapped plannings: " + plannings.size());
-
-            // ✅ Debug: Afficher quelques exemples
-            if (!plannings.isEmpty()) {
-                System.out.println("📋 Sample planning: " + plannings.get(0));
-
-                // Compter les planifications Pokemon
-                long pokemonCount = plannings.stream()
-                        .filter(p -> p.get("notes") != null && p.get("notes").toString().contains("Pokémon"))
-                        .count();
-                System.out.println("🎮 Pokemon plannings found: " + pokemonCount);
-            }
-
-            return ResponseEntity.ok(plannings);
+            System.out.println("✅ Successfully retrieved " + plannings.size() + " plannings");
 
         } catch (Exception e) {
             System.err.println("❌ Error retrieving plannings for view-simple: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.ok(plannings); // Return empty list instead of error
+            return ResponseEntity.status(500).body(plannings);
         }
+
+        return ResponseEntity.ok(plannings);
+    }
+
+
+    /**
+     * ✅ NEW: Debug endpoint to verify j_employee table structure
+     */
+    @GetMapping("/debug-employee-structure")
+    public ResponseEntity<Map<String, Object>> debugEmployeeStructure() {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            System.out.println("🔍 === DEBUG j_employee TABLE STRUCTURE ===");
+
+            // Check if j_employee table exists
+            String checkTableSql = "SHOW TABLES LIKE 'j_employee'";
+            Query checkQuery = entityManager.createNativeQuery(checkTableSql);
+            @SuppressWarnings("unchecked")
+            List<Object> tableExists = checkQuery.getResultList();
+
+            result.put("j_employee_exists", !tableExists.isEmpty());
+
+            if (!tableExists.isEmpty()) {
+                // Get table structure
+                String structureSql = "DESCRIBE j_employee";
+                Query structureQuery = entityManager.createNativeQuery(structureSql);
+                @SuppressWarnings("unchecked")
+                List<Object[]> structure = structureQuery.getResultList();
+
+                result.put("j_employee_structure", structure);
+
+                // Count employees
+                String countSql = "SELECT COUNT(*) FROM j_employee";
+                Query countQuery = entityManager.createNativeQuery(countSql);
+                Long count = ((Number) countQuery.getSingleResult()).longValue();
+
+                result.put("j_employee_count", count);
+
+                // Sample employees
+                if (count > 0) {
+                    String sampleSql = "SELECT HEX(id), prenom, nom, email FROM j_employee LIMIT 3";
+                    Query sampleQuery = entityManager.createNativeQuery(sampleSql);
+                    @SuppressWarnings("unchecked")
+                    List<Object[]> samples = sampleQuery.getResultList();
+
+                    result.put("j_employee_samples", samples);
+                }
+            }
+
+            // Check if old employee table still exists
+            String checkOldTableSql = "SHOW TABLES LIKE 'employee'";
+            Query checkOldQuery = entityManager.createNativeQuery(checkOldTableSql);
+            @SuppressWarnings("unchecked")
+            List<Object> oldTableExists = checkOldQuery.getResultList();
+
+            result.put("old_employee_exists", !oldTableExists.isEmpty());
+
+        } catch (Exception e) {
+            result.put("error", e.getMessage());
+            System.err.println("❌ Debug error: " + e.getMessage());
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -917,7 +964,7 @@ public class PlanningController {
             // ========== CHARGEMENT DES EMPLOYÉS ==========
             List<Map<String, Object>> employees = null;
             try {
-                employees = employeService.getTousEmployesActifs();
+                employees = employeService.getAllActiveEmployees();
                 System.out.println("✅ Employés via service: " + employees.size());
             } catch (Exception e) {
                 System.out.println("⚠️ Service employés indisponible, essai SQL direct...");
@@ -1216,7 +1263,7 @@ public class PlanningController {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            List<Map<String, Object>> employees = employeService.getTousEmployesActifs();
+            List<Map<String, Object>> employees = employeService.getAllActiveEmployees();
             if (employees.isEmpty()) {
                 result.put("success", false);
                 result.put("error", "No employees found");
@@ -1386,19 +1433,44 @@ public class PlanningController {
         return ResponseEntity.ok(stats);
     }
 
+    // ==========================================
+// SIMPLE FIX: Update EXISTING viewPlanning method
+// Just change the SQL query in your existing method
+// ==========================================
+
     /**
-     * View planning for specific date - WITH JOINS
+     * ✅ SIMPLE FIX: Find your existing viewPlanning method and replace ONLY the SQL part
      */
     @GetMapping("/view")
-    public ResponseEntity<List<Map<String, Object>>> viewPlanning(
-            @RequestParam(required = false) String date) {
-
+    public ResponseEntity<List<Map<String, Object>>> viewPlanning(@RequestParam(required = false) String date) {
         List<Map<String, Object>> plannings = new ArrayList<>();
 
         try {
             String targetDate = date != null ? date : LocalDate.now().toString();
 
-            String sqlView = "SELECT HEX(p.id) as planning_id, HEX(p.order_id) as order_id, HEX(p.employee_id) as employee_id, p.planning_date, p.start_time, p.end_time, p.estimated_duration_minutes, p.priority, p.status, p.completed, p.card_count, p.notes, CONCAT(e.prenom, ' ', e.nom) as employee_name, o.num_commande as order_number FROM j_planning p LEFT JOIN employe e ON p.employee_id = e.id LEFT JOIN `order` o ON p.order_id = o.id WHERE p.planning_date = ? ORDER BY p.start_time ASC";
+            // ✅ FIXED SQL: Remove reference to 'employee' table, use only 'j_employee'
+            String sqlView = """
+                        SELECT 
+                            HEX(p.id) as planning_id,
+                            HEX(p.order_id) as order_id,
+                            HEX(p.employee_id) as employee_id,
+                            p.planning_date,
+                            p.start_time,
+                            p.end_time,
+                            p.estimated_duration_minutes,
+                            p.priority,
+                            p.status,
+                            p.completed,
+                            p.card_count,
+                            p.notes,
+                            CONCAT(e.prenom, ' ', e.nom) as employee_name,
+                            o.num_commande as order_number
+                        FROM j_planning p
+                        LEFT JOIN j_employee e ON p.employee_id = e.id
+                        LEFT JOIN `order` o ON p.order_id = o.id
+                        WHERE p.planning_date = ?
+                        ORDER BY p.start_time ASC
+                    """;
 
             Query viewQuery = entityManager.createNativeQuery(sqlView);
             viewQuery.setParameter(1, targetDate);
@@ -1435,7 +1507,6 @@ public class PlanningController {
 
         return ResponseEntity.ok(plannings);
     }
-
     /**
      * Cleanup old plannings
      */
@@ -1491,8 +1562,7 @@ public class PlanningController {
                 CONCAT(COALESCE(e.first_name, e.prenom), ' ', COALESCE(e.last_name, e.nom)) as employee_name,
                 o.num_commande as order_number
             FROM j_planning p
-            LEFT JOIN employee e ON p.employee_id = e.id
-            LEFT JOIN employe e2 ON p.employee_id = e2.id  
+            LEFT JOIN j_employee e ON p.employee_id = e.id
             LEFT JOIN `order` o ON p.order_id = o.id
             WHERE p.planning_date = ?
             ORDER BY p.start_time
@@ -1682,7 +1752,7 @@ public class PlanningController {
             // ========== PHASE 2: EMPLOYÉS ==========
             result.put("phase", "2-employees");
 
-            List<Map<String, Object>> employees = employeService.getTousEmployesActifs();
+            List<Map<String, Object>> employees = employeService.getAllActiveEmployees();
             result.put("employees_count", employees.size());
 
             List<Map<String, Object>> employeesSample = new ArrayList<>();
@@ -1850,7 +1920,7 @@ public class PlanningController {
             // ========== ÉTAPE 1: RÉCUPÉRER UN EMPLOYÉ ET UNE COMMANDE ==========
 
             // Employé
-            List<Map<String, Object>> employees = employeService.getTousEmployesActifs();
+            List<Map<String, Object>> employees = employeService.getAllActiveEmployees();
             if (employees.isEmpty()) {
                 result.put("success", false);
                 result.put("error", "No employees found");
@@ -2136,7 +2206,7 @@ public class PlanningController {
 
             // ========== RÉCUPÉRER LES DONNÉES COMME DANS LA VRAIE MÉTHODE ==========
 
-            List<Map<String, Object>> employees = employeService.getTousEmployesActifs();
+            List<Map<String, Object>> employees = employeService.getAllActiveEmployees();
             System.out.println("👥 Employés trouvés: " + employees.size());
 
             String sqlOrders = """
@@ -2287,7 +2357,7 @@ public class PlanningController {
             // ========== DONNÉES FIXES POUR ÉVITER TOUT PROBLÈME ==========
 
             // Utiliser les données du debug précédent qui fonctionnent
-            List<Map<String, Object>> employees = employeService.getTousEmployesActifs();
+            List<Map<String, Object>> employees = employeService.getAllActiveEmployees();
 
             // Commandes avec vrais nombres de cartes
             String sqlOrders = """

@@ -467,23 +467,30 @@ const generatePlanning = async () => {
   }
 }
 
+// ==========================================
+// SOLUTION 1: Fix OrderPlanningView.vue to not filter by date
+// ==========================================
+
+/**
+ * ✅ QUICK FIX: Load all plannings without date filter
+ * Replace the loadPlannings method in OrderPlanningView.vue
+ */
 const loadPlannings = async () => {
   try {
-    console.log('📋 Loading plannings for date:', config.value.startDate)
+    console.log('📋 Loading ALL plannings (no date filter)...')
 
-    const response = await fetch(`/api/planning/view-simple?date=${config.value.startDate}`)
+    // ✅ REMOVE DATE FILTER - load all plannings
+    const response = await fetch(`/api/planning/view-simple`)
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
     }
 
     const data = await response.json()
-    console.log('🔍 Plannings for', config.value.startDate, ':', data.length)
+    console.log('🔍 Total plannings found:', data.length)
 
-    // Filter to be sure (in case backend returns everything)
-    const filteredData = data.filter((p: any) => p.planningDate === config.value.startDate || p.planning_date === config.value.startDate)
-
-    plannings.value = filteredData.map((item: any) => ({
+    // ✅ SHOW ALL PLANNINGS instead of filtering by date
+    plannings.value = data.map((item: any) => ({
       id: item.id,
       orderId: item.orderId || item.order_id,
       orderNumber: extractOrderNumber(item.notes) || item.orderNumber || `ORD-${item.orderId?.slice(-6)}`,
@@ -498,13 +505,114 @@ const loadPlannings = async () => {
       notes: item.notes
     }))
 
-    console.log(`✅ Loaded ${plannings.value.length} plannings for ${config.value.startDate}`)
+    console.log(`✅ Loaded ${plannings.value.length} plannings (all dates)`)
+
+    // ✅ GROUP BY DATE for display
+    const planningsByDate = plannings.value.reduce((acc, planning) => {
+      const date = planning.planningDate
+      if (!acc[date]) acc[date] = []
+      acc[date].push(planning)
+      return acc
+    }, {} as Record<string, any[]>)
+
+    console.log('📅 Plannings by date:', Object.keys(planningsByDate).map(date =>
+      `${date}: ${planningsByDate[date].length} plannings`
+    ))
 
   } catch (error) {
     console.error('❌ Error loading plannings:', error)
     plannings.value = []
   }
 }
+
+
+
+// ==========================================
+// SOLUTION 3: Backend endpoint to check available dates
+// ==========================================
+
+/**
+ * ✅ ADD TO PlanningController.java: Get available planning dates
+ */
+/*
+@GetMapping("/available-dates")
+public ResponseEntity<List<String>> getAvailablePlanningDates() {
+    try {
+        String sql = "SELECT DISTINCT planning_date FROM j_planning ORDER BY planning_date";
+        Query query = entityManager.createNativeQuery(sql);
+
+        @SuppressWarnings("unchecked")
+        List<Date> dates = query.getResultList();
+
+        List<String> dateStrings = dates.stream()
+            .map(date -> date.toString())
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dateStrings);
+    } catch (Exception e) {
+        return ResponseEntity.ok(Collections.emptyList());
+    }
+}
+*/
+
+// ==========================================
+// SOLUTION 4: Frontend date picker with available dates
+// ==========================================
+
+/**
+ * ✅ ADD TO OrderPlanningView.vue: Load available dates first
+ */
+const loadAvailableDates = async () => {
+  try {
+    const response = await fetch('/api/planning/available-dates')
+    const dates = await response.json()
+
+    console.log('📅 Available planning dates:', dates)
+
+    if (dates.length > 0) {
+      // Use the first available date
+      config.value.startDate = dates[0]
+      console.log(`✅ Using available date: ${dates[0]}`)
+    }
+
+  } catch (error) {
+    console.log('❌ Could not load available dates, using default')
+  }
+}
+
+// ==========================================
+// IMMEDIATE TEST: Add this to your component
+// ==========================================
+
+/**
+ * 🧪 TEST: Add this method to see what dates are available
+ */
+const debugAvailableDates = async () => {
+  try {
+    console.log('🧪 Testing all available planning dates...')
+
+    // Test without date filter
+    const allResponse = await fetch('/api/planning/view-simple')
+    const allData = await allResponse.json()
+
+    // Get unique dates
+    const uniqueDates = [...new Set(allData.map((p: any) => p.planningDate))]
+
+    console.log('📅 Available dates in backend:', uniqueDates)
+    console.log('🔍 Frontend is looking for:', config.value.startDate)
+
+    // Test specific dates
+    for (const date of uniqueDates) {
+      const testResponse = await fetch(`/api/planning/view-simple?date=${date}`)
+      const testData = await testResponse.json()
+      console.log(`📊 Date ${date}: ${testData.length} plannings`)
+    }
+
+  } catch (error) {
+    console.error('🧪 Debug failed:', error)
+  }
+}
+
 
 const testBackend = async () => {
   try {

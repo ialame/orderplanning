@@ -319,95 +319,77 @@ const testBackend = async () => {
   }
 }
 
+/**
+ * ✅ REMPLACEZ la méthode loadEmployees dans EmployeeListView.vue
+ * Le problème : utilise des données mock au lieu des vraies données
+ */
 const loadEmployees = async () => {
   loading.value = true
 
   try {
-    console.log('👥 Loading employees...')
+    console.log('👥 Loading employees from backend...')
 
-    // Try to load from backend first
+    // ✅ CHARGEMENT DIRECT DES VRAIES DONNÉES
     const response = await fetch('/api/employees')
-    let data = []
 
-    if (response.ok) {
-      const json = await response.json()
-      data = Array.isArray(json) ? json : (json.data || [])
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
-    // Process and normalize employee data or use mock data
-    employees.value = data.length > 0 ?
-      data.map(emp => ({
-        id: emp.id || `emp-${Math.random().toString(36).substr(2, 9)}`,
-        name: emp.name || emp.fullName || `${emp.firstName} ${emp.lastName}` || 'Unknown Employee',
-        department: emp.department || emp.role || 'PROCESSING',
-        status: emp.status || (emp.active ? 'AVAILABLE' : 'OFFLINE'),
-        efficiency: emp.efficiency || emp.workEfficiency || 75,
-        currentOrders: emp.currentOrders || emp.activeOrders || 0
-      })) : [
-        // Mock data for demonstration
-        {
-          id: 'EMP-001',
-          name: 'Alice Johnson',
-          department: 'PROCESSING',
-          status: 'AVAILABLE',
-          efficiency: 92,
-          currentOrders: 2
-        },
-        {
-          id: 'EMP-002',
-          name: 'Bob Smith',
-          department: 'PROCESSING',
-          status: 'BUSY',
-          efficiency: 88,
-          currentOrders: 3
-        },
-        {
-          id: 'EMP-003',
-          name: 'Carol Williams',
-          department: 'QUALITY',
-          status: 'AVAILABLE',
-          efficiency: 95,
-          currentOrders: 1
-        },
-        {
-          id: 'EMP-004',
-          name: 'David Brown',
-          department: 'PACKAGING',
-          status: 'BUSY',
-          efficiency: 78,
-          currentOrders: 4
-        },
-        {
-          id: 'EMP-005',
-          name: 'Eva Davis',
-          department: 'MANAGEMENT',
-          status: 'AVAILABLE',
-          efficiency: 85,
-          currentOrders: 0
-        },
-        {
-          id: 'EMP-006',
-          name: 'Frank Miller',
-          department: 'PROCESSING',
-          status: 'OFFLINE',
-          efficiency: 72,
-          currentOrders: 0
-        }
-      ]
+    const data = await response.json()
+    console.log('📥 Raw backend data:', data)
+    console.log('📊 Data type:', typeof data, 'Is array:', Array.isArray(data))
+    console.log('📊 Data length:', data?.length)
 
-    console.log(`✅ Loaded ${employees.value.length} employees`)
+    // ✅ VÉRIFIER QUE LES DONNÉES SONT VALIDES
+    if (!Array.isArray(data) || data.length === 0) {
+      console.error('❌ No valid employee data from backend')
+      console.log('📋 Backend returned:', data)
+
+      // ✅ NE PAS UTILISER DE DONNÉES MOCK - Afficher une erreur claire
+      employees.value = []
+
+      emit('show-notification', {
+        message: 'No employees found in database',
+        details: 'The backend returned no employee data. Check if employees exist in j_employee table.',
+        type: 'error'
+      })
+
+      return
+    }
+
+    // ✅ MAPPING DES VRAIES DONNÉES DE LA BASE
+    employees.value = data.map(emp => {
+      console.log('👤 Processing employee:', emp)
+
+      return {
+        id: emp.id || `emp-${Math.random().toString(36).substr(2, 9)}`,
+        name: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Unknown Employee',
+        department: 'PROCESSING', // Vous pouvez ajouter ce champ à votre base si nécessaire
+        status: emp.active ? 'AVAILABLE' : 'OFFLINE',
+        efficiency: 85, // Valeur par défaut, vous pouvez calculer cela selon vos critères
+        currentOrders: 0 // À remplir avec les vraies données de planning si disponible
+      }
+    })
+
+    console.log(`✅ Successfully loaded ${employees.value.length} real employees from database`)
+    console.log('👥 Employee names:', employees.value.map(e => e.name))
 
     emit('show-notification', {
-      message: 'Employees loaded successfully',
-      details: `Found ${employees.value.length} employees`,
+      message: 'Real employees loaded successfully',
+      details: `Found ${employees.value.length} employees from j_employee table`,
       type: 'success'
     })
 
   } catch (error) {
     console.error('❌ Error loading employees:', error)
+
+    // ✅ EN CAS D'ERREUR, AFFICHER L'ERREUR AU LIEU DE DONNÉES MOCK
+    employees.value = []
+
     emit('show-notification', {
-      message: 'Failed to load employees',
-      details: error.message,
+      message: 'Failed to load employees from database',
+      details: `Error: ${error.message}. Check backend connection.`,
       type: 'error'
     })
   } finally {

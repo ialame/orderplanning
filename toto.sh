@@ -1,155 +1,48 @@
-#!/bin/bash
+# ==========================================
+# DIAGNOSTIC: Vérifier quelles données l'API retourne vraiment
+# ==========================================
 
-# ===============================================
-# 🚀 TEST RAPIDE DES SOLUTIONS
-# ===============================================
+echo "🔍 DIAGNOSTIC DES DONNÉES EMPLOYÉS"
+echo "=================================="
 
-echo "🚀 TEST RAPIDE DES SOLUTIONS"
-
-# ===============================================
-# 1. TEST AVEC DATES SPÉCIFIQUES
-# ===============================================
-
-echo "=== 1. TEST AVEC DATES SPÉCIFIQUES ==="
-
-dates=("2025-09-01" "2025-09-02" "2025-09-03")
-
-for date in "${dates[@]}"; do
-    echo "📅 Test avec date: $date"
-
-    response=$(curl -s "http://localhost:8080/api/planning/view-simple?date=$date")
-    count=$(echo "$response" | jq '. | length' 2>/dev/null || echo "ERROR")
-
-    echo "  📋 Planifications trouvées: $count"
-
-    if [ "$count" != "0" ] && [ "$count" != "ERROR" ]; then
-        echo "  ✅ SUCCÈS ! Données trouvées pour $date"
-        echo "  📊 Exemple de données:"
-        echo "$response" | jq '.[0]' 2>/dev/null | head -10
-        break
-    fi
-done
-
-# ===============================================
-# 2. TEST ENDPOINT DEBUG-PLANNINGS
-# ===============================================
+# 1. Vérifier ce que l'API retourne vraiment
+echo "1. Test direct API /api/employees:"
+curl -s "http://localhost:8080/api/employees" | jq '.'
 
 echo ""
-echo "=== 2. TEST ENDPOINT DEBUG-PLANNINGS ==="
-
-debug_response=$(curl -s "http://localhost:8080/api/planning/debug-plannings")
-debug_count=$(echo "$debug_response" | jq '. | length' 2>/dev/null || echo "ERROR")
-
-echo "📊 Debug endpoint résultats: $debug_count items"
-
-if [ "$debug_count" != "0" ] && [ "$debug_count" != "ERROR" ]; then
-    echo "✅ Debug endpoint fonctionne !"
-    echo "📋 Échantillon de données debug:"
-    echo "$debug_response" | jq '.[0:2]' 2>/dev/null
-fi
-
-# ===============================================
-# 3. TEST SQL DIRECT POUR VÉRIFIER LES DATES
-# ===============================================
+echo "2. Compter les employés retournés:"
+curl -s "http://localhost:8080/api/employees" | jq '. | length'
 
 echo ""
-echo "=== 3. VÉRIFICATION DATES EN BASE ==="
-
-mysql -u ia -pfoufafou dev << 'EOF'
--- Voir toutes les dates de planification disponibles
-SELECT 'DATES DISPONIBLES:' as info;
-SELECT
-    planning_date,
-    COUNT(*) as count_plannings,
-    MIN(TIME(start_time)) as first_time,
-    MAX(TIME(start_time)) as last_time
-FROM j_planning
-GROUP BY planning_date
-ORDER BY planning_date;
-
--- Voir aujourd'hui spécifiquement
-SELECT 'PLANIFICATIONS AUJOURD\'HUI (2025-08-10):' as info;
-SELECT COUNT(*) as count_today FROM j_planning WHERE planning_date = '2025-08-10';
-
--- Voir les planifications récentes
-SELECT 'PLANIFICATIONS RÉCENTES:' as info;
-SELECT
-    planning_date,
-    COUNT(*) as count
-FROM j_planning
-WHERE planning_date >= '2025-09-01'
-GROUP BY planning_date;
-EOF
-
-# ===============================================
-# 4. SOLUTION TEMPORAIRE : APPEL AVEC DATE
-# ===============================================
+echo "3. Structure du premier employé:"
+curl -s "http://localhost:8080/api/employees" | jq '.[0]'
 
 echo ""
-echo "=== 4. SOLUTION TEMPORAIRE FRONTEND ==="
+echo "4. Noms des employés retournés:"
+curl -s "http://localhost:8080/api/employees" | jq -r '.[] | "\(.firstName) \(.lastName)"'
 
-echo "💡 SOLUTION RAPIDE POUR LE FRONTEND :"
+# ==========================================
+# TESTS POUR IDENTIFIER LE PROBLÈME
+# ==========================================
+
 echo ""
-echo "Dans votre composant Vue.js, remplacez l'appel API par :"
-echo ""
-echo "// Au lieu de :"
-echo "fetch('/api/planning/view-simple')"
-echo ""
-echo "// Utilisez :"
-echo "fetch('/api/planning/view-simple?date=2025-09-01')"
-echo "// ou"
-echo "fetch('/api/planning/debug-plannings')  // qui retourne tout"
-echo ""
+echo "📊 TESTS DE DIAGNOSTIC:"
+echo "======================"
 
-# ===============================================
-# 5. TEST SOLUTION TEMPORAIRE
-# ===============================================
+# Test si l'API retourne une array vide
+EMPLOYEE_COUNT=$(curl -s "http://localhost:8080/api/employees" | jq '. | length')
+echo "Nombre d'employés dans l'API: $EMPLOYEE_COUNT"
 
-echo "=== 5. TEST SOLUTION TEMPORAIRE ==="
-
-echo "🧪 Test appel avec date spécifique..."
-
-temp_response=$(curl -s "http://localhost:8080/api/planning/view-simple?date=2025-09-01")
-temp_count=$(echo "$temp_response" | jq '. | length' 2>/dev/null || echo "ERROR")
-
-if [ "$temp_count" != "0" ] && [ "$temp_count" != "ERROR" ]; then
-    echo "✅ SOLUTION TEMPORAIRE FONCTIONNE !"
-    echo "📊 Avec date 2025-09-01: $temp_count planifications"
-    echo ""
-    echo "🎯 POUR RÉPARER IMMÉDIATEMENT LE FRONTEND :"
-    echo ""
-    echo "1. Dans votre api.ts, remplacez :"
-    echo "   fetch('/api/planning/view-simple')"
-    echo "   par :"
-    echo "   fetch('/api/planning/view-simple?date=2025-09-01')"
-    echo ""
-    echo "2. Ou utilisez l'endpoint debug :"
-    echo "   fetch('/api/planning/debug-plannings')"
-    echo ""
+if [ "$EMPLOYEE_COUNT" = "0" ] || [ "$EMPLOYEE_COUNT" = "null" ]; then
+    echo "❌ PROBLÈME: L'API retourne 0 employés"
+    echo "   → Le frontend utilise les données mock par défaut"
+    echo "   → Corrigez le backend pour retourner les vrais employés"
 else
-    echo "❌ Solution temporaire ne fonctionne pas"
+    echo "✅ L'API retourne $EMPLOYEE_COUNT employés"
+    echo "   → Le problème est dans le mapping frontend"
 fi
 
-# ===============================================
-# 6. INSTRUCTIONS CORRECTIF BACKEND
-# ===============================================
-
+# Test du format des données
 echo ""
-echo "=== 6. INSTRUCTIONS CORRECTIF BACKEND ==="
-
-echo ""
-echo "🔧 POUR CORRIGER DÉFINITIVEMENT LE BACKEND :"
-echo ""
-echo "1. Dans PlanningController.java, méthode viewPlanningsSimple():"
-echo "   - Remplacer la logique de date par défaut"
-echo "   - Au lieu de LocalDate.now(), ne pas filtrer par date"
-echo "   - Ou retourner les planifications des derniers 30 jours"
-echo ""
-echo "2. Code à changer :"
-echo "   String targetDate = date != null ? date : LocalDate.now().toString();"
-echo "   Par :"
-echo "   // Retourner toutes les planifications si pas de date"
-echo "   if (date != null) { /* filtrer */ } else { /* tout retourner */ }"
-echo ""
-
-echo "🎯 Test terminé à $(date)"
+echo "5. Format des données retournées:"
+curl -s "http://localhost:8080/api/employees" | jq '.[0] | keys'

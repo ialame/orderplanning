@@ -201,43 +201,73 @@ const employeesUsed = computed(() =>
 // ========== METHODS ==========
 
 /**
- * Load all plannings from backend
+ * ✅ FIXED: Load all plannings from backend (direct API call)
+ * Replace this method in your PlanningView.vue file
  */
 const loadPlannings = async () => {
   isLoading.value = true
-  loadingMessage.value = 'Loading plannings...'
+  loadingMessage.value = 'Loading Pokemon card plannings...'
 
   try {
-    console.log('🔍 Loading Pokemon card plannings...')
+    console.log('🔍 Loading plannings from backend...')
 
-    // Use the English API service
-    const loadedPlannings = await apiService.getPlannings()
+    // ✅ DIRECT API CALL - bypass the apiService for now
+    const response = await fetch('/api/planning/view-simple', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
 
-    plannings.value = loadedPlannings
-    console.log('✅ Plannings loaded:', plannings.value.length)
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    console.log('✅ Raw backend data:', data)
+
+    // ✅ TRANSFORM DATA to match expected format
+    plannings.value = data.map((item: any) => ({
+      id: item.id,
+      orderId: item.orderId,
+      employeeId: item.employeeId,
+      planningDate: item.planningDate,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      durationMinutes: item.durationMinutes,
+      priority: item.priority,
+      status: item.status,
+      completed: item.completed,
+      cardCount: item.cardCount,
+      notes: item.notes,
+      progressPercentage: item.progressPercentage,
+      employeeName: item.employeeName,
+      orderNumber: item.orderNumber
+    }))
+
+    console.log(`✅ Transformed ${plannings.value.length} plannings successfully`)
 
     if (plannings.value.length === 0) {
-      showNotification?.('No plannings found', 'info')
+      showNotification?.('No plannings found. Try generating some first!', 'info')
     } else {
-      // Filter Pokemon plannings if possible
+      // Count Pokemon-related plannings
       const pokemonPlannings = plannings.value.filter(p =>
-        p.notes?.includes('Pokemon') ||
         p.notes?.includes('🎮') ||
-        p.orderNumber?.length > 5
+        p.notes?.includes('Pokémon') ||
+        p.notes?.includes('Pokemon')
       )
 
       if (pokemonPlannings.length > 0) {
-        console.log(`🎮 ${pokemonPlannings.length} Pokemon plannings found`)
-        showNotification?.(`${pokemonPlannings.length} Pokemon plannings loaded`, 'success')
+        showNotification?.(`🎮 ${pokemonPlannings.length} Pokemon plannings loaded`, 'success')
       } else {
-        console.log(`📋 ${plannings.value.length} plannings loaded (all types)`)
-        showNotification?.(`${plannings.value.length} plannings loaded`, 'success')
+        showNotification?.(`📋 ${plannings.value.length} plannings loaded`, 'success')
       }
     }
 
   } catch (error) {
     console.error('❌ Error loading plannings:', error)
-    showNotification?.('Error loading plannings', 'error')
+    showNotification?.(`Error loading plannings: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     plannings.value = []
   } finally {
     isLoading.value = false
@@ -371,6 +401,32 @@ const getStatusClass = (status: string | undefined): string => {
     case 'COMPLETED': return 'status-completed'
     case 'CANCELLED': return 'status-cancelled'
     default: return 'status-scheduled'
+  }
+}
+
+/**
+ * 🧪 TEST METHOD: Add this to PlanningView.vue for debugging
+ */
+const testDirectApiCall = async () => {
+  try {
+    console.log('🧪 Testing direct API call...')
+
+    const response = await fetch('/api/planning/view-simple')
+    const data = await response.json()
+
+    console.log('🧪 Test result:', {
+      status: response.status,
+      dataType: typeof data,
+      isArray: Array.isArray(data),
+      count: Array.isArray(data) ? data.length : 0,
+      firstItem: Array.isArray(data) && data.length > 0 ? data[0] : null
+    })
+
+    showNotification?.(`Test: ${Array.isArray(data) ? data.length : 0} items found`, 'info')
+
+  } catch (error) {
+    console.error('🧪 Test failed:', error)
+    showNotification?.('Test failed - check console', 'error')
   }
 }
 

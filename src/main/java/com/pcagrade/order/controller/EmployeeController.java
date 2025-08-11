@@ -404,4 +404,68 @@ public class EmployeeController {
 
         return ResponseEntity.ok(debug);
     }
+
+    /**
+     * ✅ DIAGNOSTIC METHOD : Ajoutez à EmployeeController.java
+     */
+    @GetMapping("/debug-sql")
+    public ResponseEntity<Map<String, Object>> debugSqlExecution() {
+        Map<String, Object> debug = new HashMap<>();
+
+        try {
+            // Test direct de la requête SQL
+            String sql = """
+            SELECT 
+                HEX(e.id) as id,
+                e.prenom as first_name,
+                e.nom as last_name,
+                e.email,
+                COALESCE(e.heures_travail_par_jour, 8) as work_hours_per_day,
+                COALESCE(e.actif, 1) as active,
+                e.date_creation as creation_date
+            FROM j_employee e
+            WHERE COALESCE(e.actif, 1) = 1
+            ORDER BY e.nom, e.prenom
+        """;
+
+            Query query = entityManager.createNativeQuery(sql);
+            @SuppressWarnings("unchecked")
+            List<Object[]> results = query.getResultList();
+
+            debug.put("sql_success", true);
+            debug.put("sql_result_count", results.size());
+            debug.put("sql_query", sql);
+
+            // Essayer de traiter la première ligne pour voir s'il y a des erreurs de mapping
+            if (!results.isEmpty()) {
+                Object[] firstRow = results.get(0);
+                debug.put("first_row_data", Arrays.toString(firstRow));
+
+                try {
+                    Map<String, Object> testEmployee = new HashMap<>();
+                    testEmployee.put("id", (String) firstRow[0]);
+                    testEmployee.put("firstName", (String) firstRow[1]);
+                    testEmployee.put("lastName", (String) firstRow[2]);
+                    testEmployee.put("email", (String) firstRow[3]);
+
+                    debug.put("mapping_success", true);
+                    debug.put("sample_employee", testEmployee);
+
+                } catch (Exception mappingError) {
+                    debug.put("mapping_error", mappingError.getMessage());
+                    debug.put("mapping_success", false);
+                }
+            }
+
+            // Test via service
+            List<Map<String, Object>> serviceResult = employeeService.getAllActiveEmployees();
+            debug.put("service_result_count", serviceResult.size());
+
+        } catch (Exception e) {
+            debug.put("sql_success", false);
+            debug.put("sql_error", e.getMessage());
+        }
+
+        return ResponseEntity.ok(debug);
+    }
 }

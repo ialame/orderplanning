@@ -153,36 +153,64 @@ export class ApiService {
   }
 
   /**
-   * Get plannings for a specific date
+   * ✅ FIXED: ApiService getPlannings method
+   * Replace this method in your src/services/apiService.ts file
    */
   async getPlannings(date?: string): Promise<PlanningResponse[]> {
     try {
       const url = date
-        ? `${this.baseUrl}/view-simple?date=${date}`
-        : `${this.baseUrl}/view-simple`
+        ? `/api/planning/view-simple?date=${date}`
+        : `/api/planning/view-simple`
 
       console.log('📋 [API] Loading plannings from:', url)
 
       const response = await fetch(url, {
         method: 'GET',
-        headers: this.headers
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       })
 
       if (!response.ok) {
         throw this.createApiError(`Failed to load plannings: ${response.status}`, response.status)
       }
 
-      const data = await response.json() as any[]
-      console.log('✅ [API] Plannings loaded:', data.length)
+      const data = await response.json()
+      console.log('✅ [API] Raw plannings data:', data)
 
-      // Transform to match our interface
-      return data.map(this.transformPlanningData)
+      // ✅ VERIFY DATA FORMAT
+      if (!Array.isArray(data)) {
+        console.error('❌ Backend returned non-array data:', data)
+        throw new Error('Invalid data format from backend')
+      }
+
+      // ✅ TRANSFORM DATA with proper mapping
+      const transformedData = data.map((item: any): PlanningResponse => ({
+        id: item.id || '',
+        orderId: item.orderId || '',
+        orderNumber: item.orderNumber || 'Unknown',
+        employeeId: item.employeeId || '',
+        employeeName: item.employeeName || 'Unknown Employee',
+        planningDate: item.planningDate || '',
+        startTime: item.startTime || '',
+        endTime: item.endTime || '',
+        durationMinutes: item.durationMinutes || 0,
+        priority: item.priority || 'MEDIUM',
+        status: item.status || 'SCHEDULED',
+        cardCount: item.cardCount || 0,
+        notes: item.notes || '',
+        completed: Boolean(item.completed)
+      }))
+
+      console.log(`✅ [API] Transformed ${transformedData.length} plannings`)
+      return transformedData
+
     } catch (error) {
       console.error('❌ [API] Load plannings error:', error)
       throw this.handleError(error, 'Failed to load plannings')
     }
   }
-
   /**
    * Get plannings with employee/order details (using JOINs)
    */
