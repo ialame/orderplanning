@@ -7,15 +7,19 @@
         <p class="text-gray-600 mt-1">Manage your team members and their assignments</p>
       </div>
       <div class="flex gap-3">
+        <!-- ✅ NOUVEAU BOUTON CRÉATION -->
+        <button
+          @click="showCreateForm = true"
+          class="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+        >
+          ➕ Add Employee
+        </button>
         <button
           @click="loadEmployees"
           :disabled="loading"
           class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
           <svg v-if="loading" class="animate-spin h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
           </svg>
           {{ loading ? 'Loading...' : 'Refresh' }}
@@ -27,6 +31,94 @@
           🔧 Test Backend
         </button>
       </div>
+    </div>
+
+    <!-- ✅ FORMULAIRE DE CRÉATION -->
+    <div v-if="showCreateForm" class="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-green-500">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold text-gray-900">➕ Create New Employee</h3>
+        <button @click="cancelCreate" class="text-gray-500 hover:text-gray-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <form @submit.prevent="createEmployee" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+          <input
+            v-model="newEmployee.firstName"
+            type="text"
+            required
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            placeholder="Enter first name"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+          <input
+            v-model="newEmployee.lastName"
+            type="text"
+            required
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            placeholder="Enter last name"
+          />
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+          <input
+            v-model="newEmployee.email"
+            type="email"
+            required
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            placeholder="employee@company.com"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Work Hours per Day</label>
+          <select
+            v-model="newEmployee.workHoursPerDay"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          >
+            <option value="4">4 hours (Part-time)</option>
+            <option value="6">6 hours</option>
+            <option value="8">8 hours (Full-time)</option>
+            <option value="10">10 hours</option>
+          </select>
+        </div>
+
+        <div class="flex items-center">
+          <label class="flex items-center mt-6">
+            <input
+              v-model="newEmployee.active"
+              type="checkbox"
+              class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50"
+            />
+            <span class="ml-2 text-sm text-gray-700">Active employee</span>
+          </label>
+        </div>
+
+        <div class="md:col-span-2 flex gap-3 pt-4">
+          <button
+            type="submit"
+            :disabled="!isFormValid || createLoading"
+            class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {{ createLoading ? '⏳ Creating...' : '✅ Create Employee' }}
+          </button>
+          <button
+            type="button"
+            @click="cancelCreate"
+            class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            ❌ Cancel
+          </button>
+        </div>
+      </form>
     </div>
 
     <!-- Backend Status -->
@@ -94,12 +186,12 @@
     <div v-else-if="employees.length === 0" class="text-center py-12">
       <div class="text-6xl mb-4">👥</div>
       <h3 class="text-xl font-medium text-gray-900 mb-2">No employees found</h3>
-      <p class="text-gray-600 mb-6">No employees are currently available in the system.</p>
+      <p class="text-gray-600 mb-6">Get started by creating your first employee.</p>
       <button
-        @click="loadEmployees"
-        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+        @click="showCreateForm = true"
+        class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
       >
-        🔄 Retry Loading
+        ➕ Create First Employee
       </button>
     </div>
 
@@ -118,7 +210,7 @@
             </div>
             <div class="ml-3 flex-1">
               <h3 class="text-lg font-semibold text-gray-900">{{ employee.name }}</h3>
-              <p class="text-sm text-gray-600">{{ employee.department || 'PROCESSING' }}</p>
+              <p class="text-sm text-gray-600">{{ employee.department || 'Pokemon Processing' }}</p>
             </div>
             <div :class="[
               'px-2 py-1 rounded-full text-xs font-medium',
@@ -140,45 +232,44 @@
                   <div
                     :class="[
                       'h-full transition-all',
-                      (employee.efficiency || 75) >= 90 ? 'bg-green-500' :
-                      (employee.efficiency || 75) >= 70 ? 'bg-yellow-500' :
-                      'bg-red-500'
+                      (employee.efficiency || 85) >= 90 ? 'bg-green-500' :
+                      (employee.efficiency || 85) >= 70 ? 'bg-yellow-500' : 'bg-red-500'
                     ]"
-                    :style="{ width: `${employee.efficiency || 75}%` }"
+                    :style="{ width: (employee.efficiency || 85) + '%' }"
                   ></div>
                 </div>
-                <span class="text-sm font-medium text-gray-900">{{ employee.efficiency || 75 }}%</span>
+                <span class="text-sm font-bold text-gray-700">{{ employee.efficiency || 85 }}%</span>
               </div>
             </div>
 
             <!-- Current Orders -->
-            <div class="flex items-center justify-between">
+            <div class="flex justify-between">
               <span class="text-sm font-medium text-gray-600">Current Orders</span>
-              <span class="text-sm font-medium text-gray-900">{{ employee.currentOrders || 0 }}</span>
+              <span class="text-sm font-bold text-gray-900">{{ employee.currentOrders || 0 }}</span>
             </div>
 
-            <!-- ID -->
-            <div class="flex items-center justify-between">
+            <!-- Employee ID -->
+            <div class="flex justify-between">
               <span class="text-sm font-medium text-gray-600">Employee ID</span>
-              <span class="text-sm font-medium text-gray-900">{{ employee.id }}</span>
+              <span class="text-xs font-mono text-gray-500">{{ employee.id.slice(-8) }}</span>
             </div>
           </div>
 
-          <!-- Action Buttons -->
-          <div class="mt-6 flex space-x-2">
+          <!-- Actions -->
+          <div class="flex space-x-2">
             <button
               @click="viewEmployee(employee)"
-              class="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+              class="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
             >
-              View Details
+              👁️ View Details
             </button>
             <button
               @click="toggleStatus(employee)"
               :class="[
-                'px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                employee.status === 'AVAILABLE'
-                  ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                  : 'bg-green-600 text-white hover:bg-green-700'
+                'flex-1 px-3 py-2 rounded text-sm font-medium transition-colors',
+                employee.status === 'AVAILABLE' ?
+                  'bg-yellow-50 text-yellow-600 hover:bg-yellow-100' :
+                  'bg-green-50 text-green-600 hover:bg-green-100'
               ]"
             >
               {{ employee.status === 'AVAILABLE' ? 'Set Busy' : 'Set Available' }}
@@ -204,6 +295,14 @@ interface Employee {
   currentOrders?: number
 }
 
+interface NewEmployee {
+  firstName: string
+  lastName: string
+  email: string
+  workHoursPerDay: number
+  active: boolean
+}
+
 // ========== ROUTER ==========
 const router = useRouter()
 
@@ -216,6 +315,18 @@ const employees = ref<Employee[]>([])
 const backendStatus = ref<'testing' | 'connected' | 'error'>('testing')
 const statusMessage = ref('')
 
+// ✅ NOUVEAUX ÉTATS POUR CRÉATION
+const showCreateForm = ref(false)
+const createLoading = ref(false)
+const newEmployee = ref<NewEmployee>({
+  firstName: '',
+  lastName: '',
+  email: '',
+  workHoursPerDay: 8,
+  active: true
+})
+
+
 // ========== COMPUTED ==========
 const activeEmployees = computed(() =>
   employees.value.filter(e => e.status !== 'OFFLINE').length
@@ -225,7 +336,78 @@ const busyEmployees = computed(() =>
   employees.value.filter(e => e.status === 'BUSY').length
 )
 
+// ✅ VALIDATION DU FORMULAIRE
+const isFormValid = computed(() => {
+  return newEmployee.value.firstName.trim() !== '' &&
+    newEmployee.value.lastName.trim() !== '' &&
+    newEmployee.value.email.trim() !== '' &&
+    newEmployee.value.email.includes('@') &&
+    newEmployee.value.workHoursPerDay > 0
+})
+
 // ========== METHODS ==========
+
+// ✅ MÉTHODES DE CRÉATION
+const createEmployee = async () => {
+  if (!isFormValid.value) return
+
+  createLoading.value = true
+
+  try {
+    console.log('👤 Creating new employee:', newEmployee.value)
+
+    const response = await fetch('/api/employees', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(newEmployee.value)
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    console.log('✅ Employee created:', result)
+
+    emit('show-notification', {
+      message: 'Employee created successfully!',
+      details: `${newEmployee.value.firstName} ${newEmployee.value.lastName} has been added to the team.`,
+      type: 'success'
+    })
+
+    // Reset form and hide it
+    cancelCreate()
+
+    // Reload employee list
+    await loadEmployees()
+
+  } catch (error) {
+    console.error('❌ Error creating employee:', error)
+    emit('show-notification', {
+      message: 'Failed to create employee',
+      details: error.message,
+      type: 'error'
+    })
+  } finally {
+    createLoading.value = false
+  }
+}
+
+const cancelCreate = () => {
+  showCreateForm.value = false
+  newEmployee.value = {
+    firstName: '',
+    lastName: '',
+    email: '',
+    workHoursPerDay: 8,
+    active: true
+  }
+}
+
+
 const viewEmployee = (employee: Employee) => {
   console.log(`🔄 Navigating to employee details: ${employee.id}`)
   console.log(`👤 Employee name: ${employee.name}`)

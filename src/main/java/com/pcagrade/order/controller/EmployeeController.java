@@ -72,76 +72,158 @@ public class EmployeeController {
         }
     }
 
+    // ==========================================
+// BACKEND: Endpoint création employé dans EmployeeController.java
+// ==========================================
+
     /**
-     * 💾 CREATE NEW EMPLOYEE
-     * Endpoint: POST /api/employees
+     * ✅ AJOUTEZ cette méthode à EmployeeController.java
+     * Endpoint pour créer un nouvel employé
      */
     @PostMapping
     @Transactional
     public ResponseEntity<Map<String, Object>> createEmployee(@RequestBody Map<String, Object> employeeData) {
-        try {
-            System.out.println("💾 Creating employee: " + employeeData);
+        Map<String, Object> response = new HashMap<>();
 
-            // Validate required fields
-            String lastName = (String) employeeData.get("lastName");
+        try {
+            System.out.println("👤 Creating new employee with data: " + employeeData);
+
+            // Extraire les données
             String firstName = (String) employeeData.get("firstName");
+            String lastName = (String) employeeData.get("lastName");
             String email = (String) employeeData.get("email");
+            Integer workHours = employeeData.get("workHoursPerDay") != null ?
+                    ((Number) employeeData.get("workHoursPerDay")).intValue() : 8;
+            Boolean active = employeeData.get("active") != null ?
+                    (Boolean) employeeData.get("active") : true;
+
+            // Validation
+            if (firstName == null || firstName.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "First name is required");
+                return ResponseEntity.badRequest().body(response);
+            }
 
             if (lastName == null || lastName.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "Last name is required"
-                ));
+                response.put("success", false);
+                response.put("message", "Last name is required");
+                return ResponseEntity.badRequest().body(response);
             }
 
-            if (firstName == null || firstName.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "First name is required"
-                ));
+            if (email == null || email.trim().isEmpty() || !email.contains("@")) {
+                response.put("success", false);
+                response.put("message", "Valid email is required");
+                return ResponseEntity.badRequest().body(response);
             }
 
-            // Create Employee entity
-            Employee newEmployee = new Employee();
-            newEmployee.setLastName(lastName.trim());
-            newEmployee.setFirstName(firstName.trim());
-            newEmployee.setEmail(email != null ? email.trim() : "");
+            // Vérifier que l'email n'existe pas déjà
+            String checkEmailSql = "SELECT COUNT(*) FROM j_employee WHERE email = ?";
+            Query checkQuery = entityManager.createNativeQuery(checkEmailSql);
+            checkQuery.setParameter(1, email);
+            Number existingCount = (Number) checkQuery.getSingleResult();
 
-            // Handle work hours per day
-            Object hoursObj = employeeData.get("workHoursPerDay");
-            if (hoursObj instanceof Number) {
-                newEmployee.setWorkHoursPerDay(((Number) hoursObj).intValue());
+            if (existingCount.intValue() > 0) {
+                response.put("success", false);
+                response.put("message", "Email already exists");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Générer un ID
+            String employeeId = UUID.randomUUID().toString().replace("-", "");
+
+            // Insérer le nouvel employé
+            String insertSql = """
+            INSERT INTO j_employee 
+            (id, prenom, nom, email, heures_travail_par_jour, actif, date_creation, date_modification)
+            VALUES (UNHEX(?), ?, ?, ?, ?, ?, NOW(), NOW())
+        """;
+
+            Query insertQuery = entityManager.createNativeQuery(insertSql);
+            insertQuery.setParameter(1, employeeId);
+            insertQuery.setParameter(2, firstName);
+            insertQuery.setParameter(3, lastName);
+            insertQuery.setParameter(4, email);
+            insertQuery.setParameter(5, workHours);
+            insertQuery.setParameter(6, active ? 1 : 0); // Convert Boolean to Integer
+
+            int rowsAffected = insertQuery.executeUpdate();
+
+            if (rowsAffected > 0) {
+                System.out.println("✅ Employee created successfully: " + firstName + " " + lastName);
+
+                response.put("success", true);
+                response.put("message", "Employee created successfully");
+                response.put("id", employeeId);
+                response.put("fullName", firstName + " " + lastName);
+                response.put("email", email);
+                response.put("workHoursPerDay", workHours);
+                response.put("active", active);
+
+                return ResponseEntity.ok(response);
             } else {
-                newEmployee.setWorkHoursPerDay(8); // Default
+                response.put("success", false);
+                response.put("message", "Failed to create employee");
+                return ResponseEntity.status(500).body(response);
             }
-
-            newEmployee.setActive(true);
-            newEmployee.setCreationDate(LocalDateTime.now());
-            newEmployee.setModificationDate(LocalDateTime.now());
-
-            // Save via service
-            Employee savedEmployee = employeeService.createEmployee(newEmployee);
-
-            System.out.println("✅ Employee saved with ID: " + savedEmployee.getId());
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Employee created successfully");
-            response.put("id", savedEmployee.getId().toString());
-            response.put("fullName", firstName + " " + lastName);
-
-            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             System.err.println("❌ Error creating employee: " + e.getMessage());
             e.printStackTrace();
 
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Error creating employee: " + e.getMessage());
-
-            return ResponseEntity.status(500).body(errorResponse);
+            response.put("success", false);
+            response.put("message", "Error creating employee: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
         }
+    }
+
+    /**
+     * ✅ MÉTHODE ALTERNATIVE: Création via EmployeeService
+     * Si vous préférez utiliser le service au lieu de SQL direct
+     */
+    @PostMapping("/via-service")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> createEmployeeViaService(@RequestBody Map<String, Object> employeeData) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            // Créer un objet Employee
+            Employee employee = new Employee();
+            employee.setFirstName((String) employeeData.get("firstName"));
+            employee.setLastName((String) employeeData.get("lastName"));
+            employee.setEmail((String) employeeData.get("email"));
+            employee.setWorkHoursPerDay(employeeData.get("workHoursPerDay") != null ?
+                    ((Number) employeeData.get("workHoursPerDay")).intValue() : 8);
+            employee.setActive(employeeData.get("active") != null ?
+                    (Boolean) employeeData.get("active") : true);
+
+            // Utiliser le service pour créer l'employé
+            Employee createdEmployee = employeeService.createEmployee(employee);
+
+            response.put("success", true);
+            response.put("message", "Employee created successfully");
+            response.put("id", createdEmployee.getId().toString());
+            response.put("fullName", createdEmployee.getFullName());
+            response.put("email", createdEmployee.getEmail());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error creating employee: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    /**
+     * ✅ MÉTHODE D'AIDE: Validation d'email simple
+     */
+    private boolean isValidEmail(String email) {
+        return email != null &&
+                email.trim().length() > 0 &&
+                email.contains("@") &&
+                email.contains(".") &&
+                email.indexOf("@") > 0 &&
+                email.lastIndexOf(".") > email.indexOf("@");
     }
 
     /**

@@ -1,9 +1,0 @@
-databaseChangeLog:
-
-  # Inclusion du fichier principal avec les tables
-#  - include:
-#      file: db/changelog/changes/001-create-tables.yml
-
-  # TEMPORAIREMENT DÉSACTIVÉ - Table j_planning créée manuellement
-  # - include:
-  #     file: db/changelog/changes/002-fix-planning-table.yml
