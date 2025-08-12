@@ -490,14 +490,7 @@ const chargerEmployesGestion = async () => {
     loading.value = true
     console.log('📥 Loading employees from database...')
 
-    // First check if we can connect to the API
-    const debugResponse = await fetch('/api/employees/debug')
-    if (debugResponse.ok) {
-      const debugData = await debugResponse.json()
-      console.log('🔍 Debug info:', debugData)
-    }
-
-    // Call the real API endpoint that returns database data
+    // ✅ Appel API corrigé
     const response = await fetch('/api/employees/active', {
       method: 'GET',
       headers: {
@@ -510,19 +503,33 @@ const chargerEmployesGestion = async () => {
 
     if (response.ok) {
       const data = await response.json()
-      console.log('✅ Real employees loaded:', data)
+      console.log('✅ Raw data from API:', data)
 
-      // Map the data to ensure consistent structure
-      employesListe.value = data.map((emp: any) => ({
-        id: emp.id,
-        firstName: emp.firstName,
-        lastName: emp.lastName,
-        fullName: emp.fullName || `${emp.firstName} ${emp.lastName}`,
-        email: emp.email,
-        workHoursPerDay: emp.workHoursPerDay,
-        active: emp.active,
-        creationDate: emp.creationDate
-      }))
+      if (!Array.isArray(data)) {
+        throw new Error('API returned non-array data')
+      }
+
+      // ✅ Mapping sécurisé pour l'affichage
+      employesListe.value = data.map((emp) => {
+        console.log('👤 Processing employee:', emp)
+
+        return {
+          id: emp.id,
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          fullName: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+          nomComplet: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(), // Pour template français
+          email: emp.email || 'No email',
+          workHoursPerDay: emp.workHoursPerDay || 8,
+          heuresTravailParJour: emp.workHoursPerDay || 8, // Pour template français
+          active: emp.active !== false, // Default true si undefined
+          actif: emp.active !== false, // Pour template français
+          creationDate: emp.creationDate,
+          dateCreation: emp.creationDate // Pour template français
+        }
+      })
+
+      console.log('✅ Mapped employees for display:', employesListe.value)
 
       if (employesListe.value.length === 0) {
         message.value = {
@@ -550,12 +557,29 @@ const chargerEmployesGestion = async () => {
     console.error('❌ Network error loading employees:', error)
     employesListe.value = []
     message.value = {
-      text: 'Network error connecting to backend. Check if backend is running and frontend dev server proxy is working.',
+      text: `Network error: ${error.message}. Check backend connection.`,
       type: 'error'
     }
   } finally {
     loading.value = false
   }
+}
+
+// ✅ Fonction utilitaire pour l'affichage
+const getInitiales = (employe) => {
+  // Essayer plusieurs formats de nom
+  if (employe.firstName && employe.lastName) {
+    return (employe.firstName[0] + employe.lastName[0]).toUpperCase()
+  }
+  if (employe.fullName) {
+    const parts = employe.fullName.split(' ')
+    return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
+  }
+  if (employe.nomComplet) {
+    const parts = employe.nomComplet.split(' ')
+    return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
+  }
+  return '??'
 }
 
 const chargerEmployesPlanning = async () => {

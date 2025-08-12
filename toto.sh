@@ -1,48 +1,40 @@
-# ==========================================
-# DIAGNOSTIC: Vérifier quelles données l'API retourne vraiment
-# ==========================================
+#!/bin/bash
 
-echo "🔍 DIAGNOSTIC DES DONNÉES EMPLOYÉS"
-echo "=================================="
+# ===============================================
+# TESTS DES ENDPOINTS DE PLANNING
+# ===============================================
 
-# 1. Vérifier ce que l'API retourne vraiment
-echo "1. Test direct API /api/employees:"
-curl -s "http://localhost:8080/api/employees" | jq '.'
+echo "🧪 Testing Planning Endpoints"
+echo "================================"
 
-echo ""
-echo "2. Compter les employés retournés:"
-curl -s "http://localhost:8080/api/employees" | jq '. | length'
+# 1. Test endpoint view-simple (tous les plannings)
+echo "📋 Test 1: All plannings"
+curl -s http://localhost:8080/api/planning/view-simple | jq '. | length' || echo "Endpoint failed"
 
-echo ""
-echo "3. Structure du premier employé:"
-curl -s "http://localhost:8080/api/employees" | jq '.[0]'
+# 2. Test avec date spécifique
+echo "📅 Test 2: Plannings for specific date"
+curl -s "http://localhost:8080/api/planning/view-simple?date=2025-06-01" | jq '. | length' || echo "Date filter failed"
 
-echo ""
-echo "4. Noms des employés retournés:"
-curl -s "http://localhost:8080/api/employees" | jq -r '.[] | "\(.firstName) \(.lastName)"'
+# 3. Test génération
+echo "🚀 Test 3: Generate new plannings"
+curl -s -X POST http://localhost:8080/api/planning/generate \
+  -H "Content-Type: application/json" \
+  -d '{"startDate": "2025-06-01", "timePerCard": 3}' | jq '.planningsSaved' || echo "Generation failed"
 
-# ==========================================
-# TESTS POUR IDENTIFIER LE PROBLÈME
-# ==========================================
+# 4. Test debug
+echo "🔍 Test 4: Debug info"
+curl -s http://localhost:8080/api/planning/debug-real | jq '.planningCount' || echo "Debug failed"
 
-echo ""
-echo "📊 TESTS DE DIAGNOSTIC:"
-echo "======================"
+# 5. Vérifier données SQL directement
+echo "💾 Test 5: Direct SQL check"
+mysql -u ia -pfoufafou dev -e "
+SELECT
+    COUNT(*) as total_plannings,
+    COUNT(DISTINCT employee_id) as employees_used,
+    COUNT(DISTINCT planning_date) as dates_covered,
+    MIN(planning_date) as earliest_date,
+    MAX(planning_date) as latest_date
+FROM j_planning;
+" 2>/dev/null || echo "SQL check failed"
 
-# Test si l'API retourne une array vide
-EMPLOYEE_COUNT=$(curl -s "http://localhost:8080/api/employees" | jq '. | length')
-echo "Nombre d'employés dans l'API: $EMPLOYEE_COUNT"
-
-if [ "$EMPLOYEE_COUNT" = "0" ] || [ "$EMPLOYEE_COUNT" = "null" ]; then
-    echo "❌ PROBLÈME: L'API retourne 0 employés"
-    echo "   → Le frontend utilise les données mock par défaut"
-    echo "   → Corrigez le backend pour retourner les vrais employés"
-else
-    echo "✅ L'API retourne $EMPLOYEE_COUNT employés"
-    echo "   → Le problème est dans le mapping frontend"
-fi
-
-# Test du format des données
-echo ""
-echo "5. Format des données retournées:"
-curl -s "http://localhost:8080/api/employees" | jq '.[0] | keys'
+echo "✅ Tests completed!"

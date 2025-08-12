@@ -154,45 +154,46 @@ public class EmployeeService {
      */
     public List<Map<String, Object>> getAllActiveEmployees() {
         try {
-            log.info("Getting all active employees from j_employee table");
+            System.out.println("👥 Loading active employees from j_employee table...");
 
+            // ✅ REQUÊTE CORRIGÉE pour j_employee avec colonnes anglaises
             String sql = """
-            SELECT 
-                HEX(e.id) as id,
-                e.prenom as first_name,
-                e.nom as last_name,
-                e.email,
-                COALESCE(e.heures_travail_par_jour, 8) as work_hours_per_day,
-                COALESCE(e.actif, 1) as active_int,
-                e.date_creation as creation_date
-            FROM j_employee e
-            WHERE COALESCE(e.actif, 1) = 1
-            ORDER BY e.nom, e.prenom
-        """;
+                SELECT 
+                    HEX(e.id) as id,
+                    e.first_name as firstName,
+                    e.last_name as lastName,
+                    e.email,
+                    COALESCE(e.work_hours_per_day, 8) as workHoursPerDay,
+                    COALESCE(e.active, 1) as active,
+                    e.creation_date as creationDate
+                FROM j_employee e
+                WHERE COALESCE(e.active, 1) = 1
+                ORDER BY e.last_name, e.first_name
+            """;
 
             Query query = entityManager.createNativeQuery(sql);
             @SuppressWarnings("unchecked")
             List<Object[]> results = query.getResultList();
 
-            log.info("🔍 SQL returned {} rows from j_employee", results.size());
-            System.out.println("🔍 SQL Results count: " + results.size());
-
             List<Map<String, Object>> employees = new ArrayList<>();
+
+            System.out.println("📊 Found " + results.size() + " active employees");
 
             for (Object[] row : results) {
                 try {
                     Map<String, Object> employee = new HashMap<>();
+
+                    // Mapping sécurisé avec null checks
                     employee.put("id", (String) row[0]);
                     employee.put("firstName", (String) row[1]);
                     employee.put("lastName", (String) row[2]);
                     employee.put("email", (String) row[3]);
                     employee.put("workHoursPerDay", row[4] != null ?
-                            ((Number) row[4]).intValue() : DEFAULT_WORK_HOURS_PER_DAY);
+                            ((Number) row[4]).intValue() : 8);
 
-                    // ✅ FIX CRITIQUE : Traiter row[5] comme NUMBER, pas BOOLEAN
+                    // ✅ Conversion correcte active (0/1 → boolean)
                     boolean isActive = true;
                     if (row[5] != null) {
-                        // Convertir INTEGER (0/1) vers BOOLEAN
                         int activeValue = ((Number) row[5]).intValue();
                         isActive = (activeValue == 1);
                     }
@@ -200,38 +201,37 @@ public class EmployeeService {
 
                     employee.put("creationDate", row[6]);
 
-                    // Calculated fields
-                    employee.put("fullName", row[1] + " " + row[2]);
+                    // ✅ Champs calculés pour l'affichage frontend
+                    String firstName = (String) row[1];
+                    String lastName = (String) row[2];
+                    employee.put("fullName", firstName + " " + lastName);
+                    employee.put("name", firstName + " " + lastName); // Alias pour compatibilité
+                    employee.put("nomComplet", firstName + " " + lastName); // Pour vue française
                     employee.put("available", true);
                     employee.put("currentLoad", 0);
 
                     employees.add(employee);
 
-                    System.out.println("  ✅ Employee " + employees.size() + ": " + row[1] + " " + row[2] + " (active: " + isActive + ")");
+                    System.out.println("  ✅ Employee: " + firstName + " " + lastName +
+                            " (ID: " + row[0] + ", active: " + isActive + ")");
 
                 } catch (Exception rowError) {
                     System.err.println("❌ Error processing employee row: " + rowError.getMessage());
-                    log.error("Error processing employee row: {}", rowError.getMessage());
-                    // Continue avec les autres employés au lieu de tout planter
+                    // Continue avec les autres employés
                 }
             }
 
             System.out.println("✅ Successfully processed " + employees.size() + " employees");
-            log.info("✅ Loaded {} active employees from j_employee table", employees.size());
-
             return employees;
 
         } catch (Exception e) {
-            log.error("❌ Error getting active employees from j_employee table: {}", e.getMessage(), e);
             System.err.println("❌ MAJOR ERROR in getAllActiveEmployees: " + e.getMessage());
             e.printStackTrace();
 
-            // Fallback vers employés de test mais avec diagnostics
-            log.warn("Creating test employees as fallback");
-            return createTestEmployeesWithDiagnostics();
+            // ✅ En cas d'erreur, retourner liste vide au lieu de crash
+            return new ArrayList<>();
         }
     }
-
     /**
      * ✅ MÉTHODE DE DIAGNOSTIC AMÉLIORÉE
      */

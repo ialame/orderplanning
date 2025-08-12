@@ -252,47 +252,153 @@ export class EnglishApiService {
    */
   async getPlannings(): Promise<Planning[]> {
     try {
-      console.log('📋 Loading plannings from backend...')
+      console.log('📋 [API] Loading plannings from backend...')
 
-      // Try multiple endpoints for maximum compatibility
-      const endpoints = [
-        `${API_PLANNING_URL}/view-simple`,
-        `${API_PLANNING_URL}/plannings-with-details`,
-        `${API_BASE_URL}/plannings`,
-        `${API_BASE_URL}/test/plannings`
-      ]
-
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`🔄 Trying endpoint: ${endpoint}`)
-
-          const response = await fetch(endpoint, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            console.log(`✅ Data loaded from ${endpoint}:`, data.length)
-            return this.mapPlanningResponse(data, endpoint)
-          } else {
-            console.log(`❌ ${endpoint} failed:`, response.status)
-          }
-        } catch (error) {
-          console.log(`❌ ${endpoint} error:`, error.message)
-          continue
+      const response = await fetch('/api/planning/view-simple', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
         }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to load plannings: HTTP ${response.status}`)
       }
 
-      console.warn('⚠️ No planning endpoints available')
-      return []
+      const data = await response.json()
+      console.log('📥 [API] Raw plannings data:', data)
+
+      // ✅ Vérification format
+      if (!Array.isArray(data)) {
+        console.error('❌ Backend returned non-array data:', data)
+        return []
+      }
+
+      // ✅ Transformation sécurisée
+      const plannings = data.map((item: any) => ({
+        id: item.id || '',
+        orderId: item.orderId || '',
+        orderNumber: item.orderNumber || 'Unknown Order',
+        employeeId: item.employeeId || '',
+        employeeName: item.employeeName || 'Unknown Employee',
+        planningDate: item.planningDate || '',
+        startTime: item.startTime || '',
+        endTime: item.endTime || '',
+        durationMinutes: item.durationMinutes || 0,
+        priority: item.priority || 'MEDIUM',
+        status: item.status || 'SCHEDULED',
+        cardCount: item.cardCount || 1,
+        notes: item.notes || '',
+        completed: Boolean(item.completed),
+        progressPercentage: item.progressPercentage || 0
+      }))
+
+      console.log(`✅ [API] Successfully loaded ${plannings.length} plannings`)
+      return plannings
 
     } catch (error) {
-      console.error('❌ Error loading plannings:', error)
+      console.error('❌ [API] Error loading plannings:', error)
       return []
     }
   }
 
+  /**
+   * ✅ NOUVEAU : Test de connectivité plannings
+   */
+  async testPlanningConnectivity(): Promise<{success: boolean, count: number, message: string}> {
+    try {
+      console.log('🧪 Testing planning connectivity...')
+
+      // Test simple sans paramètres
+      const response = await fetch('/api/planning/view-simple')
+
+      if (!response.ok) {
+        return {
+          success: false,
+          count: 0,
+          message: `HTTP ${response.status}: ${response.statusText}`
+        }
+      }
+
+      const data = await response.json()
+
+      return {
+        success: true,
+        count: Array.isArray(data) ? data.length : 0,
+        message: `Backend accessible, found ${Array.isArray(data) ? data.length : 0} plannings`
+      }
+
+    } catch (error) {
+      return {
+        success: false,
+        count: 0,
+        message: `Connection error: ${error.message}`
+      }
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU : Diagnostic complet
+   */
+  async diagnosePlanningIssues(): Promise<any> {
+    try {
+      console.log('🔍 Running planning diagnosis...')
+
+      const tests = {
+        backend_connection: false,
+        data_count: 0,
+        employees_found: 0,
+        dates_available: [],
+        sample_data: null,
+        errors: []
+      }
+
+      // Test 1: Connectivité basique
+      try {
+        const response = await fetch('/api/planning/view-simple')
+        if (response.ok) {
+          tests.backend_connection = true
+          const data = await response.json()
+
+          if (Array.isArray(data)) {
+            tests.data_count = data.length
+
+            // Analyser les données
+            const uniqueEmployees = new Set(data.map(p => p.employeeId).filter(Boolean))
+            tests.employees_found = uniqueEmployees.size
+
+            const uniqueDates = [...new Set(data.map(p => p.planningDate).filter(Boolean))]
+            tests.dates_available = uniqueDates.sort()
+
+            if (data.length > 0) {
+              tests.sample_data = data[0]
+            }
+          }
+        }
+      } catch (error) {
+        tests.errors.push(`Backend connection: ${error.message}`)
+      }
+
+      // Test 2: Test génération
+      try {
+        const generateResponse = await fetch('/api/planning/debug-real')
+        if (generateResponse.ok) {
+          const debugData = await generateResponse.json()
+          tests.backend_debug = debugData
+        }
+      } catch (error) {
+        tests.errors.push(`Debug endpoint: ${error.message}`)
+      }
+
+      console.log('🔍 Diagnosis complete:', tests)
+      return tests
+
+    } catch (error) {
+      console.error('❌ Diagnosis failed:', error)
+      return { error: error.message }
+    }
+  }
   /**
    * Load plannings for a specific period
    */

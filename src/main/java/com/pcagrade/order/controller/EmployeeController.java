@@ -80,71 +80,59 @@ public class EmployeeController {
      * ✅ AJOUTEZ cette méthode à EmployeeController.java
      * Endpoint pour créer un nouvel employé
      */
+// Dans EmployeeController.java, remplacez la méthode createEmployee par ceci :
+
     @PostMapping
     @Transactional
     public ResponseEntity<Map<String, Object>> createEmployee(@RequestBody Map<String, Object> employeeData) {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            System.out.println("👤 Creating new employee with data: " + employeeData);
+            System.out.println("💾 Creating employee with data: " + employeeData);
 
-            // Extraire les données
+            // 1. Validation des données
             String firstName = (String) employeeData.get("firstName");
             String lastName = (String) employeeData.get("lastName");
             String email = (String) employeeData.get("email");
-            Integer workHours = employeeData.get("workHoursPerDay") != null ?
-                    ((Number) employeeData.get("workHoursPerDay")).intValue() : 8;
-            Boolean active = employeeData.get("active") != null ?
-                    (Boolean) employeeData.get("active") : true;
 
-            // Validation
-            if (firstName == null || firstName.trim().isEmpty()) {
+            if (firstName == null || firstName.trim().isEmpty() ||
+                    lastName == null || lastName.trim().isEmpty()) {
                 response.put("success", false);
-                response.put("message", "First name is required");
+                response.put("message", "First name and last name are required");
                 return ResponseEntity.badRequest().body(response);
             }
 
-            if (lastName == null || lastName.trim().isEmpty()) {
-                response.put("success", false);
-                response.put("message", "Last name is required");
-                return ResponseEntity.badRequest().body(response);
+            // 2. Valeurs par défaut
+            Integer workHours = 8;
+            if (employeeData.containsKey("workHoursPerDay")) {
+                Object workHoursObj = employeeData.get("workHoursPerDay");
+                if (workHoursObj instanceof Number) {
+                    workHours = ((Number) workHoursObj).intValue();
+                }
             }
 
-            if (email == null || email.trim().isEmpty() || !email.contains("@")) {
-                response.put("success", false);
-                response.put("message", "Valid email is required");
-                return ResponseEntity.badRequest().body(response);
+            Boolean active = true;
+            if (employeeData.containsKey("active")) {
+                active = (Boolean) employeeData.get("active");
             }
 
-            // Vérifier que l'email n'existe pas déjà
-            String checkEmailSql = "SELECT COUNT(*) FROM j_employee WHERE email = ?";
-            Query checkQuery = entityManager.createNativeQuery(checkEmailSql);
-            checkQuery.setParameter(1, email);
-            Number existingCount = (Number) checkQuery.getSingleResult();
+            // 3. Générer ID
+            String employeeId = java.util.UUID.randomUUID().toString().replace("-", "");
 
-            if (existingCount.intValue() > 0) {
-                response.put("success", false);
-                response.put("message", "Email already exists");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Générer un ID
-            String employeeId = UUID.randomUUID().toString().replace("-", "");
-
-            // Insérer le nouvel employé
+            // 4. ✅ CORRECTION : Utiliser j_employee au lieu de employee
             String insertSql = """
             INSERT INTO j_employee 
-            (id, prenom, nom, email, heures_travail_par_jour, actif, date_creation, date_modification)
+            (id, first_name, last_name, email, work_hours_per_day, active, creation_date, modification_date)
             VALUES (UNHEX(?), ?, ?, ?, ?, ?, NOW(), NOW())
         """;
 
             Query insertQuery = entityManager.createNativeQuery(insertSql);
             insertQuery.setParameter(1, employeeId);
-            insertQuery.setParameter(2, firstName);
-            insertQuery.setParameter(3, lastName);
-            insertQuery.setParameter(4, email);
+            insertQuery.setParameter(2, firstName.trim());
+            insertQuery.setParameter(3, lastName.trim());
+            insertQuery.setParameter(4, email != null ? email.trim() : null);
             insertQuery.setParameter(5, workHours);
-            insertQuery.setParameter(6, active ? 1 : 0); // Convert Boolean to Integer
+            insertQuery.setParameter(6, active ? 1 : 0); // Convertir Boolean vers Integer
 
             int rowsAffected = insertQuery.executeUpdate();
 
@@ -175,6 +163,7 @@ public class EmployeeController {
             return ResponseEntity.status(500).body(response);
         }
     }
+
 
     /**
      * ✅ MÉTHODE ALTERNATIVE: Création via EmployeeService

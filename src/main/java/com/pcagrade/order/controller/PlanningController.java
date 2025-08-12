@@ -691,117 +691,127 @@ public class PlanningController {
      * ✅ FIXED: View simple plannings - REMOVED REFERENCE TO 'employee' TABLE
      * Replace the viewPlanningsSimple method in PlanningController.java
      */
+    // Dans PlanningController.java, remplacez la méthode view-simple par ceci :
+
     @GetMapping("/view-simple")
     public ResponseEntity<List<Map<String, Object>>> viewPlanningsSimple(@RequestParam(required = false) String date) {
         List<Map<String, Object>> plannings = new ArrayList<>();
 
         try {
             System.out.println("🔍 Loading plannings for view-simple endpoint...");
+            System.out.println("📅 Date filter: " + (date != null ? date : "ALL"));
 
             String sqlView;
             Query viewQuery;
 
+            // ✅ REQUÊTE CORRIGÉE avec vraies colonnes de j_employee
             if (date != null && !date.trim().isEmpty()) {
-                System.out.println("📅 Filtering by date: " + date);
-
-                // ✅ FIXED: Only use j_employee table, removed employee table reference
                 sqlView = """
-                    SELECT 
-                        HEX(p.id) as id,
-                        HEX(p.order_id) as orderId,
-                        HEX(p.employee_id) as employeeId,
-                        p.planning_date as planningDate,
-                        p.start_time as startTime,
-                        p.end_time as endTime,
-                        p.estimated_duration_minutes as durationMinutes,
-                        p.priority,
-                        p.status,
-                        p.completed,
-                        p.card_count as cardCount,
-                        p.notes,
-                        p.progress_percentage as progressPercentage,
-                        
-                        -- ✅ SEULEMENT j_employee, pas de tables multiples
-                        COALESCE(
-                            CONCAT(e.prenom, ' ', e.nom),
-                            CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
-                        ) as employeeName,
-                        
-                        COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
-                        
-                    FROM j_planning p
-                    LEFT JOIN j_employee e ON p.employee_id = e.id
-                    LEFT JOIN `order` o ON p.order_id = o.id
-                    WHERE p.planning_date = ?
-                    ORDER BY p.planning_date ASC, p.start_time ASC
-                """;
+                SELECT 
+                    HEX(p.id) as id,
+                    HEX(p.order_id) as orderId,
+                    HEX(p.employee_id) as employeeId,
+                    p.planning_date as planningDate,
+                    p.start_time as startTime,
+                    p.end_time as endTime,
+                    p.estimated_duration_minutes as durationMinutes,
+                    COALESCE(p.priority, 'MEDIUM') as priority,
+                    COALESCE(p.status, 'SCHEDULED') as status,
+                    COALESCE(p.completed, 0) as completed,
+                    COALESCE(p.card_count, 1) as cardCount,
+                    p.notes,
+                    COALESCE(p.progress_percentage, 0) as progressPercentage,
+                    
+                    -- ✅ CORRECTION : Utiliser first_name, last_name (vraies colonnes)
+                    COALESCE(
+                        CONCAT(e.first_name, ' ', e.last_name),
+                        CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
+                    ) as employeeName,
+                    
+                    COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
+                    
+                FROM j_planning p
+                LEFT JOIN j_employee e ON p.employee_id = e.id
+                LEFT JOIN `order` o ON p.order_id = o.id
+                WHERE p.planning_date = ?
+                ORDER BY p.start_time ASC
+            """;
+
                 viewQuery = entityManager.createNativeQuery(sqlView);
                 viewQuery.setParameter(1, date);
-
             } else {
-                // ✅ FIXED: Return ALL plannings when no date specified
-                System.out.println("📋 No date filter - returning ALL plannings");
-
+                // Sans filtre de date - récupère tout
                 sqlView = """
-                          SELECT
-                             HEX(p.id) as id,
-                             HEX(p.order_id) as orderId,
-                             HEX(p.employee_id) as employeeId,
-                             p.planning_date as planningDate,
-                             p.start_time as startTime,
-                             p.end_time as endTime,
-                             p.estimated_duration_minutes as durationMinutes,
-                             p.priority,
-                             p.status,
-                             p.completed,
-                             p.card_count as cardCount,
-                             p.notes,
-                             p.progress_percentage as progressPercentage,
-                     
-                             -- ✅ SEULEMENT j_employee
-                             COALESCE(
-                                 CONCAT(e.prenom, ' ', e.nom),
-                                 CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
-                             ) as employeeName,
-                     
-                             COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
-                     
-                         FROM j_planning p
-                         LEFT JOIN j_employee e ON p.employee_id = e.id
-                         LEFT JOIN `order` o ON p.order_id = o.id
-                         ORDER BY p.planning_date ASC, p.start_time ASC
-                         LIMIT 100  
-                """;
+                SELECT 
+                    HEX(p.id) as id,
+                    HEX(p.order_id) as orderId,
+                    HEX(p.employee_id) as employeeId,
+                    p.planning_date as planningDate,
+                    p.start_time as startTime,
+                    p.end_time as endTime,
+                    p.estimated_duration_minutes as durationMinutes,
+                    COALESCE(p.priority, 'MEDIUM') as priority,
+                    COALESCE(p.status, 'SCHEDULED') as status,
+                    COALESCE(p.completed, 0) as completed,
+                    COALESCE(p.card_count, 1) as cardCount,
+                    p.notes,
+                    COALESCE(p.progress_percentage, 0) as progressPercentage,
+                    
+                    -- ✅ CORRECTION : Utiliser first_name, last_name
+                    COALESCE(
+                        CONCAT(e.first_name, ' ', e.last_name),
+                        CONCAT('Employee-', RIGHT(HEX(p.employee_id), 6))
+                    ) as employeeName,
+                    
+                    COALESCE(o.num_commande, CONCAT('ORDER-', RIGHT(HEX(p.order_id), 6))) as orderNumber
+                    
+                FROM j_planning p
+                LEFT JOIN j_employee e ON p.employee_id = e.id
+                LEFT JOIN `order` o ON p.order_id = o.id
+                ORDER BY p.planning_date DESC, p.start_time ASC
+                LIMIT 100
+            """;
+
                 viewQuery = entityManager.createNativeQuery(sqlView);
             }
 
             @SuppressWarnings("unchecked")
             List<Object[]> results = viewQuery.getResultList();
 
-            System.out.println("📊 Raw query results: " + results.size() + " rows");
+            System.out.println("📊 Found " + results.size() + " planning records");
 
             for (Object[] row : results) {
-                Map<String, Object> planning = new HashMap<>();
-                planning.put("id", row[0]);
-                planning.put("orderId", row[1]);
-                planning.put("employeeId", row[2]);
-                planning.put("planningDate", row[3]);
-                planning.put("startTime", row[4]);
-                planning.put("endTime", row[5]);
-                planning.put("durationMinutes", row[6]);
-                planning.put("priority", row[7]);
-                planning.put("status", row[8]);
-                planning.put("completed", row[9]);
-                planning.put("cardCount", row[10]);
-                planning.put("notes", row[11]);
-                planning.put("progressPercentage", row[12]);
-                planning.put("employeeName", row[13]);
-                planning.put("orderNumber", row[14]);
+                try {
+                    Map<String, Object> planning = new HashMap<>();
 
-                plannings.add(planning);
+                    planning.put("id", (String) row[0]);
+                    planning.put("orderId", (String) row[1]);
+                    planning.put("employeeId", (String) row[2]);
+                    planning.put("planningDate", row[3] != null ? row[3].toString() : null);
+                    planning.put("startTime", row[4] != null ? row[4].toString() : null);
+                    planning.put("endTime", row[5] != null ? row[5].toString() : null);
+                    planning.put("durationMinutes", row[6] != null ? ((Number) row[6]).intValue() : 0);
+                    planning.put("priority", (String) row[7]);
+                    planning.put("status", (String) row[8]);
+                    planning.put("completed", row[9] != null ? ((Number) row[9]).intValue() == 1 : false);
+                    planning.put("cardCount", row[10] != null ? ((Number) row[10]).intValue() : 1);
+                    planning.put("notes", (String) row[11]);
+                    planning.put("progressPercentage", row[12] != null ? ((Number) row[12]).intValue() : 0);
+                    planning.put("employeeName", (String) row[13]);
+                    planning.put("orderNumber", (String) row[14]);
+
+                    plannings.add(planning);
+
+                    System.out.println("  ✅ Planning: " + row[14] + " → " + row[13] +
+                            " (" + row[3] + " " + row[4] + ")");
+
+                } catch (Exception rowError) {
+                    System.err.println("❌ Error processing planning row: " + rowError.getMessage());
+                    // Continue avec les autres plannings
+                }
             }
 
-            System.out.println("✅ Successfully retrieved " + plannings.size() + " plannings");
+            System.out.println("✅ Successfully processed " + plannings.size() + " plannings");
 
         } catch (Exception e) {
             System.err.println("❌ Error retrieving plannings for view-simple: " + e.getMessage());
@@ -811,7 +821,6 @@ public class PlanningController {
 
         return ResponseEntity.ok(plannings);
     }
-
 
     /**
      * ✅ NEW: Debug endpoint to verify j_employee table structure
