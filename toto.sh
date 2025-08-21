@@ -1,40 +1,55 @@
 #!/bin/bash
 
 # ===============================================
-# TESTS DES ENDPOINTS DE PLANNING
+# TEST BACKEND SPRING BOOT - macOS
 # ===============================================
 
-echo "🧪 Testing Planning Endpoints"
-echo "================================"
+echo "🔍 TEST BACKEND SPRING BOOT"
+echo "==========================="
 
-# 1. Test endpoint view-simple (tous les plannings)
-echo "📋 Test 1: All plannings"
-curl -s http://localhost:8080/api/planning/view-simple | jq '. | length' || echo "Endpoint failed"
+# 1. Test simple sans timeout (macOS n'a pas timeout par défaut)
+echo "📋 1. Test endpoints simples..."
 
-# 2. Test avec date spécifique
-echo "📅 Test 2: Plannings for specific date"
-curl -s "http://localhost:8080/api/planning/view-simple?date=2025-06-01" | jq '. | length' || echo "Date filter failed"
+echo "Test /api/employees/active:"
+curl -s -w "\nHTTP Status: %{http_code}\nTime: %{time_total}s\n" http://localhost:8080/api/employees/active || echo "❌ Erreur curl"
 
-# 3. Test génération
-echo "🚀 Test 3: Generate new plannings"
-curl -s -X POST http://localhost:8080/api/planning/generate \
-  -H "Content-Type: application/json" \
-  -d '{"startDate": "2025-06-01", "timePerCard": 3}' | jq '.planningsSaved' || echo "Generation failed"
+echo ""
+echo "Test page racine Spring Boot:"
+curl -s -w "\nHTTP Status: %{http_code}\n" http://localhost:8080/ || echo "❌ Erreur curl racine"
 
-# 4. Test debug
-echo "🔍 Test 4: Debug info"
-curl -s http://localhost:8080/api/planning/debug-real | jq '.planningCount' || echo "Debug failed"
+echo ""
+echo "Test /api/employees/debug:"
+curl -s -w "\nHTTP Status: %{http_code}\n" http://localhost:8080/api/employees/debug || echo "❌ Erreur curl debug"
 
-# 5. Vérifier données SQL directement
-echo "💾 Test 5: Direct SQL check"
-mysql -u ia -pfoufafou dev -e "
-SELECT
-    COUNT(*) as total_plannings,
-    COUNT(DISTINCT employee_id) as employees_used,
-    COUNT(DISTINCT planning_date) as dates_covered,
-    MIN(planning_date) as earliest_date,
-    MAX(planning_date) as latest_date
-FROM j_planning;
-" 2>/dev/null || echo "SQL check failed"
+# 2. Test avec verbosité pour voir les détails
+echo ""
+echo "📋 2. Test avec détails de connexion..."
+curl -v http://localhost:8080/api/employees/active 2>&1 | head -20
 
-echo "✅ Tests completed!"
+# 3. Vérifier les logs Spring Boot
+echo ""
+echo "📋 3. Vérification processus Java..."
+ps aux | grep java | grep -v grep
+
+# 4. Test de l'actuator Spring Boot (si activé)
+echo ""
+echo "📋 4. Test endpoints Spring Boot standard..."
+echo "Test /actuator/health:"
+curl -s http://localhost:8080/actuator/health || echo "❌ Actuator non disponible"
+
+echo ""
+echo "Test endpoints possibles:"
+for endpoint in "/api/employees" "/api/employes" "/api/employees/debug" "/api/employees/active"
+do
+    echo "Testing $endpoint:"
+    curl -s -o /dev/null -w "  Status: %{http_code}, Time: %{time_total}s\n" http://localhost:8080$endpoint
+done
+
+# 5. Instructions pour vérifier les logs
+echo ""
+echo "🔧 ÉTAPES SUIVANTES:"
+echo "==================="
+echo "1. Vérifiez les logs Spring Boot dans votre console/IDE"
+echo "2. Regardez si des erreurs apparaissent quand vous faites ces requêtes"
+echo "3. Vérifiez que Spring Boot a bien démarré tous les controllers"
+echo "4. Testez directement dans votre navigateur: http://localhost:8080/api/employees/active"

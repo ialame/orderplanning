@@ -1,0 +1,83 @@
+# ===============================================
+# DOCKER COMPOSE - POKEMON CARD PLANNING
+# ===============================================
+# Fichier: docker-compose.yml (racine du projet)
+
+version: '3.8'
+
+services:
+  # ========== BASE DE DONNÉES MYSQL ==========
+  database:
+    image: mysql:8.0
+    container_name: pokemon-planning-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: dev
+      MYSQL_USER: ia
+      MYSQL_PASSWORD: foufafou
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - pokemon-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # ========== BACKEND SPRING BOOT ==========
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pokemon-planning-backend
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:mysql://database:3306/dev?useUnicode=true&characterEncoding=utf8mb4&useSSL=false&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=ia
+      - SPRING_DATASOURCE_PASSWORD=foufafou
+      - SERVER_PORT=8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - pokemon-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/employees/debug"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ========== FRONTEND VUE ==========
+  frontend:
+    build:
+      context: ./src/main/frontend
+      dockerfile: Dockerfile
+    container_name: pokemon-planning-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - pokemon-network
+
+# ========== VOLUMES ==========
+volumes:
+  mysql_data:
+    driver: local
+
+# ========== NETWORKS ==========
+networks:
+  pokemon-network:
+    driver: bridge

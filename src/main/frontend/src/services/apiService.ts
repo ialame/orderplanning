@@ -1,583 +1,407 @@
-// ============= ENGLISH API SERVICE =============
-// Service pour interagir avec l'API backend anglaise
-// Traduction complète du service français existant
+// ===============================================
+// APISERVICE CORRIGÉ - src/services/apiService.ts
+// ===============================================
 
-// ========== INTERFACES ==========
+import type {
+  OrderResponse,
+  EmployeeResponse,
+  PlanningResponse,
+  PlanningGenerationResponse,
+  SystemDebugResponse
+} from './types'
 
-export interface OrderRequest {
-  startDate: string
-  endDate: string
-  numberOfEmployees: number
-  timePerCard: number
-}
-
-export interface OrderResponse {
-  id: string
-  orderNumber: string
-  cardCount: number
-  cardsWithName?: number
-  percentageWithName?: number
-  totalPrice?: number
-  priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW'
-  status: 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED'
-  statusCode: number
-  creationDate?: string
-  deadline?: string
-  estimatedTimeMinutes: number
-  orderQuality?: 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'POOR'
-}
-
-export interface CardResponse {
-  id: string
-  certificationId: string
-  cardId: string
-  name: string
-  labelName: string
-  barcode: string
-  type: string
-  annotation: string
-  language: string
-  withName: boolean
-}
-
-export interface EmployeeResponse {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  workHoursPerDay: number
-  active: boolean
-  fullName: string
-}
-
-export interface PlanningResponse {
-  id: string
-  orderId: string
-  orderNumber: string
-  employeeId: string
-  employeeName?: string
-  planningDate: string
-  startTime: string
-  endTime?: string
-  durationMinutes: number
-  priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW'
-  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
-  cardCount?: number
-  notes?: string
-  completed: boolean
-}
-
-export interface PlanningGenerationResponse {
-  success: boolean
-  message: string
-  algorithm: string
-  executionTimeMs: number
-  ordersAnalyzed: number
-  planningsCreated: number
-  planningsSaved: number
-  employeesUsed: number
-  plannings: PlanningResponse[]
-  period: {
-    start: string
-    end: string
-  }
-  timestamp: number
-  error?: string
-}
-
-export interface SystemDebugResponse {
-  availableOrders: number
-  activeEmployees: number
-  availableColumns: string[]
-  sampleOrders: Array<{
-    id: string
-    orderNumber: string
-    delaiCode: string
-    priority: string
-    cardCount: number
-  }>
-  status: 'SUCCESS' | 'ERROR'
-  message: string
-  error?: string
-}
-
-export interface SystemStatsResponse {
-  totalPlannings: number
-  statusBreakdown: Record<string, number>
-  lastUpdated: number
-  error?: string
-}
-
-export interface ApiError extends Error {
-  status?: number
-  code?: string
-}
-
-// ========== API SERVICE CLASS ==========
-
-export class ApiService {
-  private readonly baseUrl = '/api/planning'
-  private readonly headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-
-  // ========== PLANNING METHODS ==========
+class ApiService {
+  private readonly BASE_URL = 'http://localhost:8080'
+  private readonly DEFAULT_TIMEOUT = 10000 // 10 secondes
 
   /**
-   * Generate automatic planning using English API
+   * ✅ MÉTHODE PRIVÉE - Fetch avec timeout et gestion d'erreur
    */
-  async generatePlanning(request: OrderRequest): Promise<PlanningGenerationResponse> {
+  private async fetchWithTimeout(
+    url: string,
+    options: RequestInit = {},
+    timeout = this.DEFAULT_TIMEOUT
+  ): Promise<Response> {
+
+    // ✅ CONTROLLER D'ABORT POUR TIMEOUT
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      console.log(`⏰ [API] Request timeout after ${timeout}ms for ${url}`)
+      controller.abort()
+    }, timeout)
+
     try {
-      console.log('🚀 [API] Generating planning:', request)
-
-      const response = await fetch(`${this.baseUrl}/generate`, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(request)
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw this.createApiError(`Planning generation failed: ${response.status}`, response.status, errorText)
+      // ✅ CONFIGURATION PAR DÉFAUT
+      const defaultOptions: RequestInit = {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          ...options.headers
+        },
+        signal: controller.signal,
+        ...options
       }
 
-      const data = await response.json() as PlanningGenerationResponse
-      console.log('✅ [API] Planning generated:', data)
+      console.log(`📡 [API] Fetching: ${url}`)
+      const response = await fetch(url, defaultOptions)
 
-      return data
+      // Nettoyer le timeout si la requête se termine
+      clearTimeout(timeoutId)
+
+      console.log(`📥 [API] Response: ${response.status} in ${url}`)
+      return response
+
     } catch (error) {
-      console.error('❌ [API] Planning generation error:', error)
-      throw this.handleError(error, 'Planning generation failed')
+      clearTimeout(timeoutId)
+
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeout/1000} seconds`)
+      }
+
+      throw error
     }
   }
 
   /**
-   * ✅ FIXED: ApiService getPlannings method
-   * Replace this method in your src/services/apiService.ts file
+   * ✅ MÉTHODE PRIVÉE - Parser JSON avec gestion d'erreur
+   */
+  private async parseJsonResponse<T>(response: Response): Promise<T> {
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+
+      try {
+        const errorData = await response.json()
+        if (errorData.message) {
+          errorMessage = errorData.message
+        }
+      } catch {
+        // Si on ne peut pas parser l'erreur JSON, garder le message HTTP
+      }
+
+      throw new Error(errorMessage)
+    }
+
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(`Invalid content type: ${contentType}`)
+    }
+
+    try {
+      return await response.json()
+    } catch (error) {
+      throw new Error('Invalid JSON response')
+    }
+  }
+
+  // ========== EMPLOYEES API ==========
+
+  /**
+   * ✅ GET EMPLOYEES - Version corrigée
+   */
+  async getEmployees(): Promise<EmployeeResponse[]> {
+    try {
+      console.log('👥 [API] Getting employees...')
+
+      const response = await this.fetchWithTimeout('/api/employees/active')
+      const data = await this.parseJsonResponse<EmployeeResponse[]>(response)
+
+      if (!Array.isArray(data)) {
+        console.error('❌ [API] Response is not an array:', data)
+        return []
+      }
+
+      console.log(`✅ [API] Successfully loaded ${data.length} employees`)
+      return data
+
+    } catch (error) {
+      console.error('❌ [API] getEmployees error:', error)
+
+      // ✅ FALLBACK - Essayer d'autres endpoints
+      return this.getEmployeesWithFallback()
+    }
+  }
+
+  /**
+   * ✅ FALLBACK EMPLOYEES - Essayer plusieurs endpoints
+   */
+  private async getEmployeesWithFallback(): Promise<EmployeeResponse[]> {
+    const endpoints = [
+      '/api/employees',
+      '/api/employes/active',
+      '/api/employes'
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🔄 [API] Trying fallback endpoint: ${endpoint}`)
+
+        const response = await this.fetchWithTimeout(endpoint, {}, 8000)
+
+        if (response.ok) {
+          const data = await this.parseJsonResponse<EmployeeResponse[]>(response)
+
+          if (Array.isArray(data) && data.length > 0) {
+            console.log(`✅ [API] Fallback success with ${endpoint}: ${data.length} employees`)
+            return data
+          }
+        }
+
+      } catch (error) {
+        console.log(`❌ [API] Fallback failed for ${endpoint}:`, error.message)
+        continue
+      }
+    }
+
+    console.warn('⚠️ [API] All employee endpoints failed')
+    return []
+  }
+
+  /**
+   * ✅ CREATE EMPLOYEE - Version corrigée
+   */
+  async createEmployee(employee: Partial<EmployeeResponse>): Promise<any> {
+    try {
+      console.log('👤 [API] Creating employee:', employee)
+
+      // ✅ VALIDATION
+      if (!employee.firstName || !employee.lastName) {
+        throw new Error('First name and last name are required')
+      }
+
+      // ✅ DONNÉES NETTOYÉES
+      const cleanData = {
+        firstName: employee.firstName.trim(),
+        lastName: employee.lastName.trim(),
+        email: employee.email?.trim() || '',
+        workHoursPerDay: employee.workHoursPerDay || 8,
+        active: employee.active !== false
+      }
+
+      const response = await this.fetchWithTimeout('/api/employees', {
+        method: 'POST',
+        body: JSON.stringify(cleanData)
+      })
+
+      const result = await this.parseJsonResponse(response)
+      console.log('✅ [API] Employee created successfully:', result)
+
+      return result
+
+    } catch (error) {
+      console.error('❌ [API] createEmployee error:', error)
+      throw error
+    }
+  }
+
+  // ========== ORDERS API ==========
+
+  /**
+   * ✅ GET ORDERS - Version corrigée
+   */
+  async getOrders(): Promise<OrderResponse[]> {
+    try {
+      console.log('📋 [API] Getting orders...')
+
+      const response = await this.fetchWithTimeout('/api/orders/frontend/orders')
+      const data = await this.parseJsonResponse<OrderResponse[]>(response)
+
+      if (!Array.isArray(data)) {
+        console.error('❌ [API] Orders response is not an array:', data)
+        return []
+      }
+
+      console.log(`✅ [API] Successfully loaded ${data.length} orders`)
+      return data
+
+    } catch (error) {
+      console.error('❌ [API] getOrders error:', error)
+      return this.getOrdersWithFallback()
+    }
+  }
+
+  /**
+   * ✅ FALLBACK ORDERS
+   */
+  private async getOrdersWithFallback(): Promise<OrderResponse[]> {
+    const endpoints = [
+      '/api/commandes/frontend/commandes',
+      '/api/frontend/commandes',
+      '/api/orders'
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await this.fetchWithTimeout(endpoint, {}, 8000)
+
+        if (response.ok) {
+          const data = await this.parseJsonResponse<OrderResponse[]>(response)
+
+          if (Array.isArray(data)) {
+            console.log(`✅ [API] Orders fallback success with ${endpoint}`)
+            return data
+          }
+        }
+
+      } catch (error) {
+        continue
+      }
+    }
+
+    return []
+  }
+
+  /**
+   * ✅ GET ORDER CARDS
+   */
+  async getOrderCards(orderId: string): Promise<any[]> {
+    try {
+      console.log(`🃏 [API] Getting cards for order: ${orderId}`)
+
+      const response = await this.fetchWithTimeout(`/api/orders/frontend/orders/${orderId}/cards`)
+      const data = await this.parseJsonResponse<any[]>(response)
+
+      console.log(`✅ [API] Loaded ${data?.length || 0} cards`)
+      return Array.isArray(data) ? data : []
+
+    } catch (error) {
+      console.error('❌ [API] getOrderCards error:', error)
+      return []
+    }
+  }
+
+  // ========== PLANNING API ==========
+
+  /**
+   * ✅ GET PLANNINGS - Version corrigée
    */
   async getPlannings(date?: string): Promise<PlanningResponse[]> {
     try {
+      console.log('📅 [API] Getting plannings for date:', date || 'all')
+
       const url = date
         ? `/api/planning/view-simple?date=${date}`
-        : `/api/planning/view-simple`
+        : '/api/planning/view-simple'
 
-      console.log('📋 [API] Loading plannings from:', url)
+      const response = await this.fetchWithTimeout(url)
+      const data = await this.parseJsonResponse<PlanningResponse[]>(response)
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw this.createApiError(`Failed to load plannings: ${response.status}`, response.status)
-      }
-
-      const data = await response.json()
-      console.log('✅ [API] Raw plannings data:', data)
-
-      // ✅ VERIFY DATA FORMAT
       if (!Array.isArray(data)) {
-        console.error('❌ Backend returned non-array data:', data)
-        throw new Error('Invalid data format from backend')
+        console.error('❌ [API] Plannings response is not an array:', data)
+        return []
       }
 
-      // ✅ TRANSFORM DATA with proper mapping
-      const transformedData = data.map((item: any): PlanningResponse => ({
-        id: item.id || '',
-        orderId: item.orderId || '',
-        orderNumber: item.orderNumber || 'Unknown',
-        employeeId: item.employeeId || '',
-        employeeName: item.employeeName || 'Unknown Employee',
-        planningDate: item.planningDate || '',
-        startTime: item.startTime || '',
-        endTime: item.endTime || '',
-        durationMinutes: item.durationMinutes || 0,
-        priority: item.priority || 'MEDIUM',
-        status: item.status || 'SCHEDULED',
-        cardCount: item.cardCount || 0,
-        notes: item.notes || '',
-        completed: Boolean(item.completed)
-      }))
-
-      console.log(`✅ [API] Transformed ${transformedData.length} plannings`)
-      return transformedData
-
-    } catch (error) {
-      console.error('❌ [API] Load plannings error:', error)
-      throw this.handleError(error, 'Failed to load plannings')
-    }
-  }
-  /**
-   * Get plannings with employee/order details (using JOINs)
-   */
-  async getPlanningsWithDetails(date?: string): Promise<PlanningResponse[]> {
-    try {
-      const url = date
-        ? `${this.baseUrl}/view?date=${date}`
-        : `${this.baseUrl}/view`
-
-      console.log('📋 [API] Loading detailed plannings from:', url)
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.headers
-      })
-
-      if (!response.ok) {
-        throw this.createApiError(`Failed to load detailed plannings: ${response.status}`, response.status)
-      }
-
-      const data = await response.json() as any[]
-      console.log('✅ [API] Detailed plannings loaded:', data.length)
-
-      return data.map(this.transformDetailedPlanningData)
-    } catch (error) {
-      console.error('❌ [API] Load detailed plannings error:', error)
-      throw this.handleError(error, 'Failed to load detailed plannings')
-    }
-  }
-
-  // ========== SYSTEM METHODS ==========
-
-  /**
-   * Get system debug information
-   */
-  async getSystemDebug(): Promise<SystemDebugResponse> {
-    try {
-      console.log('🔍 [API] Loading system debug info')
-
-      const response = await fetch(`${this.baseUrl}/debug-real`, {
-        method: 'GET',
-        headers: this.headers
-      })
-
-      if (!response.ok) {
-        throw this.createApiError(`Debug request failed: ${response.status}`, response.status)
-      }
-
-      const data = await response.json() as SystemDebugResponse
-      console.log('✅ [API] System debug loaded:', data)
-
+      console.log(`✅ [API] Successfully loaded ${data.length} plannings`)
       return data
+
     } catch (error) {
-      console.error('❌ [API] System debug error:', error)
-      throw this.handleError(error, 'Failed to load system debug info')
+      console.error('❌ [API] getPlannings error:', error)
+      return []
     }
   }
 
   /**
-   * Get system statistics
+   * ✅ GENERATE PLANNING - Version corrigée
    */
-  async getSystemStats(): Promise<SystemStatsResponse> {
+  async generatePlanning(config: any = {}): Promise<PlanningGenerationResponse> {
     try {
-      console.log('📊 [API] Loading system stats')
+      console.log('🚀 [API] Generating planning with config:', config)
 
-      const response = await fetch(`${this.baseUrl}/stats`, {
-        method: 'GET',
-        headers: this.headers
-      })
-
-      if (!response.ok) {
-        throw this.createApiError(`Stats request failed: ${response.status}`, response.status)
+      const requestData = {
+        startDate: config.startDate || '2025-06-01',
+        timePerCard: config.timePerCard || 3,
+        cleanFirst: config.cleanFirst || false
       }
 
-      const data = await response.json() as SystemStatsResponse
-      console.log('✅ [API] System stats loaded:', data)
-
-      return data
-    } catch (error) {
-      console.error('❌ [API] System stats error:', error)
-      throw this.handleError(error, 'Failed to load system stats')
-    }
-  }
-
-  /**
-   * Test single planning save (for debugging)
-   */
-  async testSave(): Promise<any> {
-    try {
-      console.log('🧪 [API] Testing single save')
-
-      const response = await fetch(`${this.baseUrl}/test-save`, {
+      const response = await this.fetchWithTimeout('/api/planning/generate', {
         method: 'POST',
-        headers: this.headers
-      })
+        body: JSON.stringify(requestData)
+      }, 30000) // 30 secondes pour la génération
 
-      if (!response.ok) {
-        throw this.createApiError(`Test save failed: ${response.status}`, response.status)
+      const result = await this.parseJsonResponse<PlanningGenerationResponse>(response)
+      console.log('✅ [API] Planning generated successfully:', result)
+
+      return result
+
+    } catch (error) {
+      console.error('❌ [API] generatePlanning error:', error)
+      throw error
+    }
+  }
+
+  // ========== SYSTEM API ==========
+
+  /**
+   * ✅ TEST CONNECTION - Version corrigée
+   */
+  async testConnection(): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🧪 [API] Testing connection...')
+
+      const response = await this.fetchWithTimeout('/api/employees/debug', {}, 5000)
+
+      const success = response.ok
+      let message = success
+        ? `Backend accessible (HTTP ${response.status})`
+        : `Backend error (HTTP ${response.status})`
+
+      if (success) {
+        try {
+          const data = await response.json()
+          if (data.employee_count !== undefined) {
+            message += ` - ${data.employee_count} employees in database`
+          }
+        } catch {
+          // Ignore JSON parsing errors for connection test
+        }
       }
 
-      const data = await response.json()
-      console.log('✅ [API] Test save result:', data)
+      console.log(`🧪 [API] Connection test result: ${success ? 'SUCCESS' : 'FAILED'}`)
+      return { success, message }
 
-      return data
     } catch (error) {
-      console.error('❌ [API] Test save error:', error)
-      throw this.handleError(error, 'Test save failed')
-    }
-  }
+      console.error('🧪 [API] Connection test error:', error)
 
-  /**
-   * Check planning table status
-   */
-  async checkTable(): Promise<any> {
-    try {
-      console.log('🔧 [API] Checking table status')
-
-      const response = await fetch(`${this.baseUrl}/check-table`, {
-        method: 'GET',
-        headers: this.headers
-      })
-
-      if (!response.ok) {
-        throw this.createApiError(`Table check failed: ${response.status}`, response.status)
+      let message = 'Connection failed'
+      if (error.message.includes('timeout')) {
+        message = 'Connection timeout - backend may be slow'
+      } else if (error.message.includes('fetch')) {
+        message = 'Network error - check if backend is running'
       }
 
-      const data = await response.json()
-      console.log('✅ [API] Table status:', data)
-
-      return data
-    } catch (error) {
-      console.error('❌ [API] Table check error:', error)
-      throw this.handleError(error, 'Table check failed')
+      return { success: false, message }
     }
   }
 
   /**
-   * Cleanup old plannings
+   * ✅ GET SYSTEM INFO
    */
-  async cleanupPlannings(): Promise<any> {
+  async getSystemInfo(): Promise<SystemDebugResponse> {
     try {
-      console.log('🗑️ [API] Cleaning up old plannings')
+      const response = await this.fetchWithTimeout('/api/planning/debug-real')
+      return await this.parseJsonResponse<SystemDebugResponse>(response)
 
-      const response = await fetch(`${this.baseUrl}/cleanup`, {
-        method: 'DELETE',
-        headers: this.headers
-      })
-
-      if (!response.ok) {
-        throw this.createApiError(`Cleanup failed: ${response.status}`, response.status)
-      }
-
-      const data = await response.json()
-      console.log('✅ [API] Cleanup result:', data)
-
-      return data
     } catch (error) {
-      console.error('❌ [API] Cleanup error:', error)
-      throw this.handleError(error, 'Cleanup failed')
-    }
-  }
-
-  // ========== UTILITY METHODS ==========
-
-  /**
-   * Get combined system information (debug + stats)
-   */
-  async getSystemInfo(): Promise<{
-    debug: SystemDebugResponse
-    stats: SystemStatsResponse
-  }> {
-    try {
-      const [debug, stats] = await Promise.all([
-        this.getSystemDebug(),
-        this.getSystemStats()
-      ])
-
-      return { debug, stats }
-    } catch (error) {
-      console.error('❌ [API] System info error:', error)
-      throw this.handleError(error, 'Failed to load system information')
-    }
-  }
-
-  /**
-   * Get planning summary for a date range
-   */
-  async getPlanningsSummary(startDate: string, endDate: string): Promise<{
-    plannings: PlanningResponse[]
-    totalCount: number
-    statusBreakdown: Record<string, number>
-    priorityBreakdown: Record<string, number>
-  }> {
-    try {
-      const plannings = await this.getPlannings(startDate)
-
-      // Filter by date range if endDate is different
-      const filteredPlannings = plannings.filter(p =>
-        p.planningDate >= startDate && p.planningDate <= endDate
-      )
-
-      // Calculate breakdowns
-      const statusBreakdown: Record<string, number> = {}
-      const priorityBreakdown: Record<string, number> = {}
-
-      filteredPlannings.forEach(planning => {
-        statusBreakdown[planning.status] = (statusBreakdown[planning.status] || 0) + 1
-        priorityBreakdown[planning.priority] = (priorityBreakdown[planning.priority] || 0) + 1
-      })
+      console.error('❌ [API] getSystemInfo error:', error)
 
       return {
-        plannings: filteredPlannings,
-        totalCount: filteredPlannings.length,
-        statusBreakdown,
-        priorityBreakdown
+        availableOrders: 0,
+        activeEmployees: 0,
+        availableColumns: [],
+        sampleOrders: [],
+        status: 'ERROR',
+        message: error.message,
+        error: error.message
       }
-    } catch (error) {
-      console.error('❌ [API] Planning summary error:', error)
-      throw this.handleError(error, 'Failed to get planning summary')
     }
-  }
-
-  // ========== PRIVATE HELPERS ==========
-
-  private transformPlanningData(item: any): PlanningResponse {
-    return {
-      id: item.id,
-      orderId: item.orderId,
-      orderNumber: this.extractOrderNumber(item.notes),
-      employeeId: item.employeeId,
-      employeeName: item.employeeName,
-      planningDate: item.planningDate,
-      startTime: item.startTime,
-      endTime: item.endTime,
-      durationMinutes: item.durationMinutes || item.estimated_duration_minutes,
-      priority: item.priority,
-      status: item.status,
-      cardCount: item.cardCount,
-      notes: item.notes,
-      completed: Boolean(item.completed)
-    }
-  }
-
-  private transformDetailedPlanningData(item: any): PlanningResponse {
-    return {
-      id: item.id,
-      orderId: item.orderId,
-      orderNumber: item.orderNumber,
-      employeeId: item.employeeId,
-      employeeName: item.employeeName,
-      planningDate: item.planningDate,
-      startTime: item.startTime,
-      endTime: item.endTime,
-      durationMinutes: item.durationMinutes,
-      priority: item.priority,
-      status: item.status,
-      cardCount: item.cardCount,
-      notes: item.notes,
-      completed: Boolean(item.completed)
-    }
-  }
-
-  private extractOrderNumber(notes?: string): string {
-    if (!notes) return 'Unknown'
-    const match = notes.match(/order (\w+)/)
-    return match ? match[1] : 'Unknown'
-  }
-
-  private createApiError(message: string, status?: number, details?: string): ApiError {
-    const error = new Error(details ? `${message}: ${details}` : message) as ApiError
-    error.status = status
-    error.name = 'ApiError'
-    return error
-  }
-
-  private handleError(error: unknown, fallbackMessage: string): ApiError {
-    if (error instanceof Error) {
-      return error as ApiError
-    }
-    return this.createApiError(fallbackMessage, undefined, String(error))
   }
 }
 
-// ========== SINGLETON INSTANCE ==========
-export const apiService = new EnglishApiService()
+// ========== SINGLETON EXPORT ==========
+export const apiService = new ApiService()
 
 // ========== CONVENIENCE FUNCTIONS ==========
+export const generatePlanning = (config?: any) => apiService.generatePlanning(config)
+export const getTodaysPlannings = () => apiService.getPlannings()
+export const getSystemStatus = () => apiService.getSystemInfo()
 
-/**
- * Quick function to generate planning
- */
-export const generatePlanning = (config: OrderRequest) =>
-  apiService.generatePlanning(config)
-
-/**
- * Quick function to get today's plannings
- */
-export const getTodaysPlannings = () =>
-  apiService.getPlannings(new Date().toISOString().split('T')[0])
-
-/**
- * Quick function to get system status
- */
-export const getSystemStatus = () =>
-  apiService.getSystemInfo()
-
-/**
- * Format planning for display
- */
-export const formatPlanningForDisplay = (planning: PlanningResponse) => ({
-  ...planning,
-  formattedDate: new Date(planning.planningDate).toLocaleDateString('en-US', {
-    weekday: 'short',
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  }),
-  formattedStartTime: new Date(planning.startTime).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit'
-  }),
-  formattedDuration: `${planning.durationMinutes} min`,
-  priorityColor: {
-    'URGENT': 'red',
-    'HIGH': 'orange',
-    'MEDIUM': 'yellow',
-    'LOW': 'green'
-  }[planning.priority] || 'gray',
-  statusColor: {
-    'SCHEDULED': 'blue',
-    'IN_PROGRESS': 'orange',
-    'COMPLETED': 'green',
-    'CANCELLED': 'red'
-  }[planning.status] || 'gray'
-})
-
-// ========== ERROR HANDLING UTILITIES ==========
-
-export const isApiError = (error: unknown): error is ApiError => {
-  return error instanceof Error && error.name === 'ApiError'
-}
-
-export const getErrorMessage = (error: unknown): string => {
-  if (isApiError(error)) {
-    return error.message
-  }
-  if (error instanceof Error) {
-    return error.message
-  }
-  return 'An unknown error occurred'
-}
-
-export const getErrorDetails = (error: unknown): { message: string; status?: number; details?: string } => {
-  if (isApiError(error)) {
-    return {
-      message: error.message,
-      status: error.status,
-      details: error.code
-    }
-  }
-  if (error instanceof Error) {
-    return {
-      message: error.message
-    }
-  }
-  return {
-    message: 'An unknown error occurred',
-    details: String(error)
-  }
-}
+export default apiService

@@ -1,13 +1,10 @@
 <!-- =============================================== -->
-<!-- EMPLOYEELISTVIEW.VUE - AVEC SERVICE CORRIGÉ -->
+<!-- CORRECTION PROBLÈME CHARGEMENT FRONTEND -->
 <!-- =============================================== -->
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-// ✅ IMPORT DU SERVICE CORRIGÉ
-import { apiService } from '@/services/apiService'
-import type { EmployeeResponse } from '@/services/types'
 
 // ========== INTERFACES ==========
 interface Employee {
@@ -66,7 +63,7 @@ const isFormValid = computed(() => {
 // ========== METHODS ==========
 
 /**
- * ✅ FONCTION getInitials
+ * ✅ FONCTION getInitials CORRIGÉE
  */
 const getInitials = (name: string): string => {
   if (!name || typeof name !== 'string') {
@@ -81,53 +78,69 @@ const getInitials = (name: string): string => {
 }
 
 /**
- * ✅ LOAD EMPLOYEES - Avec service corrigé
+ * ✅ MÉTHODE CORRIGÉE - Appel direct sans service problématique
  */
 const loadEmployees = async () => {
   loading.value = true
   error.value = null
 
-  console.log('👥 [SERVICE] Loading employees via corrected apiService...')
+  console.log('👥 [DIRECT] Loading employees directly from API...')
 
   try {
-    // ✅ UTILISATION DU SERVICE CORRIGÉ
-    const employeeData: EmployeeResponse[] = await apiService.getEmployees()
+    console.log('📡 [DIRECT] Fetching from /api/employees/active...')
 
-    console.log('📥 [SERVICE] Received data:', employeeData)
-    console.log('📊 [SERVICE] Data length:', employeeData?.length)
+    // ✅ APPEL DIRECT SANS SERVICE INTERMEDIAIRE
+    const response = await fetch('/api/employees/active', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
 
-    if (!Array.isArray(employeeData)) {
-      throw new Error('Service returned invalid data format')
+    console.log('📥 [DIRECT] Response status:', response.status)
+    console.log('📥 [DIRECT] Response ok:', response.ok)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
-    if (employeeData.length === 0) {
-      console.warn('⚠️ [SERVICE] No employees found')
+    const data = await response.json()
+    console.log('📊 [DIRECT] Raw data received:', data)
+    console.log('📊 [DIRECT] Data length:', data?.length)
+
+    if (!Array.isArray(data)) {
+      throw new Error('Response is not an array')
+    }
+
+    if (data.length === 0) {
+      console.warn('⚠️ [DIRECT] No employees found')
       employees.value = []
 
       emit('show-notification', {
         message: 'No employees found',
-        details: 'The database appears to be empty. Try creating an employee!',
+        details: 'The database appears to be empty.',
         type: 'warning'
       })
       return
     }
 
-    // ✅ MAPPING DES DONNÉES
-    employees.value = employeeData.map((emp: EmployeeResponse) => {
-      console.log('👤 [SERVICE] Processing employee:', emp.firstName, emp.lastName)
+    // ✅ MAPPING DIRECT DES DONNÉES BACKEND
+    employees.value = data.map((emp: any) => {
+      console.log('👤 [DIRECT] Processing employee:', emp.firstName, emp.lastName)
 
       return {
         id: emp.id,
-        name: emp.fullName || `${emp.firstName} ${emp.lastName}`.trim() || 'Unknown Employee',
+        name: emp.fullName || emp.name || `${emp.firstName} ${emp.lastName}`.trim(),
         department: 'PROCESSING',
         status: emp.active ? 'AVAILABLE' : 'OFFLINE',
         efficiency: 85,
-        currentOrders: 0
+        currentOrders: emp.currentLoad || 0
       }
     })
 
-    console.log(`✅ [SERVICE] Successfully loaded ${employees.value.length} employees`)
-    console.log('👥 [SERVICE] Employee names:', employees.value.map(e => e.name))
+    console.log(`✅ [DIRECT] Successfully loaded ${employees.value.length} employees`)
+    console.log('👥 [DIRECT] Employee names:', employees.value.map(e => e.name))
 
     emit('show-notification', {
       message: 'Employees loaded successfully',
@@ -136,37 +149,25 @@ const loadEmployees = async () => {
     })
 
   } catch (error: any) {
-    console.error('❌ [SERVICE] Error in loadEmployees:', error)
+    console.error('❌ [DIRECT] Error in loadEmployees:', error)
 
     employees.value = []
     error.value = error.message
 
-    // ✅ MESSAGES D'ERREUR SPÉCIFIQUES
-    let errorMessage = 'Failed to load employees'
-    let errorDetails = error.message
-
-    if (error.message.includes('timeout')) {
-      errorMessage = 'Request timed out'
-      errorDetails = 'The server is taking too long to respond. Please try again.'
-    } else if (error.message.includes('Network') || error.message.includes('fetch')) {
-      errorMessage = 'Connection error'
-      errorDetails = 'Cannot connect to the backend. Please check if the server is running.'
-    }
-
     emit('show-notification', {
-      message: errorMessage,
-      details: errorDetails,
+      message: 'Failed to load employees',
+      details: `Error: ${error.message}`,
       type: 'error'
     })
 
   } finally {
     loading.value = false
-    console.log('🏁 [SERVICE] loadEmployees finished')
+    console.log('🏁 [DIRECT] loadEmployees finished')
   }
 }
 
 /**
- * ✅ CREATE EMPLOYEE - Avec service corrigé
+ * ✅ CRÉATION EMPLOYÉ - Appel direct
  */
 const createEmployee = async () => {
   if (!isFormValid.value) {
@@ -180,49 +181,48 @@ const createEmployee = async () => {
   createLoading.value = true
 
   try {
-    console.log('👤 [SERVICE] Creating employee via apiService:', newEmployee.value)
+    console.log('👤 [DIRECT] Creating employee:', newEmployee.value)
 
-    // ✅ UTILISATION DU SERVICE CORRIGÉ
-    const result = await apiService.createEmployee({
-      firstName: newEmployee.value.firstName,
-      lastName: newEmployee.value.lastName,
-      email: newEmployee.value.email,
-      workHoursPerDay: newEmployee.value.workHoursPerDay,
-      active: newEmployee.value.active
+    const response = await fetch('/api/employees', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        firstName: newEmployee.value.firstName.trim(),
+        lastName: newEmployee.value.lastName.trim(),
+        email: newEmployee.value.email.trim(),
+        workHoursPerDay: newEmployee.value.workHoursPerDay,
+        active: newEmployee.value.active
+      })
     })
 
-    console.log('✅ [SERVICE] Employee created successfully:', result)
+    console.log('📥 [DIRECT] Create response status:', response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+      throw new Error(errorData.message || `HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('✅ [DIRECT] Employee created:', result)
 
     emit('show-notification', {
       message: 'Employee created successfully!',
-      details: `${newEmployee.value.firstName} ${newEmployee.value.lastName} has been added to the team.`,
+      details: `${newEmployee.value.firstName} ${newEmployee.value.lastName} has been added.`,
       type: 'success'
     })
 
-    // Reset et reload
     cancelCreate()
     await loadEmployees()
 
   } catch (error: any) {
-    console.error('❌ [SERVICE] Create employee error:', error)
-
-    // ✅ GESTION D'ERREUR SPÉCIFIQUE
-    let errorMessage = 'Failed to create employee'
-    let errorDetails = error.message
-
-    if (error.message.includes('required')) {
-      errorMessage = 'Missing required information'
-    } else if (error.message.includes('already exists')) {
-      errorMessage = 'Employee already exists'
-      errorDetails = 'An employee with this email already exists'
-    } else if (error.message.includes('timeout')) {
-      errorMessage = 'Request timed out'
-      errorDetails = 'The server is taking too long to respond'
-    }
+    console.error('❌ [DIRECT] Create employee error:', error)
 
     emit('show-notification', {
-      message: errorMessage,
-      details: errorDetails,
+      message: 'Failed to create employee',
+      details: error.message,
       type: 'error'
     })
   } finally {
@@ -231,42 +231,26 @@ const createEmployee = async () => {
 }
 
 /**
- * ✅ TEST BACKEND - Avec service corrigé
+ * ✅ TEST CONNEXION - Appel direct
  */
-const testBackend = async () => {
+const testConnection = async () => {
   try {
-    console.log('🧪 [SERVICE] Testing backend via apiService...')
+    console.log('🧪 [DIRECT] Testing connection...')
 
-    // ✅ UTILISATION DU SERVICE CORRIGÉ
-    const result = await apiService.testConnection()
+    const response = await fetch('/api/employees/debug')
+    const success = response.ok
 
-    console.log('🧪 [SERVICE] Connection test result:', result)
+    console.log(`🧪 [DIRECT] Connection test: ${success ? 'SUCCESS' : 'FAILED'}`)
 
-    if (result.success) {
-      emit('show-notification', {
-        message: 'Backend connection successful',
-        details: result.message,
-        type: 'success'
-      })
-    } else {
-      emit('show-notification', {
-        message: 'Backend connection failed',
-        details: result.message,
-        type: 'warning'
-      })
+    if (success) {
+      const data = await response.json()
+      console.log('🧪 [DIRECT] Debug data:', data)
     }
 
-    return result.success
+    return success
 
-  } catch (error: any) {
-    console.error('🧪 [SERVICE] Connection test error:', error)
-
-    emit('show-notification', {
-      message: 'Connection test failed',
-      details: error.message,
-      type: 'error'
-    })
-
+  } catch (error) {
+    console.error('🧪 [DIRECT] Connection test failed:', error)
     return false
   }
 }
@@ -304,30 +288,27 @@ const toggleStatus = (employee: Employee) => {
 
 // ========== LIFECYCLE ==========
 onMounted(async () => {
-  console.log('👥 EmployeeListView mounted - using CORRECTED apiService')
+  console.log('👥 EmployeeListView mounted - DIRECT API CALLS')
 
-  // Test de connexion d'abord
-  const connectionOK = await testBackend()
+  const connectionOK = await testConnection()
   console.log('🔌 Connection test:', connectionOK ? 'OK' : 'FAILED')
 
-  // Charger les employés
+  // Toujours essayer de charger, même si le test échoue
   await loadEmployees()
 })
 
 // ========== DEBUG FUNCTIONS ==========
 const debugInfo = () => {
-    console.log('🔍 DEBUG INFO (with corrected service):')
+    console.log('🔍 DEBUG INFO:')
     console.log('- Loading:', loading.value)
     console.log('- Employees count:', employees.value.length)
     console.log('- Error:', error.value)
     console.log('- Employees:', employees.value)
-    console.log('- ApiService methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(apiService)))
   }
 
-// Exposer pour debug
+// Exposer pour debug dans la console
 ;(window as any).debugEmployees = debugInfo
 ;(window as any).retryLoad = loadEmployees
-;(window as any).testService = testBackend
 </script>
 
 <template>
@@ -339,18 +320,9 @@ const debugInfo = () => {
         <p class="text-gray-600 mt-1">Manage your Pokemon card processing team</p>
       </div>
       <div class="flex space-x-2">
-        <!-- ✅ BOUTONS DE DEBUG/CONTRÔLE -->
-        <button
-          @click="testBackend"
-          class="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700"
-          title="Test backend connection"
-        >
-          🧪 Test
-        </button>
         <button
           @click="loadEmployees"
           class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-          title="Reload employees"
         >
           🔄 Reload
         </button>
@@ -363,35 +335,19 @@ const debugInfo = () => {
       </div>
     </div>
 
-    <!-- Service Status -->
-    <div v-if="loading" class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-      <div class="flex items-center">
-        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-        <p class="text-blue-800 text-sm">Loading via corrected apiService...</p>
-      </div>
-    </div>
-
     <!-- Error Display -->
     <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
       <div class="flex">
         <div class="text-red-400 mr-3">❌</div>
         <div>
-          <h3 class="text-red-800 font-medium">Service Error</h3>
+          <h3 class="text-red-800 font-medium">Error Loading Employees</h3>
           <p class="text-red-700 text-sm mt-1">{{ error }}</p>
-          <div class="mt-2 space-x-2">
-            <button
-              @click="testBackend"
-              class="text-sm bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200"
-            >
-              Test Connection
-            </button>
-            <button
-              @click="loadEmployees"
-              class="text-sm bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200"
-            >
-              Retry Load
-            </button>
-          </div>
+          <button
+            @click="loadEmployees"
+            class="mt-2 text-sm bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     </div>
@@ -429,8 +385,15 @@ const debugInfo = () => {
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="text-center py-12">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <p class="mt-2 text-gray-600">Loading employees...</p>
+      <p class="mt-1 text-sm text-gray-500">Backend is working, this should be quick!</p>
+    </div>
+
     <!-- Employee Grid -->
-    <div v-if="employees.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div v-else-if="employees.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div
         v-for="employee in employees"
         :key="employee.id"
@@ -493,7 +456,7 @@ const debugInfo = () => {
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!loading" class="text-center py-12">
+    <div v-else class="text-center py-12">
       <div class="text-6xl mb-4">👥</div>
       <h3 class="text-xl font-semibold text-gray-900 mb-2">No employees found</h3>
       <p class="text-gray-600 mb-4">Get started by adding your first team member</p>
@@ -513,7 +476,7 @@ const debugInfo = () => {
       </div>
     </div>
 
-    <!-- Create Employee Modal (identique à la version précédente) -->
+    <!-- Create Employee Modal -->
     <div
       v-if="showCreateForm"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
