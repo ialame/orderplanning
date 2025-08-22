@@ -1,10 +1,13 @@
 import { createApp } from 'vue'
-import './style.css'
 import App from './App.vue'
 import router from './router'
 
+console.log('🚀 Starting Pokemon Card Planning App...')
+
 const app = createApp(App)
+
 app.use(router)
+
 app.mount('#app')
 
-console.log('🚀 Vue app initialized with router')
+console.log('✅ Vue.js application mounted successfully')

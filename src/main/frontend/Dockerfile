@@ -1,40 +1,41 @@
 # ===============================================
-# DOCKERFILE FRONTEND VUE
+# DOCKERFILE FOR VUE.JS APP WITH NGINX
 # ===============================================
-# Fichier: src/main/frontend/Dockerfile
 
-# ========== ÉTAPE 1: BUILD ==========
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copier les fichiers de dépendances
+# Copy package files
 COPY package*.json ./
 
-# Installer les dépendances
-RUN npm ci --only=production
+# Install dependencies
+RUN npm install
 
-# Copier le code source
+# Copy source code
 COPY . .
 
-# Build de production
+# Build for production
 RUN npm run build
 
-# ========== ÉTAPE 2: SERVEUR NGINX ==========
+# ========== PRODUCTION STAGE ==========
 FROM nginx:alpine
 
-# Copier la configuration nginx
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy our nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copier les fichiers buildés
+# Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Exposer le port
+# Add a startup script to show we're running
+RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
+    echo 'echo "🚀 Starting Pokemon Card Planning Frontend..."' >> /docker-entrypoint.sh && \
+    echo 'nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
+
 EXPOSE 3000
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/ || exit 1
-
-# Démarrer nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/docker-entrypoint.sh"]
