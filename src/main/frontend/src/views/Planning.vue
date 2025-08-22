@@ -1,455 +1,1017 @@
 <template>
-  <div class="min-h-screen bg-gray-50 p-6">
-    <div class="max-w-7xl mx-auto">
+  <div class="planning-page">
+    <!-- ✅ EN-TÊTE PRINCIPAL -->
+    <div class="page-header">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="page-title">📅 Planification des Commandes Pokemon</h1>
+          <p class="page-subtitle">
+            Gestion automatique de la planification des commandes de cartes Pokemon depuis juin 2025
+          </p>
+        </div>
 
-      <!-- ✅ PAGE HEADER with proper styling -->
-      <div class="page-header mb-8">
-        <div class="flex justify-between items-center">
-          <div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">📅 Advanced Planning System</h1>
-            <p class="text-gray-600">Intelligent Pokemon card order scheduling and optimization</p>
+        <!-- Actions principales -->
+        <div class="action-buttons">
+          <button
+            @click="refreshData"
+            :disabled="loading"
+            class="btn btn-secondary"
+          >
+            <span v-if="loading">🔄</span>
+            <span v-else>🔄</span>
+            {{ loading ? 'Chargement...' : 'Actualiser' }}
+          </button>
+
+          <button
+            @click="runOptimization"
+            :disabled="optimizing"
+            class="btn btn-primary"
+          >
+            <span v-if="optimizing">⚡</span>
+            <span v-else>🚀</span>
+            {{ optimizing ? 'Optimisation...' : 'Optimiser Planning' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ STATISTIQUES DE PLANNING -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-icon">📦</div>
+          <div class="stat-content">
+            <h3>Commandes Totales</h3>
+            <p class="stat-number">{{ stats.totalOrders || 0 }}</p>
+            <span class="stat-label">Depuis juin 2025</span>
+          </div>
+        </div>
+
+        <div class="stat-card green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-content">
+            <h3>Planifiées</h3>
+            <p class="stat-number">{{ stats.plannedOrders || 0 }}</p>
+            <span class="stat-label">Répartition effectuée</span>
+          </div>
+        </div>
+
+        <div class="stat-card yellow">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-content">
+            <h3>En Attente</h3>
+            <p class="stat-number">{{ stats.pendingOrders || 0 }}</p>
+            <span class="stat-label">À planifier</span>
+          </div>
+        </div>
+
+        <div class="stat-card purple">
+          <div class="stat-icon">⚡</div>
+          <div class="stat-content">
+            <h3>Efficacité</h3>
+            <p class="stat-number">{{ stats.efficiency || 0 }}%</p>
+            <span class="stat-label">Performance globale</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ OUTILS DE PLANIFICATION -->
+    <div class="tools-section">
+      <div class="tools-grid">
+
+        <!-- Planification Automatique -->
+        <div class="tool-card">
+          <div class="tool-header">
+            <h3>🤖 Planification Automatique</h3>
+            <p>Répartition intelligente des commandes entre {{ stats.employeeCount || 'm' }} employés</p>
           </div>
 
-          <div class="flex space-x-3">
-            <button
-              @click="refreshPlanning"
-              :disabled="loading"
-              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
-            >
-              <span>🔄</span>
-              <span>{{ loading ? 'Loading...' : 'Refresh' }}</span>
-            </button>
+          <div class="tool-content">
+            <div class="setting-row">
+              <label>Date de début :</label>
+              <input
+                type="date"
+                v-model="config.startDate"
+                class="form-input"
+                :min="minDate"
+              />
+            </div>
 
+            <div class="setting-row">
+              <label>Temps par carte :</label>
+              <div class="input-group">
+                <input
+                  type="number"
+                  v-model="config.cardProcessingTime"
+                  class="form-input"
+                  min="1"
+                  max="10"
+                />
+                <span class="input-suffix">minutes</span>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <label>Prioriser :</label>
+              <select v-model="config.priorityMode" class="form-select">
+                <option value="urgent">Commandes urgentes d'abord</option>
+                <option value="date">Par date de commande</option>
+                <option value="size">Petites commandes d'abord</option>
+                <option value="balanced">Équilibrage de charge</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="tool-actions">
             <button
-              @click="runOptimization"
+              @click="generatePlanning"
+              :disabled="generating"
+              class="btn btn-primary full-width"
+            >
+              {{ generating ? '🔄 Génération...' : '🚀 Générer Planning' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Optimisation -->
+        <div class="tool-card">
+          <div class="tool-header">
+            <h3>⚡ Optimisation de Performance</h3>
+            <p>Amélioration de la répartition des charges de travail</p>
+          </div>
+
+          <div class="tool-content">
+            <div class="performance-metrics">
+              <div class="metric">
+                <span class="metric-label">Charge max :</span>
+                <span class="metric-value">{{ performance.maxLoad || 0 }}%</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Équilibrage :</span>
+                <span class="metric-value">{{ performance.balance || 0 }}%</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Temps total :</span>
+                <span class="metric-value">{{ performance.totalTime || 0 }}h</span>
+              </div>
+            </div>
+
+            <div class="optimization-options">
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="config.redistributeOverload" />
+                Redistribuer les surcharges
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="config.respectPriorities" />
+                Respecter les priorités
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="config.minimizeDowntime" />
+                Minimiser les temps morts
+              </label>
+            </div>
+          </div>
+
+          <div class="tool-actions">
+            <button
+              @click="optimizePlanning"
               :disabled="optimizing"
-              class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center space-x-2"
+              class="btn btn-success full-width"
             >
-              <span>🚀</span>
-              <span>{{ optimizing ? 'Optimizing...' : 'Run Optimization' }}</span>
+              {{ optimizing ? '⚡ Optimisation...' : '⚡ Optimiser' }}
             </button>
           </div>
         </div>
+
+        <!-- Gestion des Données -->
+        <div class="tool-card">
+          <div class="tool-header">
+            <h3>🔧 Gestion des Données</h3>
+            <p>Nettoyage et maintenance de la base de planning</p>
+          </div>
+
+          <div class="tool-content">
+            <div class="feature-list">
+              <div class="feature-item">
+                <span class="feature-icon">🧹</span>
+                <span class="feature-text">Nettoyer les doublons</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">📊</span>
+                <span class="feature-text">Recalculer les statistiques</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">🔄</span>
+                <span class="feature-text">Réinitialiser le planning</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">📤</span>
+                <span class="feature-text">Exporter les données</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="tool-actions">
+            <button
+              @click="cleanupData"
+              class="btn btn-warning full-width"
+            >
+              🧹 Nettoyer Base
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ✅ RÉSULTATS DU PLANNING -->
+    <div v-if="plannings.length > 0" class="results-section">
+      <div class="section-header">
+        <h2>📋 Planning Généré</h2>
+        <p>{{ plannings.length }} planifications créées</p>
       </div>
 
-      <!-- ✅ PLANNING STATISTICS -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Total Orders</p>
-              <p class="text-2xl font-bold text-blue-600">{{ stats.totalOrders }}</p>
-            </div>
-            <div class="text-3xl text-blue-600">📦</div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Planned</p>
-              <p class="text-2xl font-bold text-green-600">{{ stats.plannedOrders }}</p>
-            </div>
-            <div class="text-3xl text-green-600">✅</div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-yellow-500">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Pending</p>
-              <p class="text-2xl font-bold text-yellow-600">{{ stats.pendingOrders }}</p>
-            </div>
-            <div class="text-3xl text-yellow-600">⏳</div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Efficiency</p>
-              <p class="text-2xl font-bold text-purple-600">{{ stats.efficiency }}%</p>
-            </div>
-            <div class="text-3xl text-purple-600">⚡</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ✅ PLANNING FEATURES -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-
-        <!-- Dynamic Algorithm Features -->
-        <div class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center space-x-2">
-            <span>🤖</span>
-            <span>AI-Powered Planning</span>
-          </h2>
-
-          <div class="space-y-4">
-            <div class="feature-item">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span class="text-blue-600">⚡</span>
-                </div>
-                <div>
-                  <h3 class="font-medium text-gray-900">Dynamic Programming Algorithm</h3>
-                  <p class="text-sm text-gray-600">Optimal task allocation using advanced DP techniques</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="feature-item">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <span class="text-green-600">🎯</span>
-                </div>
-                <div>
-                  <h3 class="font-medium text-gray-900">Priority-Based Scheduling</h3>
-                  <p class="text-sm text-gray-600">Automatic priority handling (URGENT → HIGH → MEDIUM → LOW)</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="feature-item">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span class="text-purple-600">⏱️</span>
-                </div>
-                <div>
-                  <h3 class="font-medium text-gray-900">Real-Time Optimization</h3>
-                  <p class="text-sm text-gray-600">Continuous adjustment based on workload changes</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Performance Analytics -->
-        <div class="bg-white rounded-lg shadow-lg p-6">
-          <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center space-x-2">
-            <span>📊</span>
-            <span>Performance Analytics</span>
-          </h2>
-
-          <div class="space-y-4">
-            <div class="performance-metric">
-              <div class="flex justify-between items-center mb-2">
-                <span class="text-sm font-medium text-gray-700">Employee Utilization</span>
-                <span class="text-sm font-bold text-blue-600">{{ analytics.employeeUtilization }}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-blue-600 h-2 rounded-full" :style="{ width: analytics.employeeUtilization + '%' }"></div>
-              </div>
-            </div>
-
-            <div class="performance-metric">
-              <div class="flex justify-between items-center mb-2">
-                <span class="text-sm font-medium text-gray-700">On-Time Delivery</span>
-                <span class="text-sm font-bold text-green-600">{{ analytics.onTimeDelivery }}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-green-600 h-2 rounded-full" :style="{ width: analytics.onTimeDelivery + '%' }"></div>
-              </div>
-            </div>
-
-            <div class="performance-metric">
-              <div class="flex justify-between items-center mb-2">
-                <span class="text-sm font-medium text-gray-700">Planning Accuracy</span>
-                <span class="text-sm font-bold text-purple-600">{{ analytics.planningAccuracy }}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div class="bg-purple-600 h-2 rounded-full" :style="{ width: analytics.planningAccuracy + '%' }"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ✅ ACTIVE FEATURES -->
-      <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center space-x-2">
-          <span>🔧</span>
-          <span>Planning Tools</span>
-        </h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-          <!-- Employee Management -->
-          <div class="tool-card">
-            <div class="text-center p-6 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-              <div class="text-4xl mb-3">👥</div>
-              <h3 class="font-semibold text-gray-900 mb-2">Employee Management</h3>
-              <p class="text-sm text-gray-600 mb-4">View and manage employee schedules and workloads</p>
-              <router-link
-                to="/employees"
-                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 inline-block"
+      <div class="planning-table-container">
+        <table class="planning-table">
+          <thead>
+          <tr>
+            <th>Commande</th>
+            <th>Employé</th>
+            <th>Date</th>
+            <th>Heure</th>
+            <th>Durée</th>
+            <th>Priorité</th>
+            <th>Statut</th>
+            <th>Actions</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr v-for="planning in plannings" :key="planning.id" class="planning-row">
+            <td class="order-cell">
+              <span class="order-number">{{ planning.orderNumber || 'N/A' }}</span>
+            </td>
+            <td class="employee-cell">
+              <span class="employee-name">{{ planning.employeeName || 'Non assigné' }}</span>
+            </td>
+            <td class="date-cell">
+              {{ formatDate(planning.scheduledDate) }}
+            </td>
+            <td class="time-cell">
+              {{ planning.startTime }} - {{ planning.endTime }}
+            </td>
+            <td class="duration-cell">
+              <span class="duration-badge">{{ planning.duration || 0 }}min</span>
+            </td>
+            <td class="priority-cell">
+                <span :class="getPriorityClass(planning.priority)">
+                  {{ planning.priority || 'MEDIUM' }}
+                </span>
+            </td>
+            <td class="status-cell">
+                <span :class="getStatusClass(planning.status)">
+                  {{ getStatusLabel(planning.status) }}
+                </span>
+            </td>
+            <td class="actions-cell">
+              <button
+                @click="editPlanning(planning)"
+                class="btn-small btn-edit"
+                title="Modifier"
               >
-                Open Employees
-              </router-link>
-            </div>
-          </div>
-
-          <!-- Order Scheduling -->
-          <div class="tool-card">
-            <div class="text-center p-6 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-              <div class="text-4xl mb-3">📋</div>
-              <h3 class="font-semibold text-gray-900 mb-2">Order Scheduling</h3>
-              <p class="text-sm text-gray-600 mb-4">Manage and schedule Pokemon card orders</p>
-              <router-link
-                to="/orders"
-                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 inline-block"
+                ✏️
+              </button>
+              <button
+                @click="deletePlanning(planning.id)"
+                class="btn-small btn-delete"
+                title="Supprimer"
               >
-                Open Orders
-              </router-link>
-            </div>
-          </div>
-
-          <!-- Dashboard Analytics -->
-          <div class="tool-card">
-            <div class="text-center p-6 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-              <div class="text-4xl mb-3">📈</div>
-              <h3 class="font-semibold text-gray-900 mb-2">Dashboard</h3>
-              <p class="text-sm text-gray-600 mb-4">View comprehensive system analytics and reports</p>
-              <router-link
-                to="/"
-                class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 inline-block"
-              >
-                Open Dashboard
-              </router-link>
-            </div>
-          </div>
-
-        </div>
+                🗑️
+              </button>
+            </td>
+          </tr>
+          </tbody>
+        </table>
       </div>
+    </div>
 
-      <!-- ✅ PLANNING ALGORITHM INFO -->
-      <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center space-x-2">
-          <span>🧠</span>
-          <span>Planning Algorithm Details</span>
-        </h2>
+    <!-- ✅ MESSAGE D'ÉTAT VIDE -->
+    <div v-else-if="!loading" class="empty-state">
+      <div class="empty-icon">📅</div>
+      <h3>Aucun planning généré</h3>
+      <p>Utilisez les outils ci-dessus pour créer une planification automatique des commandes.</p>
+      <button @click="generatePlanning" class="btn btn-primary">
+        🚀 Créer Premier Planning
+      </button>
+    </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 class="font-medium text-gray-900 mb-2">Current Configuration</h3>
-            <ul class="text-sm text-gray-700 space-y-1">
-              <li>• <strong>Processing Time:</strong> 3 minutes per card</li>
-              <li>• <strong>Working Hours:</strong> 8 hours per day default</li>
-              <li>• <strong>Priority Levels:</strong> URGENT, HIGH, MEDIUM, LOW</li>
-              <li>• <strong>Data Source:</strong> Orders since June 1, 2025</li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 class="font-medium text-gray-900 mb-2">Algorithm Features</h3>
-            <ul class="text-sm text-gray-700 space-y-1">
-              <li>• <strong>Load Balancing:</strong> Even distribution across employees</li>
-              <li>• <strong>Deadline Optimization:</strong> Meets delivery deadlines</li>
-              <li>• <strong>Dynamic Adjustment:</strong> Real-time recalculation</li>
-              <li>• <strong>Efficiency Tracking:</strong> Performance monitoring</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <!-- ✅ LOADING OVERLAY -->
-      <div v-if="loading || optimizing" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-8 text-center">
-          <div class="text-6xl mb-4">⚡</div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">
-            {{ optimizing ? 'Running Optimization...' : 'Loading Planning Data...' }}
-          </h3>
-          <p class="text-gray-600">Please wait while we process your request</p>
-          <div class="loading-animation mt-4">
-            <div class="animate-pulse bg-blue-200 h-2 rounded-full"></div>
-          </div>
-        </div>
-      </div>
-
+    <!-- ✅ LOADING STATE -->
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>{{ loadingMessage || 'Chargement en cours...' }}</p>
     </div>
   </div>
 </template>
 
 <script>
 export default {
-  name: 'PlanningView',
+  name: 'Planning',
   data() {
     return {
       loading: false,
+      generating: false,
       optimizing: false,
-      stats: {
-        totalOrders: 156,
-        plannedOrders: 143,
-        pendingOrders: 13,
-        efficiency: 92
+      loadingMessage: '',
+
+      // Configuration
+      config: {
+        startDate: this.getNextBusinessDay(),
+        cardProcessingTime: 3,
+        priorityMode: 'urgent',
+        redistributeOverload: true,
+        respectPriorities: true,
+        minimizeDowntime: false
       },
-      analytics: {
-        employeeUtilization: 78,
-        onTimeDelivery: 94,
-        planningAccuracy: 89
+
+      // Données
+      plannings: [],
+      stats: {
+        totalOrders: 0,
+        plannedOrders: 0,
+        pendingOrders: 0,
+        efficiency: 0,
+        employeeCount: 0
+      },
+
+      // Performance
+      performance: {
+        maxLoad: 0,
+        balance: 0,
+        totalTime: 0
       }
     }
   },
-  async mounted() {
-    await this.loadPlanningData()
+
+  computed: {
+    minDate() {
+      return new Date().toISOString().split('T')[0]
+    }
   },
+
+  mounted() {
+    this.loadInitialData()
+  },
+
   methods: {
-    async loadPlanningData() {
+    async loadInitialData() {
       this.loading = true
+      this.loadingMessage = 'Chargement des données initiales...'
+
       try {
-        console.log('📊 Loading planning statistics...')
-
-        // ✅ Load real planning statistics
-        const response = await fetch('/api/planification-dp/statistiques')
-        if (response.ok) {
-          const data = await response.json()
-          console.log('✅ Planning stats loaded:', data)
-
-          // Update stats with real data
-          this.stats = {
-            totalOrders: data.totalCommandes || this.stats.totalOrders,
-            plannedOrders: data.commandesPlanifiees || this.stats.plannedOrders,
-            pendingOrders: data.commandesEnAttente || this.stats.pendingOrders,
-            efficiency: data.efficacite || this.stats.efficiency
-          }
-
-          this.analytics = {
-            employeeUtilization: data.utilisationEmployes || this.analytics.employeeUtilization,
-            onTimeDelivery: data.livraisonATemps || this.analytics.onTimeDelivery,
-            planningAccuracy: data.precisionPlanification || this.analytics.planningAccuracy
-          }
-        }
+        await this.loadStats()
+        await this.loadPlannings()
       } catch (error) {
-        console.error('❌ Error loading planning data:', error)
-        // Keep default values
+        console.error('Erreur chargement initial:', error)
+        this.$emit('show-notification', 'Erreur de chargement', 'error')
       } finally {
         this.loading = false
       }
     },
 
-    async refreshPlanning() {
-      await this.loadPlanningData()
+    async loadStats() {
+      try {
+        const response = await fetch('/api/pokemon-planning/stats')
+        if (response.ok) {
+          this.stats = await response.json()
+        }
+      } catch (error) {
+        console.error('Erreur stats:', error)
+      }
     },
 
-    async runOptimization() {
-      this.optimizing = true
+    async loadPlannings() {
       try {
-        console.log('🚀 Starting planning optimization...')
+        const response = await fetch('/api/pokemon-planning/view')
+        if (response.ok) {
+          this.plannings = await response.json()
+        }
+      } catch (error) {
+        console.error('Erreur plannings:', error)
+      }
+    },
 
-        // ✅ Call real optimization API
-        const response = await fetch('/api/planification-dp/executer', {
+    async refreshData() {
+      await this.loadInitialData()
+      this.$emit('show-notification', 'Données actualisées', 'success')
+    },
+
+    async generatePlanning() {
+      this.generating = true
+      this.loadingMessage = 'Génération du planning automatique...'
+
+      try {
+        const response = await fetch('/api/pokemon-planning/generate', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            jour: 1,
-            mois: new Date().getMonth() + 1,
-            annee: new Date().getFullYear()
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.config)
         })
 
         if (response.ok) {
           const result = await response.json()
-          console.log('✅ Optimization completed:', result)
-
-          // Refresh data after optimization
-          await this.loadPlanningData()
-
-          // Show success message
-          alert('Planning optimization completed successfully!')
+          this.$emit('show-notification', `Planning généré: ${result.count} planifications`, 'success')
+          await this.loadPlannings()
         } else {
-          throw new Error(`Optimization failed: ${response.status}`)
+          throw new Error('Erreur génération planning')
         }
-
       } catch (error) {
-        console.error('❌ Error running optimization:', error)
-        alert('Failed to run optimization. Please try again.')
+        console.error('Erreur génération:', error)
+        this.$emit('show-notification', 'Erreur génération planning', 'error')
+      } finally {
+        this.generating = false
+      }
+    },
+
+    async optimizePlanning() {
+      this.optimizing = true
+      this.loadingMessage = 'Optimisation du planning...'
+
+      try {
+        const response = await fetch('/api/pokemon-planning/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.config)
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          this.$emit('show-notification', 'Planning optimisé avec succès', 'success')
+          await this.loadPlannings()
+        }
+      } catch (error) {
+        console.error('Erreur optimisation:', error)
+        this.$emit('show-notification', 'Erreur optimisation', 'error')
       } finally {
         this.optimizing = false
       }
+    },
+
+    async cleanupData() {
+      if (!confirm('Nettoyer les données de planning ?')) return
+
+      try {
+        const response = await fetch('/api/pokemon-planning/cleanup', {
+          method: 'DELETE'
+        })
+
+        if (response.ok) {
+          this.$emit('show-notification', 'Nettoyage effectué', 'success')
+          await this.loadPlannings()
+        }
+      } catch (error) {
+        console.error('Erreur nettoyage:', error)
+        this.$emit('show-notification', 'Erreur nettoyage', 'error')
+      }
+    },
+
+    // Méthodes utilitaires
+    getNextBusinessDay() {
+      const date = new Date()
+      const day = date.getDay()
+      if (day === 6) date.setDate(date.getDate() + 2) // Samedi -> Lundi
+      else if (day === 0) date.setDate(date.getDate() + 1) // Dimanche -> Lundi
+      return date.toISOString().split('T')[0]
+    },
+
+    formatDate(dateStr) {
+      if (!dateStr) return 'N/A'
+      try {
+        return new Date(dateStr).toLocaleDateString('fr-FR')
+      } catch {
+        return dateStr
+      }
+    },
+
+    getPriorityClass(priority) {
+      const classes = {
+        'URGENT': 'priority-urgent',
+        'HIGH': 'priority-high',
+        'MEDIUM': 'priority-medium',
+        'LOW': 'priority-low'
+      }
+      return classes[priority] || 'priority-medium'
+    },
+
+    getStatusClass(status) {
+      const classes = {
+        'SCHEDULED': 'status-scheduled',
+        'IN_PROGRESS': 'status-progress',
+        'COMPLETED': 'status-completed',
+        'CANCELLED': 'status-cancelled'
+      }
+      return classes[status] || 'status-scheduled'
+    },
+
+    getStatusLabel(status) {
+      const labels = {
+        'SCHEDULED': 'Planifié',
+        'IN_PROGRESS': 'En cours',
+        'COMPLETED': 'Terminé',
+        'CANCELLED': 'Annulé'
+      }
+      return labels[status] || 'Planifié'
+    },
+
+    editPlanning(planning) {
+      // À implémenter
+      console.log('Edit planning:', planning)
+    },
+
+    deletePlanning(id) {
+      if (!confirm('Supprimer cette planification ?')) return
+      // À implémenter
+      console.log('Delete planning:', id)
     }
   }
 }
 </script>
 
 <style scoped>
+/* =============================================== */
+/* STYLES CORRIGÉS POUR LA PAGE PLANNING          */
+/* =============================================== */
+
+.planning-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ✅ EN-TÊTE */
 .page-header {
-  border-bottom: 2px solid #e5e7eb;
-  padding-bottom: 2rem;
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  color: #64748b;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+/* ✅ BOUTONS */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* ✅ STATISTIQUES */
+.stats-section {
+  margin-bottom: 24px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #e2e8f0;
+}
+
+.stat-card.blue { border-left-color: #3b82f6; }
+.stat-card.green { border-left-color: #10b981; }
+.stat-card.yellow { border-left-color: #f59e0b; }
+.stat-card.purple { border-left-color: #8b5cf6; }
+
+.stat-icon {
+  font-size: 2rem;
+}
+
+.stat-content h3 {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0 0 4px 0;
+  font-weight: 500;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0 0 4px 0;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* ✅ OUTILS */
+.tools-section {
+  margin-bottom: 24px;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 24px;
+}
+
+.tool-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tool-header {
+  padding: 24px 24px 16px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tool-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 8px 0;
+}
+
+.tool-header p {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.tool-content {
+  padding: 24px;
+}
+
+.tool-actions {
+  padding: 0 24px 24px 24px;
+}
+
+/* ✅ FORMULAIRES */
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.setting-row label {
+  min-width: 120px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-input, .form-select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.input-suffix {
+  margin-left: 8px;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+}
+
+/* ✅ MÉTRIQUES */
+.performance-metrics {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.metric {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.metric:last-child {
+  margin-bottom: 0;
+}
+
+.metric-label {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+/* ✅ FEATURES */
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .feature-item {
-  padding: 1rem 0;
-  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
 }
 
-.feature-item:last-child {
-  border-bottom: none;
+.feature-icon {
+  font-size: 1.25rem;
 }
 
-.performance-metric {
-  margin-bottom: 1rem;
+.feature-text {
+  color: #374151;
+  font-size: 0.875rem;
 }
 
-.tool-card:hover {
-  transform: translateY(-2px);
-  transition: transform 0.2s ease;
+/* ✅ TABLEAU */
+.results-section {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.loading-animation {
-  width: 200px;
-  margin: 0 auto;
+.section-header {
+  padding: 24px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 4px 0;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: .5;
-  }
+.section-header p {
+  color: #64748b;
+  margin: 0;
 }
 
-/* Responsive design */
+.planning-table-container {
+  overflow-x: auto;
+}
+
+.planning-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.planning-table th {
+  background: #f8fafc;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.planning-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.planning-row:hover {
+  background: #f8fafc;
+}
+
+/* Cellules spécifiques */
+.order-number {
+  font-family: monospace;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.employee-name {
+  font-weight: 500;
+  color: #1a202c;
+}
+
+.duration-badge {
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* ✅ PRIORITÉS */
+.priority-urgent { color: #dc2626; font-weight: 600; }
+.priority-high { color: #ea580c; font-weight: 600; }
+.priority-medium { color: #059669; font-weight: 600; }
+.priority-low { color: #64748b; font-weight: 600; }
+
+/* ✅ STATUTS */
+.status-scheduled { color: #3b82f6; }
+.status-progress { color: #f59e0b; }
+.status-completed { color: #10b981; }
+.status-cancelled { color: #ef4444; }
+
+/* ✅ BOUTONS PETITS */
+.btn-small {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 4px;
+}
+
+.btn-edit {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.btn-delete {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ✅ ÉTATS VIDES ET LOADING */
+.empty-state {
+  text-align: center;
+  padding: 64px 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  font-size: 1.25rem;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  color: #64748b;
+  margin-bottom: 24px;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 64px 24px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ✅ RESPONSIVE */
 @media (max-width: 768px) {
-  .grid {
-    grid-template-columns: 1fr;
+  .planning-page {
+    padding: 16px;
+    max-width: 100%;
+  }
+
+  .page-header {
+    padding: 24px;
   }
 
   .page-header .flex {
     flex-direction: column;
     align-items: stretch;
-    gap: 1rem;
+    gap: 16px;
   }
-}
 
-/* Button hover effects */
-.hover\:bg-blue-700:hover {
-  background-color: #1d4ed8;
-}
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
 
-.hover\:bg-green-700:hover {
-  background-color: #15803d;
-}
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
 
-.hover\:bg-purple-700:hover {
-  background-color: #7c3aed;
-}
+  .setting-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-.hover\:shadow-md:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
+  .setting-row label {
+    min-width: auto;
+    margin-bottom: 4px;
+  }
 
-.transition-shadow {
-  transition: box-shadow 0.2s ease;
-}
-
-.disabled\:opacity-50:disabled {
-  opacity: 0.5;
+  .planning-table-container {
+    font-size: 0.875rem;
+  }
 }
 </style>

@@ -3,16 +3,20 @@
     <Navigation />
     <main class="main-content">
       <router-view />
+      <!-- Outil de debug temporaire -->
+      <DebugTool />
     </main>
   </div>
 </template>
 
 <script>
 import Navigation from './components/Navigation.vue'
+import DebugTool from "./components/DebugTool.vue";
 
 export default {
   name: 'App',
   components: {
+    DebugTool,
     Navigation
   }
 }

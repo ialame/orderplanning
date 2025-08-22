@@ -1,140 +1,370 @@
 <template>
-  <div class="orders-page">
-    <!-- Header -->
-    <div class="page-header">
-      <h1 class="page-title">📦 Orders Management</h1>
-      <p class="page-subtitle">Manage Pokemon card orders and track their processing status</p>
-    </div>
+  <div class="min-h-screen bg-gray-50 p-6">
+    <div class="max-w-7xl mx-auto">
 
-    <!-- Statistics Cards -->
-    <div class="stats-grid">
-      <div class="stat-card total">
-        <div class="stat-icon">📊</div>
-        <div class="stat-content">
-          <h3>Total Orders</h3>
-          <p class="stat-number">{{ stats.total }}</p>
+      <!-- ✅ HEADER -->
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900">📦 Orders Management</h1>
+            <p class="text-gray-600">Real orders from Pokemon card database</p>
+          </div>
+
+          <div class="flex gap-3">
+            <button
+              @click="refreshOrders"
+              :disabled="loading"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              <svg v-if="loading" class="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span v-else>🔄</span>
+              {{ loading ? 'Loading...' : 'Refresh' }}
+            </button>
+
+            <button
+              @click="debugWorkingEndpoint"
+              class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700"
+            >
+              🔧 Debug API
+            </button>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card pending">
-        <div class="stat-icon">⏳</div>
-        <div class="stat-content">
-          <h3>Pending</h3>
-          <p class="stat-number">{{ stats.pending }}</p>
+      <!-- ✅ DATE FILTER CONTROLS -->
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">📅 Date Filtering</h3>
+            <p class="text-sm text-gray-600">Filter orders by creation date</p>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                v-model="enableDateFilter"
+                class="rounded border-gray-300"
+              />
+              <span class="text-sm font-medium">Enable date filter</span>
+            </label>
+
+            <div v-if="enableDateFilter" class="flex items-center gap-2">
+              <label class="text-sm font-medium">Show orders since:</label>
+              <input
+                type="date"
+                v-model="filterFromDate"
+                class="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 p-3 rounded-lg">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span class="font-medium">Total in DB:</span>
+              <span class="ml-2">{{ statistics.totalInDb }} orders</span>
+            </div>
+            <div>
+              <span class="font-medium">Currently shown:</span>
+              <span class="ml-2">{{ statistics.total }} orders</span>
+            </div>
+            <div>
+              <span class="font-medium">Filter active:</span>
+              <span class="ml-2">{{ enableDateFilter ? `Since ${filterFromDate}` : 'No filter' }}</span>
+            </div>
+            <div>
+              <span class="font-medium">Cards:</span>
+              <span class="ml-2">{{ statistics.totalCards }} total</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card processing">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-content">
-          <h3>Processing</h3>
-          <p class="stat-number">{{ stats.processing }}</p>
+      <!-- ✅ QUICK STATISTICS -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-600">Displayed Orders</p>
+              <p class="text-2xl font-bold text-blue-600">{{ statistics.total }}</p>
+            </div>
+            <div class="text-3xl text-blue-600">📦</div>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-yellow-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-600">Pending</p>
+              <p class="text-2xl font-bold text-yellow-600">{{ statistics.pending }}</p>
+            </div>
+            <div class="text-3xl text-yellow-600">⏳</div>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-600">Completed</p>
+              <p class="text-2xl font-bold text-green-600">{{ statistics.completed }}</p>
+            </div>
+            <div class="text-3xl text-green-600">✅</div>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-600">Total Cards</p>
+              <p class="text-2xl font-bold text-purple-600">{{ statistics.totalCards }}</p>
+            </div>
+            <div class="text-3xl text-purple-600">🃏</div>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card completed">
-        <div class="stat-icon">✅</div>
-        <div class="stat-content">
-          <h3>Completed</h3>
-          <p class="stat-number">{{ stats.completed }}</p>
+      <!-- ✅ SEARCH & FILTERS -->
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">🔍 Search & Filters</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <input
+              v-model="searchTerm"
+              type="text"
+              placeholder="Order number..."
+              class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select v-model="filterStatus" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="all">All Statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+            <select v-model="filterPriority" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="all">All Priorities</option>
+              <option value="URGENT">Urgent</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
+          </div>
+
+          <div class="flex items-end">
+            <button
+              @click="loadOrders"
+              class="w-full bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+            >
+              🔄 Reload Data
+            </button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Action Buttons -->
-    <div class="action-bar">
-      <button @click="refreshOrders" class="btn-primary" :disabled="loading">
-        {{ loading ? '🔄 Loading...' : '🔄 Refresh Orders' }}
-      </button>
-      <button @click="loadSampleData" class="btn-secondary">
-        🧪 Load Sample Data
-      </button>
-      <button @click="generatePlanning" class="btn-success">
-        🤖 Generate Planning
-      </button>
-    </div>
+      <!-- ✅ LOADING STATE -->
+      <div v-if="loading" class="text-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <span class="text-gray-600 mt-3 block">Loading real orders from database...</span>
+      </div>
 
-    <!-- Orders Table -->
-    <div class="orders-table-container">
-      <div class="table-header">
-        <h2>📋 Orders List ({{ orders.length }} orders)</h2>
-        <div class="table-filters">
-          <select v-model="filterPriority" class="filter-select">
-            <option value="">All Priorities</option>
-            <option value="URGENT">🔴 Urgent</option>
-            <option value="HIGH">🟠 High</option>
-            <option value="MEDIUM">🟡 Medium</option>
-            <option value="LOW">🟢 Low</option>
-          </select>
-
-          <select v-model="filterStatus" class="filter-select">
-            <option value="">All Status</option>
-            <option value="PENDING">⏳ Pending</option>
-            <option value="PROCESSING">⚡ Processing</option>
-            <option value="COMPLETED">✅ Completed</option>
-          </select>
+      <!-- ✅ ORDERS TABLE -->
+      <div v-else-if="filteredOrders.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-900">
+            📋 {{ filteredOrders.length }} Order{{ filteredOrders.length > 1 ? 's' : '' }}
+          </h2>
         </div>
-      </div>
 
-      <div v-if="loading" class="loading-state">
-        <div class="loading-spinner">🔄</div>
-        <p>Loading orders...</p>
-      </div>
-
-      <div v-else-if="filteredOrders.length === 0" class="empty-state">
-        <div class="empty-icon">📦</div>
-        <h3>No orders found</h3>
-        <p>No orders match your current filters or no orders are available.</p>
-        <button @click="loadSampleData" class="btn-primary">Load Sample Data</button>
-      </div>
-
-      <div v-else class="table-wrapper">
-        <table class="orders-table">
-          <thead>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
             <tr>
-              <th>Order ID</th>
-              <th>Customer</th>
-              <th>Cards</th>
-              <th>Priority</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Estimated Time</th>
-              <th>Actions</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cards</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quality</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
-          </thead>
-          <tbody>
-            <tr v-for="order in filteredOrders" :key="order.id" class="order-row">
-              <td class="order-id">{{ order.orderNumber }}</td>
-              <td class="customer">{{ order.customer }}</td>
-              <td class="cards">
-                <span class="card-count">{{ order.cardCount }}</span>
-                <span class="card-label">cards</span>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+            <tr v-for="order in filteredOrders" :key="order.id" class="hover:bg-gray-50 transition-colors">
+              <!-- Order -->
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center">
+                  <div>
+                    <div class="text-sm font-medium text-gray-900">{{ order.orderNumber }}</div>
+                    <div class="text-sm text-gray-500">ID: {{ order.id.slice(-8) }}</div>
+                  </div>
+                </div>
               </td>
-              <td class="priority">
-                <span :class="['priority-badge', order.priority.toLowerCase()]">
-                  {{ getPriorityIcon(order.priority) }} {{ order.priority }}
-                </span>
-              </td>
-              <td class="status">
-                <span :class="['status-badge', order.status.toLowerCase()]">
-                  {{ getStatusIcon(order.status) }} {{ order.status }}
-                </span>
-              </td>
-              <td class="created">{{ formatDate(order.createdAt) }}</td>
-              <td class="estimated-time">{{ order.estimatedMinutes }} min</td>
-              <td class="actions">
-                <button @click="viewOrder(order)" class="btn-view">👁️ View</button>
-                <button @click="editOrder(order)" class="btn-edit">✏️ Edit</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
 
-    <!-- Message -->
-    <div v-if="message.text" :class="['message', message.type]">
-      {{ message.text }}
+              <!-- Date -->
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">{{ formatDate(order.createdDate) }}</div>
+              </td>
+
+              <!-- Cards -->
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">{{ order.cardCount }} cards</div>
+                <div class="text-sm text-gray-500">
+                  {{ order.cardsWithName || 0 }} with names ({{ order.namePercentage || 0 }}%)
+                  <span :class="(order.namePercentage || 0) >= 95 ? 'text-green-600' : 'text-orange-600'">
+                      {{ (order.namePercentage || 0) >= 95 ? '✅' : '⚠️' }}
+                    </span>
+                </div>
+              </td>
+
+              <!-- Quality -->
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="text-2xl">{{ getQualityIndicator(order.namePercentage || 0) }}</span>
+              </td>
+
+              <!-- Priority -->
+              <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        :class="getPriorityColor(order.priority)">
+                    {{ getPriorityLabel(order.priority) }}
+                  </span>
+              </td>
+
+              <!-- Status -->
+              <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        :class="getStatusColor(order.status)">
+                    {{ getStatusLabel(order.status) }}
+                  </span>
+              </td>
+
+              <!-- Duration -->
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">{{ order.estimatedDuration || 0 }} min</div>
+                <div class="text-xs text-gray-500">{{ formatDuration(order.estimatedDuration || 0) }}</div>
+              </td>
+
+              <!-- Actions -->
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <div class="flex space-x-2">
+                  <button
+                    @click="viewDetails(order)"
+                    class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                    title="View details"
+                  >
+                    👁️
+                  </button>
+                  <button
+                    @click="viewCards(order)"
+                    class="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
+                    title="View cards"
+                  >
+                    🃏
+                  </button>
+                  <button
+                    v-if="order.status === 'PENDING'"
+                    @click="startOrder(order.id)"
+                    class="text-purple-600 hover:text-purple-900 p-1 rounded hover:bg-purple-50"
+                    title="Start"
+                  >
+                    ▶️
+                  </button>
+                  <button
+                    v-if="order.status === 'IN_PROGRESS'"
+                    @click="completeOrder(order.id)"
+                    class="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
+                    title="Complete"
+                  >
+                    ✅
+                  </button>
+                </div>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ✅ EMPTY STATE -->
+      <div v-else-if="!loading" class="text-center py-12">
+        <div class="text-gray-500">
+          <div class="text-4xl mb-4">📦</div>
+          <div class="text-lg font-medium mb-2">{{ orders.length === 0 ? 'No orders found' : 'No orders match your filters' }}</div>
+          <div class="text-sm">{{ orders.length === 0 ? 'Check if your backend is running' : 'Try adjusting your search criteria' }}</div>
+          <button
+            @click="loadOrders"
+            class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            🔄 Reload
+          </button>
+        </div>
+      </div>
+
+      <!-- ✅ MODALS -->
+
+      <!-- Details Modal -->
+      <div v-if="showDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold">Details - {{ selectedOrder?.orderNumber }}</h3>
+              <button @click="showDetailsModal = false" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            <div v-if="selectedOrder" class="space-y-3">
+              <p><strong>ID:</strong> {{ selectedOrder.id }}</p>
+              <p><strong>Created Date:</strong> {{ selectedOrder.createdDate }}</p>
+              <p><strong>Card Count:</strong> {{ selectedOrder.cardCount }}</p>
+              <p><strong>Cards with Names:</strong> {{ selectedOrder.cardsWithName }} ({{ selectedOrder.namePercentage }}%)</p>
+              <p><strong>Priority:</strong> {{ selectedOrder.priority }}</p>
+              <p><strong>Status:</strong> {{ selectedOrder.status }}</p>
+              <p><strong>Estimated Duration:</strong> {{ selectedOrder.estimatedDuration }} minutes</p>
+              <p><strong>Total Price:</strong> ${{ selectedOrder.totalPrice || 0 }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards Modal -->
+      <div v-if="showCardsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-96 overflow-y-auto">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold">Cards - {{ selectedOrder?.orderNumber }}</h3>
+              <button @click="showCardsModal = false" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            <div v-if="loadingCards" class="text-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <span class="text-gray-600 mt-2 block">Loading cards...</span>
+            </div>
+
+            <div v-else-if="orderCards" class="space-y-3">
+              <p><strong>Total Cards:</strong> {{ orderCards.cardCount }}</p>
+              <p><strong>With Names:</strong> {{ orderCards.cardsWithName }}</p>
+              <p><strong>Percentage:</strong> {{ orderCards.namePercentage }}%</p>
+              <p class="text-sm text-gray-600">Individual card details available via API</p>
+            </div>
+
+            <div v-else class="text-gray-500 text-center py-8">
+              No card data available
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -142,331 +372,295 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 
-// State
+// ========== STATE ==========
 const loading = ref(false)
 const orders = ref([])
-const filterPriority = ref('')
-const filterStatus = ref('')
-const message = ref({ text: '', type: 'info' })
+const selectedOrder = ref(null)
+const showDetailsModal = ref(false)
+const showCardsModal = ref(false)
+const orderCards = ref(null)
+const loadingCards = ref(false)
 
-// Stats
-const stats = computed(() => {
-  const total = orders.value.length
-  const pending = orders.value.filter(o => o.status === 'PENDING').length
-  const processing = orders.value.filter(o => o.status === 'PROCESSING').length
-  const completed = orders.value.filter(o => o.status === 'COMPLETED').length
+// Date filtering
+const enableDateFilter = ref(true)
+const filterFromDate = ref('2025-06-01')
 
-  return { total, pending, processing, completed }
-})
+// Other filters
+const filterStatus = ref('all')
+const filterPriority = ref('all')
+const searchTerm = ref('')
 
-// Filtered orders
+// ========== COMPUTED ==========
 const filteredOrders = computed(() => {
-  return orders.value.filter(order => {
-    const priorityMatch = !filterPriority.value || order.priority === filterPriority.value
-    const statusMatch = !filterStatus.value || order.status === filterStatus.value
-    return priorityMatch && statusMatch
-  })
+  let filtered = [...orders.value]
+
+  // Date filter (applied first)
+  if (enableDateFilter.value && filterFromDate.value) {
+    filtered = filtered.filter(order => {
+      const orderDate = order.createdDate || order.orderDate || order.date
+      if (!orderDate) return true
+
+      const dateOnly = orderDate.split('T')[0]
+      return dateOnly >= filterFromDate.value
+    })
+  }
+
+  // Status filter
+  if (filterStatus.value !== 'all') {
+    filtered = filtered.filter(order => order.status === filterStatus.value)
+  }
+
+  // Priority filter
+  if (filterPriority.value !== 'all') {
+    filtered = filtered.filter(order => order.priority === filterPriority.value)
+  }
+
+  // Search filter
+  if (searchTerm.value) {
+    const term = searchTerm.value.toLowerCase()
+    filtered = filtered.filter(order =>
+      order.orderNumber.toLowerCase().includes(term) ||
+      order.id?.toString().toLowerCase().includes(term)
+    )
+  }
+
+  return filtered
 })
 
-// Methods
-const refreshOrders = async () => {
+const statistics = computed(() => {
+  const total = filteredOrders.value.length
+  const totalInDb = orders.value.length
+  const pending = filteredOrders.value.filter(o => o.status === 'PENDING').length
+  const inProgress = filteredOrders.value.filter(o => o.status === 'IN_PROGRESS').length
+  const completed = filteredOrders.value.filter(o => o.status === 'COMPLETED').length
+  const totalCards = filteredOrders.value.reduce((sum, o) => sum + o.cardCount, 0)
+
+  return {
+    total,
+    totalInDb,
+    pending,
+    inProgress,
+    completed,
+    totalCards
+  }
+})
+
+// ========== METHODS ==========
+
+const loadOrders = async () => {
   loading.value = true
   try {
-    console.log('🔄 Refreshing orders...')
+    console.log('📦 Loading orders using SAME endpoint as Dashboard...')
 
-    const response = await fetch('/api/orders')
+    // Try commandes endpoint like Dashboard
+    const commandesResponse = await fetch('http://localhost:8080/api/commandes', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    })
+
+    if (commandesResponse.ok) {
+      const commandesData = await commandesResponse.json()
+      console.log('✅ Commandes data retrieved:', commandesData.length)
+
+      // Map French commandes to English orders
+      const mappedOrders = commandesData.map(cmd => ({
+        id: cmd.id,
+        orderNumber: cmd.numeroCommande || cmd.num_commande,
+        createdDate: (cmd.dateCreation || cmd.dateReception || cmd.date || '').split('T')[0],
+        cardCount: cmd.nombreCartes || 0,
+        cardsWithName: cmd.nombreAvecNom || 0,
+        namePercentage: cmd.pourcentageAvecNom || 0,
+        priority: mapPriority(cmd.priorite),
+        totalPrice: cmd.prixTotal || 0,
+        status: mapStatus(cmd.status || cmd.statut),
+        estimatedDuration: cmd.dureeEstimeeMinutes || cmd.tempsEstimeMinutes || 0
+      })).filter(order => order !== null)
+
+      orders.value = mappedOrders
+      console.log('📊 French commandes mapped to English orders:', mappedOrders.length)
+      showNotification(`✅ ${mappedOrders.length} real orders loaded`)
+      return
+    }
+
+    // Fallback to /api/orders
+    const response = await fetch('http://localhost:8080/api/orders')
     if (response.ok) {
       const data = await response.json()
-      orders.value = data.map(order => ({
-        ...order,
-        orderNumber: order.orderNumber || `ORD-${order.id?.slice(-6)}`,
-        customer: order.customer || `Customer ${Math.floor(Math.random() * 1000)}`,
-        cardCount: order.cardCount || Math.floor(Math.random() * 50) + 1,
-        priority: order.priority || ['URGENT', 'HIGH', 'MEDIUM', 'LOW'][Math.floor(Math.random() * 4)],
-        status: order.status || ['PENDING', 'PROCESSING', 'COMPLETED'][Math.floor(Math.random() * 3)],
-        createdAt: order.createdAt || new Date().toISOString(),
-        estimatedMinutes: (order.cardCount || 10) * 3
-      }))
-
-      showMessage(`✅ Loaded ${orders.value.length} orders`, 'success')
-    } else {
-      throw new Error(`HTTP ${response.status}`)
+      orders.value = data.map(mapOrderFromApi).filter(order => order !== null)
+      showNotification(`✅ ${orders.value.length} orders loaded (fallback)`)
     }
+
   } catch (error) {
-    console.error('Error loading orders:', error)
-    loadSampleOrders() // Fallback to sample data
-    showMessage('⚠️ Using sample data (backend not available)', 'warning')
+    console.error('❌ Error loading orders:', error)
+    showNotification('❌ Error loading orders', 'error')
+    orders.value = []
   } finally {
     loading.value = false
   }
 }
 
-const loadSampleData = () => {
-  console.log('🧪 Loading sample orders...')
+const mapOrderFromApi = (order) => {
+  let orderDate = order.createdDate || order.dateCreation || order.date || '2025-06-01'
+  if (orderDate.includes('T')) {
+    orderDate = orderDate.split('T')[0]
+  }
 
-  const sampleOrders = [
-    {
-      id: '1',
-      orderNumber: 'ORD-001',
-      customer: 'Pokemon Trainer Alex',
-      cardCount: 25,
-      priority: 'URGENT',
-      status: 'PENDING',
-      createdAt: new Date().toISOString(),
-      estimatedMinutes: 75
-    },
-    {
-      id: '2',
-      orderNumber: 'ORD-002',
-      customer: 'Card Collector Sarah',
-      cardCount: 12,
-      priority: 'HIGH',
-      status: 'PROCESSING',
-      createdAt: new Date(Date.now() - 3600000).toISOString(),
-      estimatedMinutes: 36
-    },
-    {
-      id: '3',
-      orderNumber: 'ORD-003',
-      customer: 'Battle League Mike',
-      cardCount: 8,
-      priority: 'MEDIUM',
-      status: 'COMPLETED',
-      createdAt: new Date(Date.now() - 7200000).toISOString(),
-      estimatedMinutes: 24
-    },
-    {
-      id: '4',
-      orderNumber: 'ORD-004',
-      customer: 'Gym Leader Emma',
-      cardCount: 35,
-      priority: 'LOW',
-      status: 'PENDING',
-      createdAt: new Date(Date.now() - 10800000).toISOString(),
-      estimatedMinutes: 105
-    }
-  ]
-
-  orders.value = sampleOrders
-  showMessage('🧪 Sample orders loaded successfully', 'success')
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber || order.numeroCommande || `ORD-${order.id}`,
+    createdDate: orderDate,
+    cardCount: order.cardCount || order.nombreCartes || 1,
+    cardsWithName: order.cardsWithName || order.nombreAvecNom || 0,
+    namePercentage: order.namePercentage || order.pourcentageAvecNom || 0,
+    priority: mapPriority(order.priority || order.priorite || 'MEDIUM'),
+    totalPrice: order.totalPrice || order.prixTotal || 0,
+    status: mapStatus(order.status || order.statut || 'PENDING'),
+    estimatedDuration: order.estimatedDuration || order.estimatedTimeMinutes || 0
+  }
 }
 
-const loadSampleOrders = () => loadSampleData()
+const mapPriority = (priority) => {
+  if (!priority) return 'MEDIUM'
+  const p = String(priority).toUpperCase()
+  if (p.includes('URGENT')) return 'URGENT'
+  if (p.includes('HIGH') || p.includes('HAUTE')) return 'HIGH'
+  if (p.includes('LOW') || p.includes('BASSE')) return 'LOW'
+  return 'MEDIUM'
+}
 
-const generatePlanning = async () => {
+const mapStatus = (status) => {
+  if (typeof status === 'number') {
+    switch (status) {
+      case 1: return 'PENDING'
+      case 2: return 'SCHEDULED'
+      case 3: return 'IN_PROGRESS'
+      case 4: return 'COMPLETED'
+      default: return 'PENDING'
+    }
+  }
+  return String(status || 'PENDING').toUpperCase()
+}
+
+const refreshOrders = () => loadOrders()
+
+const debugWorkingEndpoint = async () => {
   try {
-    showMessage('🤖 Generating planning...', 'info')
-
-    const response = await fetch('/api/planning/generate', { method: 'POST' })
+    const response = await fetch('http://localhost:8080/api/commandes')
     if (response.ok) {
-      showMessage('✅ Planning generated successfully!', 'success')
-    } else {
-      throw new Error('Planning generation failed')
+      const data = await response.json()
+      console.log('🔍 Debug data:', data)
+      alert(`Found ${data.length} orders. Check console for details.`)
     }
   } catch (error) {
-    showMessage('❌ Planning generation failed', 'error')
+    alert(`Error: ${error.message}`)
   }
 }
 
-const viewOrder = (order) => {
-  showMessage(`👁️ Viewing order ${order.orderNumber}`, 'info')
+const viewDetails = (order) => {
+  selectedOrder.value = order
+  showDetailsModal.value = true
 }
 
-const editOrder = (order) => {
-  showMessage(`✏️ Editing order ${order.orderNumber}`, 'info')
-}
-
-const showMessage = (text, type = 'info') => {
-  message.value = { text, type }
-  setTimeout(() => {
-    message.value = { text: '', type: 'info' }
-  }, 3000)
-}
-
-// Utility functions
-const getPriorityIcon = (priority) => {
-  const icons = {
-    'URGENT': '🔴',
-    'HIGH': '🟠',
-    'MEDIUM': '🟡',
-    'LOW': '🟢'
+const viewCards = (order) => {
+  selectedOrder.value = order
+  showCardsModal.value = true
+  orderCards.value = {
+    cardCount: order.cardCount,
+    cardsWithName: order.cardsWithName,
+    namePercentage: order.namePercentage
   }
-  return icons[priority] || '⚪'
 }
 
-const getStatusIcon = (status) => {
-  const icons = {
-    'PENDING': '⏳',
-    'PROCESSING': '⚡',
-    'COMPLETED': '✅'
+const startOrder = (id) => console.log('Start order:', id)
+const completeOrder = (id) => console.log('Complete order:', id)
+
+const getPriorityColor = (priority) => {
+  switch (priority?.toUpperCase()) {
+    case 'URGENT': return 'bg-red-100 text-red-800'
+    case 'HIGH': return 'bg-orange-100 text-orange-800'
+    case 'MEDIUM': return 'bg-yellow-100 text-yellow-800'
+    case 'LOW': return 'bg-green-100 text-green-800'
+    default: return 'bg-gray-100 text-gray-800'
   }
-  return icons[status] || '❓'
 }
 
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+const getPriorityLabel = (priority) => {
+  switch (priority?.toUpperCase()) {
+    case 'URGENT': return '🔴 Urgent'
+    case 'HIGH': return '🟠 High'
+    case 'MEDIUM': return '🟡 Medium'
+    case 'LOW': return '🟢 Low'
+    default: return '⚪ Unknown'
+  }
 }
 
-// Initialize
+const getStatusColor = (status) => {
+  switch (status?.toUpperCase()) {
+    case 'PENDING': return 'bg-gray-100 text-gray-800'
+    case 'SCHEDULED': return 'bg-blue-100 text-blue-800'
+    case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800'
+    case 'COMPLETED': return 'bg-green-100 text-green-800'
+    default: return 'bg-gray-100 text-gray-800'
+  }
+}
+
+const getStatusLabel = (status) => {
+  switch (status?.toUpperCase()) {
+    case 'PENDING': return 'Pending'
+    case 'SCHEDULED': return 'Scheduled'
+    case 'IN_PROGRESS': return 'In Progress'
+    case 'COMPLETED': return 'Completed'
+    default: return 'Unknown'
+  }
+}
+
+const getQualityIndicator = (percentage) => {
+  if (percentage >= 95) return '🟢'
+  if (percentage >= 80) return '🟡'
+  return '🔴'
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'N/A'
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+const formatDuration = (minutes) => {
+  if (!minutes) return 'N/A'
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  if (hours > 0) {
+    return `${hours}h ${remainingMinutes}m`
+  }
+  return `${remainingMinutes}m`
+}
+
+const showNotification = (message, type = 'success') => {
+  console.log(`${type === 'success' ? '✅' : '❌'} ${message}`)
+}
+
 onMounted(() => {
-  refreshOrders()
+  console.log('📦 OrdersView mounted - Loading real orders...')
+  loadOrders()
 })
 </script>
-
 <style scoped>
-.orders-page {
-  max-width: 1400px;
+.orders-view {
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px;
 }
 
-.page-header {
-  margin-bottom: 30px;
-}
-
-.page-title {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #1f2937;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  color: #6b7280;
-  font-size: 1.1rem;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.stat-card {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  border-left: 4px solid;
-}
-
-.stat-card.total { border-left-color: #3b82f6; }
-.stat-card.pending { border-left-color: #f59e0b; }
-.stat-card.processing { border-left-color: #8b5cf6; }
-.stat-card.completed { border-left-color: #10b981; }
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-content h3 {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.stat-number {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #1f2937;
-}
-
-.action-bar {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-}
-
-.btn-primary, .btn-secondary, .btn-success, .btn-view, .btn-edit {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover { background: #2563eb; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-secondary {
-  background: #6b7280;
-  color: white;
-}
-
-.btn-secondary:hover { background: #4b5563; }
-
-.btn-success {
-  background: #10b981;
-  color: white;
-}
-
-.btn-success:hover { background: #059669; }
-
-.orders-table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.table-header {
-  padding: 20px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.table-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.table-filters {
-  display: flex;
-  gap: 10px;
-}
-
-.filter-select {
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.9rem;
-}
-
-.loading-state, .empty-state {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.loading-spinner {
-  font-size: 3rem;
+/* Loading spinner */
+.animate-spin {
   animation: spin 1s linear infinite;
 }
 
@@ -475,133 +669,19 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: 20px;
+/* Hover effects */
+.hover\:bg-gray-50:hover {
+  background-color: #f9fafb;
 }
 
-.table-wrapper {
-  overflow-x: auto;
-}
+/* Responsive design */
+@media (max-width: 768px) {
+  .orders-view {
+    padding: 16px;
+  }
 
-.orders-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.orders-table th {
-  background: #f9fafb;
-  padding: 12px;
-  text-align: left;
-  font-weight: 600;
-  color: #374151;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.orders-table td {
-  padding: 12px;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.order-row:hover {
-  background: #f9fafb;
-}
-
-.order-id {
-  font-family: monospace;
-  font-weight: 600;
-  color: #3b82f6;
-}
-
-.cards {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.card-count {
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.card-label {
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.priority-badge, .status-badge {
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.priority-badge.urgent { background: #fee2e2; color: #dc2626; }
-.priority-badge.high { background: #fed7aa; color: #ea580c; }
-.priority-badge.medium { background: #fef3c7; color: #d97706; }
-.priority-badge.low { background: #dcfce7; color: #16a34a; }
-
-.status-badge.pending { background: #fef3c7; color: #d97706; }
-.status-badge.processing { background: #e0e7ff; color: #7c3aed; }
-.status-badge.completed { background: #dcfce7; color: #16a34a; }
-
-.actions {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-view, .btn-edit {
-  padding: 4px 8px;
-  font-size: 0.8rem;
-}
-
-.btn-view {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.btn-view:hover { background: #c7d2fe; }
-
-.btn-edit {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.btn-edit:hover { background: #fde68a; }
-
-.message {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 15px 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-weight: 500;
-  z-index: 1000;
-}
-
-.message.success {
-  background: #dcfce7;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
-}
-
-.message.error {
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.message.warning {
-  background: #fef3c7;
-  color: #d97706;
-  border: 1px solid #fde68a;
-}
-
-.message.info {
-  background: #e0f2fe;
-  color: #0891b2;
-  border: 1px solid #bae6fd;
+  .overflow-x-auto {
+    font-size: 0.875rem;
+  }
 }
 </style>
