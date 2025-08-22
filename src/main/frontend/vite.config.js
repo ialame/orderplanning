@@ -8,6 +8,18 @@ export default defineConfig({
     port: 3000
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    rollupOptions: {
+      // Assurer que vue-router est inclus dans le bundle
+      external: [],
+      output: {
+        globals: {}
+      }
+    }
+  },
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
   }
 })
