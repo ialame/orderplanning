@@ -1,1387 +1,1365 @@
 #!/bin/bash
 
-# ===============================================
-# CRÉER LA VRAIE APPLICATION VUE.JS EN ANGLAIS
-# ===============================================
+# =======================================================
+# FIX NAVIGATION BUTTONS - CREATE MISSING VUE.JS VIEWS
+# =======================================================
 
-echo "🎨 CREATING REAL VUE.JS APP IN ENGLISH"
-echo "======================================="
-
-echo "✅ Good news: nginx is working!"
-echo "📋 Now creating a real Vue.js application in English..."
-echo ""
+echo "🔧 FIXING NAVIGATION BUTTONS"
+echo "============================="
 
 cd src/main/frontend || {
     echo "❌ Cannot access frontend directory"
     exit 1
 }
 
-# 1. Create proper Vue.js structure
-echo "📁 Creating Vue.js structure..."
-mkdir -p src/components
-mkdir -p src/views
-mkdir -p src/router
-mkdir -p src/services
-mkdir -p src/assets
-
-# 2. Create package.json with Vue Router
-echo "📝 Creating package.json with dependencies..."
-cat > package.json << 'EOF'
-{
-  "name": "pokemon-card-planning-frontend",
-  "version": "2.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3000",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 3000"
-  },
-  "dependencies": {
-    "vue": "^3.5.0",
-    "vue-router": "^4.0.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.0",
-    "vite": "^5.0.0"
-  }
-}
-EOF
-
-# 3. Create vite.config.js
-echo "📝 Creating vite.config.js..."
-cat > vite.config.js << 'EOF'
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-
-export default defineConfig({
-  plugins: [vue()],
-  server: {
-    host: '0.0.0.0',
-    port: 3000
-  },
-  build: {
-    outDir: 'dist'
-  }
-})
-EOF
-
-# 4. Create Vue Router
-echo "📝 Creating Vue Router..."
-cat > src/router/index.js << 'EOF'
-import { createRouter, createWebHistory } from 'vue-router'
-import Dashboard from '../views/Dashboard.vue'
-import Orders from '../views/Orders.vue'
-import Employees from '../views/Employees.vue'
-import Planning from '../views/Planning.vue'
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    {
-      path: '/',
-      name: 'dashboard',
-      component: Dashboard
-    },
-    {
-      path: '/orders',
-      name: 'orders',
-      component: Orders
-    },
-    {
-      path: '/employees',
-      name: 'employees',
-      component: Employees
-    },
-    {
-      path: '/planning',
-      name: 'planning',
-      component: Planning
-    }
-  ]
-})
-
-export default router
-EOF
-
-# 5. Create API service
-echo "📝 Creating API service..."
-cat > src/services/api.js << 'EOF'
-const API_BASE_URL = 'http://localhost:8080'
-
-class ApiService {
-  async request(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    }
-
-    try {
-      const response = await fetch(url, config)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      return await response.json()
-    } catch (error) {
-      console.error('API request failed:', error)
-      throw error
-    }
-  }
-
-  // Employee methods
-  async getEmployees() {
-    return this.request('/api/employees')
-  }
-
-  async createEmployee(employee) {
-    return this.request('/api/employees', {
-      method: 'POST',
-      body: JSON.stringify(employee),
-    })
-  }
-
-  // Order methods
-  async getOrders() {
-    return this.request('/api/orders')
-  }
-
-  async createOrder(order) {
-    return this.request('/api/orders', {
-      method: 'POST',
-      body: JSON.stringify(order),
-    })
-  }
-
-  // Planning methods
-  async getPlanning() {
-    return this.request('/api/planning')
-  }
-
-  async generatePlanning() {
-    return this.request('/api/planning/generate', {
-      method: 'POST',
-    })
-  }
-
-  // Health check
-  async healthCheck() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/actuator/health`)
-      return response.ok
-    } catch {
-      return false
-    }
-  }
-}
-
-export default new ApiService()
-EOF
-
-# 6. Create Dashboard view
-echo "📝 Creating Dashboard view..."
-cat > src/views/Dashboard.vue << 'EOF'
-<template>
-  <div class="dashboard">
-    <div class="hero">
-      <h1>🎴 Pokemon Card Planning</h1>
-      <p>Pokemon Card Order Planning System</p>
-      <div class="timestamp">Last updated: {{ currentTime }}</div>
-    </div>
-
-    <div class="status-grid">
-      <div class="status-card" :class="{ 'connected': backendConnected }">
-        <h3>🔧 Backend Status</h3>
-        <p class="status">{{ backendConnected ? '✅ Connected' : '❌ Disconnected' }}</p>
-        <button @click="checkBackend" class="btn-refresh">Refresh</button>
-      </div>
-
-      <div class="status-card">
-        <h3>📊 Statistics</h3>
-        <div class="stats">
-          <p>{{ stats.orders }} Orders</p>
-          <p>{{ stats.employees }} Employees</p>
-          <p>{{ stats.planning }} Planned Tasks</p>
-        </div>
-      </div>
-
-      <div class="status-card">
-        <h3>⚡ Quick Actions</h3>
-        <div class="actions">
-          <button @click="generatePlanning" class="btn-primary">Generate Planning</button>
-          <button @click="refreshStats" class="btn-secondary">Refresh Stats</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="navigation-grid">
-      <h2>Navigation</h2>
-      <div class="nav-cards">
-        <router-link to="/orders" class="nav-card">
-          <div class="card-icon">📦</div>
-          <h3>Orders</h3>
-          <p>Manage Pokemon card orders</p>
-        </router-link>
-
-        <router-link to="/employees" class="nav-card">
-          <div class="card-icon">👥</div>
-          <h3>Employees</h3>
-          <p>Manage team members</p>
-        </router-link>
-
-        <router-link to="/planning" class="nav-card">
-          <div class="card-icon">📅</div>
-          <h3>Planning</h3>
-          <p>View and edit schedules</p>
-        </router-link>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script>
-import ApiService from '../services/api.js'
-
-export default {
-  name: 'Dashboard',
-  data() {
-    return {
-      backendConnected: false,
-      currentTime: new Date().toLocaleString(),
-      stats: {
-        orders: 0,
-        employees: 0,
-        planning: 0
-      }
-    }
-  },
-  async mounted() {
-    await this.checkBackend()
-    await this.loadStats()
-    this.startTimeUpdate()
-  },
-  methods: {
-    async checkBackend() {
-      this.backendConnected = await ApiService.healthCheck()
-    },
-    async loadStats() {
-      try {
-        const [orders, employees, planning] = await Promise.all([
-          ApiService.getOrders().catch(() => []),
-          ApiService.getEmployees().catch(() => []),
-          ApiService.getPlanning().catch(() => [])
-        ])
-
-        this.stats = {
-          orders: orders.length || Math.floor(Math.random() * 10), // Demo data if API fails
-          employees: employees.length || Math.floor(Math.random() * 5) + 2,
-          planning: planning.length || Math.floor(Math.random() * 15)
-        }
-      } catch (error) {
-        console.error('Error loading stats:', error)
-      }
-    },
-    async generatePlanning() {
-      try {
-        await ApiService.generatePlanning()
-        alert('Planning generated successfully!')
-        await this.loadStats()
-      } catch (error) {
-        alert('Error generating planning - check backend connection')
-        console.error(error)
-      }
-    },
-    async refreshStats() {
-      await this.loadStats()
-    },
-    startTimeUpdate() {
-      setInterval(() => {
-        this.currentTime = new Date().toLocaleString()
-      }, 1000)
-    }
-  }
-}
-</script>
-
-<style scoped>
-.dashboard {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.hero {
-  text-align: center;
-  margin-bottom: 40px;
-  padding: 40px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 15px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-}
-
-.hero h1 {
-  font-size: 3rem;
-  margin-bottom: 10px;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-}
-
-.hero p {
-  font-size: 1.2rem;
-  margin-bottom: 10px;
-}
-
-.timestamp {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-.status-grid, .nav-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-  margin-bottom: 40px;
-}
-
-.status-card, .nav-card {
-  background: white;
-  padding: 25px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e5e9;
-  transition: all 0.3s ease;
-}
-
-.status-card:hover, .nav-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.status-card.connected {
-  border-left: 4px solid #4caf50;
-}
-
-.nav-card {
-  text-decoration: none;
-  color: inherit;
-  text-align: center;
-}
-
-.card-icon {
-  font-size: 3rem;
-  margin-bottom: 15px;
-}
-
-.nav-card h3 {
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.status {
-  font-size: 1.1rem;
-  font-weight: bold;
-  margin: 10px 0;
-}
-
-.stats p {
-  margin: 8px 0;
-  font-size: 1rem;
-}
-
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.btn-primary, .btn-secondary, .btn-refresh {
-  border: none;
-  padding: 12px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #545b62;
-}
-
-.btn-refresh {
-  background: #28a745;
-  color: white;
-}
-
-.btn-refresh:hover {
-  background: #1e7e34;
-}
-
-h2 {
-  color: #333;
-  margin-bottom: 20px;
-  font-size: 1.8rem;
-}
-
-h3 {
-  color: #555;
-  margin-bottom: 10px;
-  font-size: 1.2rem;
-}
-
-@media (max-width: 768px) {
-  .hero h1 {
-    font-size: 2rem;
-  }
-
-  .status-grid, .nav-cards {
-    grid-template-columns: 1fr;
-  }
-
-  .actions {
-    flex-direction: column;
-  }
-}
-</style>
-EOF
-
-# 7. Create Orders view
-echo "📝 Creating Orders view..."
+# 1. Create Orders.vue view
+echo "📝 Creating Orders.vue view..."
 cat > src/views/Orders.vue << 'EOF'
 <template>
-  <div class="orders">
+  <div class="orders-page">
+    <!-- Header -->
     <div class="page-header">
-      <h1>📦 Order Management</h1>
-      <button @click="showCreateForm = true" class="btn-primary">
-        ➕ New Order
+      <h1 class="page-title">📦 Orders Management</h1>
+      <p class="page-subtitle">Manage Pokemon card orders and track their processing status</p>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <div class="stat-icon">📊</div>
+        <div class="stat-content">
+          <h3>Total Orders</h3>
+          <p class="stat-number">{{ stats.total }}</p>
+        </div>
+      </div>
+
+      <div class="stat-card pending">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-content">
+          <h3>Pending</h3>
+          <p class="stat-number">{{ stats.pending }}</p>
+        </div>
+      </div>
+
+      <div class="stat-card processing">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-content">
+          <h3>Processing</h3>
+          <p class="stat-number">{{ stats.processing }}</p>
+        </div>
+      </div>
+
+      <div class="stat-card completed">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+          <h3>Completed</h3>
+          <p class="stat-number">{{ stats.completed }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-bar">
+      <button @click="refreshOrders" class="btn-primary" :disabled="loading">
+        {{ loading ? '🔄 Loading...' : '🔄 Refresh Orders' }}
+      </button>
+      <button @click="loadSampleData" class="btn-secondary">
+        🧪 Load Sample Data
+      </button>
+      <button @click="generatePlanning" class="btn-success">
+        🤖 Generate Planning
       </button>
     </div>
 
-    <!-- Create form modal -->
-    <div v-if="showCreateForm" class="modal-overlay" @click="closeModal">
-      <div class="modal" @click.stop>
-        <h2>Create New Order</h2>
-        <form @submit.prevent="createOrder">
-          <div class="form-group">
-            <label>Order Number:</label>
-            <input v-model="newOrder.numCommande" required placeholder="CMD-001">
-          </div>
-          <div class="form-group">
-            <label>Number of Cards:</label>
-            <input v-model.number="newOrder.nombreCartes" type="number" required min="1">
-          </div>
-          <div class="form-group">
-            <label>Priority:</label>
-            <select v-model="newOrder.priorite">
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High</option>
-              <option value="URGENT">Urgent</option>
-            </select>
-          </div>
-          <div class="form-actions">
-            <button type="button" @click="closeModal" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Create Order</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <!-- Orders Table -->
+    <div class="orders-table-container">
+      <div class="table-header">
+        <h2>📋 Orders List ({{ orders.length }} orders)</h2>
+        <div class="table-filters">
+          <select v-model="filterPriority" class="filter-select">
+            <option value="">All Priorities</option>
+            <option value="URGENT">🔴 Urgent</option>
+            <option value="HIGH">🟠 High</option>
+            <option value="MEDIUM">🟡 Medium</option>
+            <option value="LOW">🟢 Low</option>
+          </select>
 
-    <!-- Orders list -->
-    <div class="orders-list">
-      <div v-if="loading" class="loading">
+          <select v-model="filterStatus" class="filter-select">
+            <option value="">All Status</option>
+            <option value="PENDING">⏳ Pending</option>
+            <option value="PROCESSING">⚡ Processing</option>
+            <option value="COMPLETED">✅ Completed</option>
+          </select>
+        </div>
+      </div>
+
+      <div v-if="loading" class="loading-state">
+        <div class="loading-spinner">🔄</div>
         <p>Loading orders...</p>
       </div>
 
-      <div v-else-if="orders.length === 0" class="empty-state">
+      <div v-else-if="filteredOrders.length === 0" class="empty-state">
+        <div class="empty-icon">📦</div>
         <h3>No orders found</h3>
-        <p class="hint">{{ backendConnected ? 'Create your first order!' : 'Check backend connection' }}</p>
+        <p>No orders match your current filters or no orders are available.</p>
+        <button @click="loadSampleData" class="btn-primary">Load Sample Data</button>
       </div>
 
-      <div v-else class="orders-grid">
-        <div v-for="order in orders" :key="order.id" class="order-card">
-          <div class="order-header">
-            <h3>{{ order.numCommande }}</h3>
-            <span :class="'priority-' + order.priorite.toLowerCase()">{{ order.priorite }}</span>
-          </div>
-          <div class="order-details">
-            <p><strong>Cards:</strong> {{ order.nombreCartes }}</p>
-            <p><strong>Status:</strong> {{ getStatusLabel(order.statut) }}</p>
-            <p v-if="order.prixTotal"><strong>Total:</strong> ${{ order.prixTotal }}</p>
-            <p v-if="order.dureeEstimeeMinutes"><strong>Est. Duration:</strong> {{ order.dureeEstimeeMinutes }}min</p>
-          </div>
-        </div>
+      <div v-else class="table-wrapper">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Cards</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Estimated Time</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="order in filteredOrders" :key="order.id" class="order-row">
+              <td class="order-id">{{ order.orderNumber }}</td>
+              <td class="customer">{{ order.customer }}</td>
+              <td class="cards">
+                <span class="card-count">{{ order.cardCount }}</span>
+                <span class="card-label">cards</span>
+              </td>
+              <td class="priority">
+                <span :class="['priority-badge', order.priority.toLowerCase()]">
+                  {{ getPriorityIcon(order.priority) }} {{ order.priority }}
+                </span>
+              </td>
+              <td class="status">
+                <span :class="['status-badge', order.status.toLowerCase()]">
+                  {{ getStatusIcon(order.status) }} {{ order.status }}
+                </span>
+              </td>
+              <td class="created">{{ formatDate(order.createdAt) }}</td>
+              <td class="estimated-time">{{ order.estimatedMinutes }} min</td>
+              <td class="actions">
+                <button @click="viewOrder(order)" class="btn-view">👁️ View</button>
+                <button @click="editOrder(order)" class="btn-edit">✏️ Edit</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+    </div>
+
+    <!-- Message -->
+    <div v-if="message.text" :class="['message', message.type]">
+      {{ message.text }}
     </div>
   </div>
 </template>
 
-<script>
-import ApiService from '../services/api.js'
+<script setup>
+import { ref, computed, onMounted } from 'vue'
 
-export default {
-  name: 'Orders',
-  data() {
-    return {
-      orders: [],
-      showCreateForm: false,
-      backendConnected: false,
-      loading: true,
-      newOrder: {
-        numCommande: '',
-        nombreCartes: 1,
-        priorite: 'MEDIUM'
-      }
+// State
+const loading = ref(false)
+const orders = ref([])
+const filterPriority = ref('')
+const filterStatus = ref('')
+const message = ref({ text: '', type: 'info' })
+
+// Stats
+const stats = computed(() => {
+  const total = orders.value.length
+  const pending = orders.value.filter(o => o.status === 'PENDING').length
+  const processing = orders.value.filter(o => o.status === 'PROCESSING').length
+  const completed = orders.value.filter(o => o.status === 'COMPLETED').length
+
+  return { total, pending, processing, completed }
+})
+
+// Filtered orders
+const filteredOrders = computed(() => {
+  return orders.value.filter(order => {
+    const priorityMatch = !filterPriority.value || order.priority === filterPriority.value
+    const statusMatch = !filterStatus.value || order.status === filterStatus.value
+    return priorityMatch && statusMatch
+  })
+})
+
+// Methods
+const refreshOrders = async () => {
+  loading.value = true
+  try {
+    console.log('🔄 Refreshing orders...')
+
+    const response = await fetch('/api/orders')
+    if (response.ok) {
+      const data = await response.json()
+      orders.value = data.map(order => ({
+        ...order,
+        orderNumber: order.orderNumber || `ORD-${order.id?.slice(-6)}`,
+        customer: order.customer || `Customer ${Math.floor(Math.random() * 1000)}`,
+        cardCount: order.cardCount || Math.floor(Math.random() * 50) + 1,
+        priority: order.priority || ['URGENT', 'HIGH', 'MEDIUM', 'LOW'][Math.floor(Math.random() * 4)],
+        status: order.status || ['PENDING', 'PROCESSING', 'COMPLETED'][Math.floor(Math.random() * 3)],
+        createdAt: order.createdAt || new Date().toISOString(),
+        estimatedMinutes: (order.cardCount || 10) * 3
+      }))
+
+      showMessage(`✅ Loaded ${orders.value.length} orders`, 'success')
+    } else {
+      throw new Error(`HTTP ${response.status}`)
     }
-  },
-  async mounted() {
-    await this.loadOrders()
-  },
-  methods: {
-    async loadOrders() {
-      this.loading = true
-      try {
-        this.orders = await ApiService.getOrders()
-        this.backendConnected = true
-      } catch (error) {
-        console.error('Error loading orders:', error)
-        this.backendConnected = false
-        // Demo data when backend is not available
-        this.orders = [
-          {
-            id: '1',
-            numCommande: 'CMD-001',
-            nombreCartes: 100,
-            priorite: 'HIGH',
-            statut: 1,
-            prixTotal: 250.00,
-            dureeEstimeeMinutes: 300
-          },
-          {
-            id: '2',
-            numCommande: 'CMD-002',
-            nombreCartes: 50,
-            priorite: 'MEDIUM',
-            statut: 2,
-            prixTotal: 125.00,
-            dureeEstimeeMinutes: 150
-          }
-        ]
-      }
-      this.loading = false
-    },
-    async createOrder() {
-      try {
-        await ApiService.createOrder(this.newOrder)
-        this.closeModal()
-        await this.loadOrders()
-        alert('Order created successfully!')
-      } catch (error) {
-        alert('Error creating order - check backend connection')
-        console.error(error)
-      }
-    },
-    closeModal() {
-      this.showCreateForm = false
-      this.newOrder = { numCommande: '', nombreCartes: 1, priorite: 'MEDIUM' }
-    },
-    getStatusLabel(status) {
-      const labels = { 1: 'Pending', 2: 'In Progress', 3: 'Completed' }
-      return labels[status] || 'Unknown'
-    }
+  } catch (error) {
+    console.error('Error loading orders:', error)
+    loadSampleOrders() // Fallback to sample data
+    showMessage('⚠️ Using sample data (backend not available)', 'warning')
+  } finally {
+    loading.value = false
   }
 }
+
+const loadSampleData = () => {
+  console.log('🧪 Loading sample orders...')
+
+  const sampleOrders = [
+    {
+      id: '1',
+      orderNumber: 'ORD-001',
+      customer: 'Pokemon Trainer Alex',
+      cardCount: 25,
+      priority: 'URGENT',
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+      estimatedMinutes: 75
+    },
+    {
+      id: '2',
+      orderNumber: 'ORD-002',
+      customer: 'Card Collector Sarah',
+      cardCount: 12,
+      priority: 'HIGH',
+      status: 'PROCESSING',
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+      estimatedMinutes: 36
+    },
+    {
+      id: '3',
+      orderNumber: 'ORD-003',
+      customer: 'Battle League Mike',
+      cardCount: 8,
+      priority: 'MEDIUM',
+      status: 'COMPLETED',
+      createdAt: new Date(Date.now() - 7200000).toISOString(),
+      estimatedMinutes: 24
+    },
+    {
+      id: '4',
+      orderNumber: 'ORD-004',
+      customer: 'Gym Leader Emma',
+      cardCount: 35,
+      priority: 'LOW',
+      status: 'PENDING',
+      createdAt: new Date(Date.now() - 10800000).toISOString(),
+      estimatedMinutes: 105
+    }
+  ]
+
+  orders.value = sampleOrders
+  showMessage('🧪 Sample orders loaded successfully', 'success')
+}
+
+const loadSampleOrders = () => loadSampleData()
+
+const generatePlanning = async () => {
+  try {
+    showMessage('🤖 Generating planning...', 'info')
+
+    const response = await fetch('/api/planning/generate', { method: 'POST' })
+    if (response.ok) {
+      showMessage('✅ Planning generated successfully!', 'success')
+    } else {
+      throw new Error('Planning generation failed')
+    }
+  } catch (error) {
+    showMessage('❌ Planning generation failed', 'error')
+  }
+}
+
+const viewOrder = (order) => {
+  showMessage(`👁️ Viewing order ${order.orderNumber}`, 'info')
+}
+
+const editOrder = (order) => {
+  showMessage(`✏️ Editing order ${order.orderNumber}`, 'info')
+}
+
+const showMessage = (text, type = 'info') => {
+  message.value = { text, type }
+  setTimeout(() => {
+    message.value = { text: '', type: 'info' }
+  }, 3000)
+}
+
+// Utility functions
+const getPriorityIcon = (priority) => {
+  const icons = {
+    'URGENT': '🔴',
+    'HIGH': '🟠',
+    'MEDIUM': '🟡',
+    'LOW': '🟢'
+  }
+  return icons[priority] || '⚪'
+}
+
+const getStatusIcon = (status) => {
+  const icons = {
+    'PENDING': '⏳',
+    'PROCESSING': '⚡',
+    'COMPLETED': '✅'
+  }
+  return icons[status] || '❓'
+}
+
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// Initialize
+onMounted(() => {
+  refreshOrders()
+})
 </script>
 
 <style scoped>
-.orders {
-  max-width: 1200px;
+.orders-page {
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
 }
 
 .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e1e5e9;
 }
 
-.orders-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
-}
-
-.order-card {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  border-left: 4px solid #007bff;
-  transition: transform 0.2s ease;
-}
-
-.order-card:hover {
-  transform: translateY(-2px);
-}
-
-.order-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.order-header h3 {
-  margin: 0;
-  color: #333;
-}
-
-.priority-high, .priority-urgent {
-  background: #dc3545;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
+.page-title {
+  font-size: 2.5rem;
   font-weight: bold;
-}
-
-.priority-medium {
-  background: #ffc107;
-  color: #333;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-.priority-low {
-  background: #28a745;
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-.order-details p {
-  margin: 8px 0;
-  color: #666;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
+  color: #1f2937;
   margin-bottom: 8px;
-  font-weight: 600;
-  color: #333;
 }
 
-.form-group input, .form-group select {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  font-size: 14px;
-  transition: border-color 0.2s;
-}
-
-.form-group input:focus, .form-group select:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.form-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 30px;
-}
-
-.btn-primary, .btn-secondary {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #545b62;
-}
-
-.empty-state, .loading {
-  text-align: center;
-  padding: 60px 20px;
-  color: #666;
-}
-
-.empty-state h3 {
-  margin-bottom: 10px;
-  color: #333;
-}
-
-.hint {
-  font-size: 0.9em;
-  color: #999;
-}
-
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    gap: 15px;
-    align-items: stretch;
-  }
-
-  .orders-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
-EOF
-
-# 8. Create simple views for Employees and Planning
-echo "📝 Creating Employees and Planning views..."
-
-cat > src/views/Employees.vue << 'EOF'
-<template>
-  <div class="employees">
-    <div class="page-header">
-      <h1>👥 Employee Management</h1>
-    </div>
-    <div class="coming-soon">
-      <div class="icon">🚧</div>
-      <h2>Under Development</h2>
-      <p>Employee management features will be available soon!</p>
-      <router-link to="/" class="btn-primary">Back to Dashboard</router-link>
-    </div>
-  </div>
-</template>
-
-<script>
-export default {
-  name: 'Employees'
-}
-</script>
-
-<style scoped>
-.employees {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e1e5e9;
-}
-
-.coming-soon {
-  text-align: center;
-  padding: 80px 20px;
-  background: #f8f9fa;
-  border-radius: 15px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.icon {
-  font-size: 4rem;
-  margin-bottom: 20px;
-}
-
-.coming-soon h2 {
-  color: #333;
-  margin-bottom: 15px;
-}
-
-.coming-soon p {
-  color: #666;
-  margin-bottom: 30px;
+.page-subtitle {
+  color: #6b7280;
   font-size: 1.1rem;
 }
 
-.btn-primary {
-  display: inline-block;
-  background: #007bff;
-  color: white;
-  padding: 12px 24px;
-  text-decoration: none;
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.2s;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-.btn-primary:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-left: 4px solid;
+}
+
+.stat-card.total { border-left-color: #3b82f6; }
+.stat-card.pending { border-left-color: #f59e0b; }
+.stat-card.processing { border-left-color: #8b5cf6; }
+.stat-card.completed { border-left-color: #10b981; }
+
+.stat-icon {
+  font-size: 2rem;
+}
+
+.stat-content h3 {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.action-bar {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.btn-primary, .btn-secondary, .btn-success, .btn-view, .btn-edit {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover { background: #2563eb; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover { background: #4b5563; }
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover { background: #059669; }
+
+.orders-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.table-header {
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.table-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.table-filters {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.loading-state, .empty-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.loading-spinner {
+  font-size: 3rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.orders-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.orders-table th {
+  background: #f9fafb;
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.orders-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.order-row:hover {
+  background: #f9fafb;
+}
+
+.order-id {
+  font-family: monospace;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.cards {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.card-count {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.card-label {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.priority-badge, .status-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.priority-badge.urgent { background: #fee2e2; color: #dc2626; }
+.priority-badge.high { background: #fed7aa; color: #ea580c; }
+.priority-badge.medium { background: #fef3c7; color: #d97706; }
+.priority-badge.low { background: #dcfce7; color: #16a34a; }
+
+.status-badge.pending { background: #fef3c7; color: #d97706; }
+.status-badge.processing { background: #e0e7ff; color: #7c3aed; }
+.status-badge.completed { background: #dcfce7; color: #16a34a; }
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-view, .btn-edit {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.btn-view {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.btn-view:hover { background: #c7d2fe; }
+
+.btn-edit {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.btn-edit:hover { background: #fde68a; }
+
+.message {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 500;
+  z-index: 1000;
+}
+
+.message.success {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.message.error {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.message.warning {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.message.info {
+  background: #e0f2fe;
+  color: #0891b2;
+  border: 1px solid #bae6fd;
 }
 </style>
 EOF
 
-cat > src/views/Planning.vue << 'EOF'
+# 2. Create Employees.vue view
+echo "📝 Creating Employees.vue view..."
+cat > src/views/Employees.vue << 'EOF'
 <template>
-  <div class="planning">
+  <div class="employees-page">
+    <!-- Header -->
     <div class="page-header">
-      <h1>📅 Planning & Scheduling</h1>
+      <h1 class="page-title">👥 Employee Management</h1>
+      <p class="page-subtitle">Manage your team and track their workload</p>
     </div>
-    <div class="coming-soon">
-      <div class="icon">🔮</div>
-      <h2>Advanced Planning System</h2>
-      <p>Dynamic planning algorithm will be available soon!</p>
-      <div class="features">
-        <div class="feature">
-          <h3>🤖 AI Planning</h3>
-          <p>Intelligent task scheduling</p>
-        </div>
-        <div class="feature">
-          <h3>⚡ Real-time Updates</h3>
-          <p>Live planning adjustments</p>
-        </div>
-        <div class="feature">
-          <h3>📊 Analytics</h3>
-          <p>Performance insights</p>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+          <h3>Total Employees</h3>
+          <p class="stat-number">{{ stats.total }}</p>
         </div>
       </div>
-      <router-link to="/" class="btn-primary">Back to Dashboard</router-link>
+
+      <div class="stat-card active">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+          <h3>Active</h3>
+          <p class="stat-number">{{ stats.active }}</p>
+        </div>
+      </div>
+
+      <div class="stat-card busy">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-content">
+          <h3>Busy</h3>
+          <p class="stat-number">{{ stats.busy }}</p>
+        </div>
+      </div>
+
+      <div class="stat-card available">
+        <div class="stat-icon">🆓</div>
+        <div class="stat-content">
+          <h3>Available</h3>
+          <p class="stat-number">{{ stats.available }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-bar">
+      <button @click="refreshEmployees" class="btn-primary" :disabled="loading">
+        {{ loading ? '🔄 Loading...' : '🔄 Refresh Employees' }}
+      </button>
+      <button @click="addEmployee" class="btn-success">
+        ➕ Add Employee
+      </button>
+      <button @click="loadSampleData" class="btn-secondary">
+        🧪 Load Sample Data
+      </button>
+    </div>
+
+    <!-- Employees Grid -->
+    <div class="employees-container">
+      <div class="section-header">
+        <h2>👥 Team Members ({{ employees.length }})</h2>
+        <div class="view-options">
+          <button
+            @click="viewMode = 'grid'"
+            :class="['view-btn', { active: viewMode === 'grid' }]"
+          >
+            🔲 Grid
+          </button>
+          <button
+            @click="viewMode = 'list'"
+            :class="['view-btn', { active: viewMode === 'list' }]"
+          >
+            📋 List
+          </button>
+        </div>
+      </div>
+
+      <div v-if="loading" class="loading-state">
+        <div class="loading-spinner">🔄</div>
+        <p>Loading employees...</p>
+      </div>
+
+      <div v-else-if="employees.length === 0" class="empty-state">
+        <div class="empty-icon">👥</div>
+        <h3>No employees found</h3>
+        <p>Add your first team member to get started.</p>
+        <button @click="loadSampleData" class="btn-primary">Load Sample Data</button>
+      </div>
+
+      <!-- Grid View -->
+      <div v-else-if="viewMode === 'grid'" class="employees-grid">
+        <div
+          v-for="employee in employees"
+          :key="employee.id"
+          class="employee-card"
+          @click="viewEmployee(employee)"
+        >
+          <div class="employee-avatar">
+            {{ getInitials(employee.name) }}
+          </div>
+          <div class="employee-info">
+            <h3 class="employee-name">{{ employee.name }}</h3>
+            <p class="employee-role">{{ employee.role }}</p>
+            <div class="employee-stats">
+              <span class="stat">
+                📋 {{ employee.totalTasks || 0 }} tasks
+              </span>
+              <span class="stat">
+                ⏱️ {{ employee.totalHours || 0 }}h
+              </span>
+            </div>
+          </div>
+          <div class="employee-status">
+            <span :class="['status-badge', employee.status.toLowerCase()]">
+              {{ getStatusIcon(employee.status) }} {{ employee.status }}
+            </span>
+          </div>
+          <div class="employee-actions">
+            <button @click.stop="editEmployee(employee)" class="btn-edit">✏️</button>
+            <button @click.stop="viewSchedule(employee)" class="btn-schedule">📅</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- List View -->
+      <div v-else class="employees-list">
+        <div class="list-header">
+          <div class="col-name">Name</div>
+          <div class="col-role">Role</div>
+          <div class="col-status">Status</div>
+          <div class="col-workload">Workload</div>
+          <div class="col-actions">Actions</div>
+        </div>
+        <div
+          v-for="employee in employees"
+          :key="employee.id"
+          class="employee-row"
+          @click="viewEmployee(employee)"
+        >
+          <div class="col-name">
+            <div class="employee-avatar-small">
+              {{ getInitials(employee.name) }}
+            </div>
+            <div>
+              <h4>{{ employee.name }}</h4>
+              <p class="employee-email">{{ employee.email }}</p>
+            </div>
+          </div>
+          <div class="col-role">{{ employee.role }}</div>
+          <div class="col-status">
+            <span :class="['status-badge', employee.status.toLowerCase()]">
+              {{ getStatusIcon(employee.status) }} {{ employee.status }}
+            </span>
+          </div>
+          <div class="col-workload">
+            <div class="workload-bar">
+              <div
+                class="workload-fill"
+                :style="{ width: `${employee.workloadPercentage || 0}%` }"
+              ></div>
+            </div>
+            <span class="workload-text">{{ employee.workloadPercentage || 0 }}%</span>
+          </div>
+          <div class="col-actions">
+            <button @click.stop="editEmployee(employee)" class="btn-action">✏️ Edit</button>
+            <button @click.stop="viewSchedule(employee)" class="btn-action">📅 Schedule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div v-if="message.text" :class="['message', message.type]">
+      {{ message.text }}
     </div>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'Planning'
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+
+// State
+const loading = ref(false)
+const employees = ref([])
+const viewMode = ref('grid')
+const message = ref({ text: '', type: 'info' })
+
+// Stats
+const stats = computed(() => {
+  const total = employees.value.length
+  const active = employees.value.filter(e => e.status === 'ACTIVE').length
+  const busy = employees.value.filter(e => e.status === 'BUSY').length
+  const available = employees.value.filter(e => e.status === 'AVAILABLE').length
+
+  return { total, active, busy, available }
+})
+
+// Methods
+const refreshEmployees = async () => {
+  loading.value = true
+  try {
+    console.log('🔄 Refreshing employees...')
+
+    const response = await fetch('/api/employees')
+    if (response.ok) {
+      const data = await response.json()
+      employees.value = data.map(employee => ({
+        ...employee,
+        role: employee.role || 'Card Processor',
+        status: employee.status || ['ACTIVE', 'BUSY', 'AVAILABLE'][Math.floor(Math.random() * 3)],
+        email: employee.email || `${employee.name.toLowerCase().replace(' ', '.')}@pokemon.com`,
+        totalTasks: employee.totalTasks || Math.floor(Math.random() * 20),
+        totalHours: employee.totalHours || Math.floor(Math.random() * 40),
+        workloadPercentage: employee.workloadPercentage || Math.floor(Math.random() * 100)
+      }))
+
+      showMessage(`✅ Loaded ${employees.value.length} employees`, 'success')
+    } else {
+      throw new Error(`HTTP ${response.status}`)
+    }
+  } catch (error) {
+    console.error('Error loading employees:', error)
+    loadSampleEmployees() // Fallback to sample data
+    showMessage('⚠️ Using sample data (backend not available)', 'warning')
+  } finally {
+    loading.value = false
+  }
 }
+
+const loadSampleData = () => {
+  console.log('🧪 Loading sample employees...')
+
+  const sampleEmployees = [
+    {
+      id: '1',
+      name: 'Alice Johnson',
+      role: 'Senior Card Processor',
+      status: 'ACTIVE',
+      email: 'alice.johnson@pokemon.com',
+      totalTasks: 15,
+      totalHours: 32,
+      workloadPercentage: 85
+    },
+    {
+      id: '2',
+      name: 'Bob Smith',
+      role: 'Card Processor',
+      status: 'BUSY',
+      email: 'bob.smith@pokemon.com',
+      totalTasks: 12,
+      totalHours: 28,
+      workloadPercentage: 95
+    },
+    {
+      id: '3',
+      name: 'Carol Davis',
+      role: 'Quality Checker',
+      status: 'AVAILABLE',
+      email: 'carol.davis@pokemon.com',
+      totalTasks: 8,
+      totalHours: 20,
+      workloadPercentage: 60
+    },
+    {
+      id: '4',
+      name: 'David Wilson',
+      role: 'Card Processor',
+      status: 'ACTIVE',
+      email: 'david.wilson@pokemon.com',
+      totalTasks: 10,
+      totalHours: 25,
+      workloadPercentage: 75
+    }
+  ]
+
+  employees.value = sampleEmployees
+  showMessage('🧪 Sample employees loaded successfully', 'success')
+}
+
+const loadSampleEmployees = () => loadSampleData()
+
+const addEmployee = () => {
+  showMessage('➕ Add employee feature coming soon!', 'info')
+}
+
+const editEmployee = (employee) => {
+  showMessage(`✏️ Editing ${employee.name}`, 'info')
+}
+
+const viewEmployee = (employee) => {
+  showMessage(`👁️ Viewing ${employee.name}'s profile`, 'info')
+}
+
+const viewSchedule = (employee) => {
+  showMessage(`📅 Viewing ${employee.name}'s schedule`, 'info')
+}
+
+const showMessage = (text, type = 'info') => {
+  message.value = { text, type }
+  setTimeout(() => {
+    message.value = { text: '', type: 'info' }
+  }, 3000)
+}
+
+// Utility functions
+const getInitials = (name) => {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase()
+}
+
+const getStatusIcon = (status) => {
+  const icons = {
+    'ACTIVE': '✅',
+    'BUSY': '⚡',
+    'AVAILABLE': '🆓'
+  }
+  return icons[status] || '❓'
+}
+
+// Initialize
+onMounted(() => {
+  refreshEmployees()
+})
 </script>
 
 <style scoped>
-.planning {
-  max-width: 1200px;
+.employees-page {
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
 }
 
 .page-header {
   margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e1e5e9;
 }
 
-.coming-soon {
+.page-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-left: 4px solid;
+}
+
+.stat-card.total { border-left-color: #3b82f6; }
+.stat-card.active { border-left-color: #10b981; }
+.stat-card.busy { border-left-color: #f59e0b; }
+.stat-card.available { border-left-color: #8b5cf6; }
+
+.stat-icon {
+  font-size: 2rem;
+}
+
+.stat-content h3 {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.action-bar {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.btn-primary, .btn-secondary, .btn-success {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover { background: #2563eb; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover { background: #4b5563; }
+
+.btn-success {
+  background: #10b981;
+  color: white;
+}
+
+.btn-success:hover { background: #059669; }
+
+.employees-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.view-options {
+  display: flex;
+  gap: 8px;
+}
+
+.view-btn {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.view-btn.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.loading-state, .empty-state {
   text-align: center;
   padding: 60px 20px;
-  background: #f8f9fa;
-  border-radius: 15px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.icon {
+.loading-spinner {
+  font-size: 3rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.empty-icon {
   font-size: 4rem;
   margin-bottom: 20px;
 }
 
-.features {
+.employees-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-  margin: 40px 0;
-}
-
-.feature {
-  background: white;
   padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.feature h3 {
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.feature p {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.btn-primary {
-  display: inline-block;
-  background: #007bff;
-  color: white;
-  padding: 12px 24px;
-  text-decoration: none;
-  border-radius: 8px;
-  font-weight: 500;
+.employee-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
   transition: all 0.2s;
-}
-
-.btn-primary:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-</style>
-EOF
-
-# 9. Create navigation component
-echo "📝 Creating Navigation component..."
-cat > src/components/Navigation.vue << 'EOF'
-<template>
-  <nav class="navbar">
-    <div class="nav-container">
-      <router-link to="/" class="nav-brand">
-        🎴 Pokemon Card Planning
-      </router-link>
-
-      <div class="nav-menu">
-        <router-link to="/" class="nav-link">Dashboard</router-link>
-        <router-link to="/orders" class="nav-link">Orders</router-link>
-        <router-link to="/employees" class="nav-link">Employees</router-link>
-        <router-link to="/planning" class="nav-link">Planning</router-link>
-      </div>
-
-      <div class="nav-status">
-        <div class="status-indicator" :class="{ 'online': isOnline }"></div>
-        <span class="status-text">{{ isOnline ? 'Online' : 'Offline' }}</span>
-      </div>
-    </div>
-  </nav>
-</template>
-
-<script>
-export default {
-  name: 'Navigation',
-  data() {
-    return {
-      isOnline: navigator.onLine
-    }
-  },
-  mounted() {
-    window.addEventListener('online', this.updateOnlineStatus)
-    window.addEventListener('offline', this.updateOnlineStatus)
-  },
-  unmounted() {
-    window.removeEventListener('online', this.updateOnlineStatus)
-    window.removeEventListener('offline', this.updateOnlineStatus)
-  },
-  methods: {
-    updateOnlineStatus() {
-      this.isOnline = navigator.onLine
-    }
-  }
-}
-</script>
-
-<style scoped>
-.navbar {
-  background: #343a40;
-  color: white;
-  padding: 1rem 0;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.nav-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 20px;
-}
-
-.nav-brand {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: white;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.nav-brand:hover {
-  color: #ccc;
-}
-
-.nav-menu {
-  display: flex;
-  gap: 2rem;
-}
-
-.nav-link {
-  color: #adb5bd;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s;
   position: relative;
 }
 
-.nav-link:hover {
+.employee-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.employee-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #3b82f6;
   color: white;
-}
-
-.nav-link.router-link-active {
-  color: white;
-}
-
-.nav-link.router-link-active::after {
-  content: '';
-  position: absolute;
-  bottom: -8px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #007bff;
-}
-
-.nav-status {
   display: flex;
   align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+}
+
+.employee-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 5px;
+}
+
+.employee-role {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+}
+
+.employee-stats {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.stat {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.employee-status {
+  margin-bottom: 15px;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.active { background: #dcfce7; color: #16a34a; }
+.status-badge.busy { background: #fef3c7; color: #d97706; }
+.status-badge.available { background: #e0e7ff; color: #7c3aed; }
+
+.employee-actions {
+  display: flex;
   gap: 8px;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+}
+
+.btn-edit, .btn-schedule {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.btn-edit {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.btn-edit:hover { background: #fde68a; }
+
+.btn-schedule {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.btn-schedule:hover { background: #c7d2fe; }
+
+.employees-list {
+  padding: 0;
+}
+
+.list-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 20px;
+  padding: 15px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.employee-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  align-items: center;
+}
+
+.employee-row:hover {
+  background: #f9fafb;
+}
+
+.col-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.employee-avatar-small {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
   font-size: 0.9rem;
 }
 
-.status-indicator {
-  width: 8px;
+.col-name h4 {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.employee-email {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.workload-bar {
+  width: 60px;
   height: 8px;
-  border-radius: 50%;
-  background: #dc3545;
-  transition: background 0.2s;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
 }
 
-.status-indicator.online {
-  background: #28a745;
+.workload-fill {
+  height: 100%;
+  background: #3b82f6;
+  transition: width 0.3s;
 }
 
-.status-text {
-  color: #adb5bd;
+.workload-text {
+  font-size: 0.8rem;
+  color: #6b7280;
 }
 
-@media (max-width: 768px) {
-  .nav-container {
-    flex-direction: column;
-    gap: 1rem;
-  }
+.btn-action {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: #e0e7ff;
+  color: #3730a3;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-right: 4px;
+  transition: background-color 0.2s;
+}
 
-  .nav-menu {
-    gap: 1.5rem;
-  }
+.btn-action:hover {
+  background: #c7d2fe;
+}
 
-  .nav-status {
-    order: -1;
-  }
+.message {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 500;
+  z-index: 1000;
+}
+
+.message.success {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.message.error {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.message.warning {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.message.info {
+  background: #e0f2fe;
+  color: #0891b2;
+  border: 1px solid #bae6fd;
 }
 </style>
 EOF
 
-# 10. Update main.js
-echo "📝 Updating main.js..."
-cat > src/main.js << 'EOF'
-import { createApp } from 'vue'
-import App from './App.vue'
-import router from './router'
-
-console.log('🚀 Starting Pokemon Card Planning App...')
-
-const app = createApp(App)
-
-app.use(router)
-
-app.mount('#app')
-
-console.log('✅ Vue.js application mounted successfully')
-EOF
-
-# 11. Update App.vue
-echo "📝 Updating App.vue..."
-cat > src/App.vue << 'EOF'
-<template>
-  <div id="app">
-    <Navigation />
-    <main class="main-content">
-      <router-view />
-    </main>
-  </div>
-</template>
-
-<script>
-import Navigation from './components/Navigation.vue'
-
-export default {
-  name: 'App',
-  components: {
-    Navigation
-  }
-}
-</script>
-
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f8f9fa;
-  color: #333;
-  line-height: 1.6;
-}
-
-#app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.main-content {
-  flex: 1;
-  padding-top: 20px;
-}
-
-/* Global button styles */
-.btn-primary {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  background: #545b62;
-}
-
-/* Global header styles */
-.page-header h1 {
-  color: #333;
-  font-size: 2rem;
-  margin-bottom: 10px;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .main-content {
-    padding: 10px;
-  }
-}
-
-/* Loading animation */
-@keyframes pulse {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; }
-  100% { opacity: 0.6; }
-}
-
-.loading {
-  animation: pulse 1.5s ease-in-out infinite;
-}
-</style>
-EOF
-
-# 12. Update index.html
-echo "📝 Updating index.html..."
-cat > index.html << 'EOF'
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pokemon Card Planning</title>
-    <meta name="description" content="Pokemon Card Order Planning System">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎴</text></svg>">
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>
-EOF
-
-# 13. Update Dockerfile to build Vue properly
-echo "📝 Updating Dockerfile..."
-cat > Dockerfile << 'EOF'
-# ===============================================
-# DOCKERFILE FOR VUE.JS APP WITH NGINX
-# ===============================================
-
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm install
-
-# Copy source code
-COPY . .
-
-# Build for production
-RUN npm run build
-
-# ========== PRODUCTION STAGE ==========
-FROM nginx:alpine
-
-# Remove default nginx config
-RUN rm /etc/nginx/conf.d/default.conf
-
-# Copy our nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy built files from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Add a startup script to show we're running
-RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
-    echo 'echo "🚀 Starting Pokemon Card Planning Frontend..."' >> /docker-entrypoint.sh && \
-    echo 'nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
-    chmod +x /docker-entrypoint.sh
-
-EXPOSE 3000
-
-CMD ["/docker-entrypoint.sh"]
-EOF
-
-# 14. Rebuild and restart
-echo ""
-echo "🔨 BUILDING REAL VUE.JS APPLICATION..."
-echo "═══════════════════════════════════════"
-
-cd ../../..
-
-echo "🛑 Stopping frontend..."
-docker-compose stop frontend
-
-echo "🗑️  Removing old image..."
-docker rmi planning-frontend 2>/dev/null || echo "Image already removed"
-
-echo "🔨 Building new Vue.js application..."
-docker-compose build --no-cache frontend
-
-echo "🚀 Starting new frontend..."
-docker-compose up -d frontend
-
-echo ""
-echo "⏳ Waiting for startup (60 seconds)..."
-sleep 60
-
-# Final test
-echo ""
-echo "🧪 FINAL TEST:"
-echo "═════════════"
-
-echo "📋 Container status:"
-docker-compose ps frontend
-
-echo ""
-echo "📋 Testing connection:"
-if curl -f http://localhost:3000 >/dev/null 2>&1; then
-    echo "✅ Frontend responds successfully!"
-    echo ""
-    echo "🎉 SUCCESS! YOUR REAL VUE.JS APP IS READY!"
-    echo "════════════════════════════════════════════"
-    echo ""
-    echo "🌐 Access your application at: http://localhost:3000"
-    echo ""
-    echo "✨ Features available:"
-    echo "   🏠 Dashboard with real-time status"
-    echo "   📦 Order management (fully functional)"
-    echo "   👥 Employee management (coming soon)"
-    echo "   📅 Planning system (coming soon)"
-    echo "   🧭 Navigation between pages"
-    echo "   📱 Responsive design"
-    echo "   🌐 English interface"
-    echo ""
-    echo "🎯 Clear your browser cache and enjoy your new app!"
-else
-    echo "⚠️  Frontend not responding yet"
-    echo "📋 Check logs: docker-compose logs frontend"
-fi
-
-echo ""
-echo "✅ VUE.JS APP CREATION COMPLETED"

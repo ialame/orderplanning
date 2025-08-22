@@ -1,10 +1,12 @@
 <template>
   <nav class="navbar">
     <div class="nav-container">
+      <!-- ✅ Brand in English -->
       <router-link to="/" class="nav-brand">
         🎴 Pokemon Card Planning
       </router-link>
 
+      <!-- ✅ Navigation menu in English -->
       <div class="nav-menu">
         <router-link to="/" class="nav-link">Dashboard</router-link>
         <router-link to="/orders" class="nav-link">Orders</router-link>
@@ -12,6 +14,7 @@
         <router-link to="/planning" class="nav-link">Planning</router-link>
       </div>
 
+      <!-- ✅ Status indicator in English -->
       <div class="nav-status">
         <div class="status-indicator" :class="{ 'online': isOnline }"></div>
         <span class="status-text">{{ isOnline ? 'Online' : 'Offline' }}</span>
