@@ -654,7 +654,7 @@ onMounted(() => {
 </script>
 <style scoped>
 .orders-view {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -674,6 +674,12 @@ onMounted(() => {
   background-color: #f9fafb;
 }
 
+.transition-colors {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .orders-view {
@@ -682,6 +688,16 @@ onMounted(() => {
 
   .overflow-x-auto {
     font-size: 0.875rem;
+  }
+
+  .grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 </style>

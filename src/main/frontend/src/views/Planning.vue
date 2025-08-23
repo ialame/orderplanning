@@ -1,292 +1,249 @@
 <template>
   <div class="planning-page">
-    <!-- ✅ EN-TÊTE PRINCIPAL -->
-    <div class="page-header">
-      <div class="flex justify-between items-center">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex items-center justify-between">
         <div>
-          <h1 class="page-title">📅 Planification des Commandes Pokemon</h1>
-          <p class="page-subtitle">
-            Gestion automatique de la planification des commandes de cartes Pokemon depuis juin 2025
-          </p>
+          <h1 class="text-2xl font-bold text-gray-900">📅 Planning Management</h1>
+          <p class="text-gray-600 mt-1">Generate and manage work assignments for Pokemon card orders</p>
         </div>
-
-        <!-- Actions principales -->
-        <div class="action-buttons">
+        <div class="flex space-x-3">
+          <button
+            @click="testPlanningEndpoints"
+            class="btn-secondary"
+          >
+            🔍 Debug API
+          </button>
           <button
             @click="refreshData"
             :disabled="loading"
-            class="btn btn-secondary"
+            class="btn-primary"
           >
-            <span v-if="loading">🔄</span>
-            <span v-else>🔄</span>
-            {{ loading ? 'Chargement...' : 'Actualiser' }}
-          </button>
-
-          <button
-            @click="runOptimization"
-            :disabled="optimizing"
-            class="btn btn-primary"
-          >
-            <span v-if="optimizing">⚡</span>
-            <span v-else>🚀</span>
-            {{ optimizing ? 'Optimisation...' : 'Optimiser Planning' }}
+            {{ loading ? '⏳ Loading...' : '🔄 Refresh' }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ✅ STATISTIQUES DE PLANNING -->
-    <div class="stats-section">
-      <div class="stats-grid">
-        <div class="stat-card blue">
-          <div class="stat-icon">📦</div>
-          <div class="stat-content">
-            <h3>Commandes Totales</h3>
-            <p class="stat-number">{{ stats.totalOrders || 0 }}</p>
-            <span class="stat-label">Depuis juin 2025</span>
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-blue-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V9a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Total Orders</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ stats.totalOrders }}</p>
           </div>
         </div>
+      </div>
 
-        <div class="stat-card green">
-          <div class="stat-icon">✅</div>
-          <div class="stat-content">
-            <h3>Planifiées</h3>
-            <p class="stat-number">{{ stats.plannedOrders || 0 }}</p>
-            <span class="stat-label">Répartition effectuée</span>
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-green-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Planned Orders</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ stats.plannedOrders }}</p>
           </div>
         </div>
+      </div>
 
-        <div class="stat-card yellow">
-          <div class="stat-icon">⏳</div>
-          <div class="stat-content">
-            <h3>En Attente</h3>
-            <p class="stat-number">{{ stats.pendingOrders || 0 }}</p>
-            <span class="stat-label">À planifier</span>
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-orange-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Employees Used</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ stats.employeeCount }}</p>
           </div>
         </div>
+      </div>
 
-        <div class="stat-card purple">
-          <div class="stat-icon">⚡</div>
-          <div class="stat-content">
-            <h3>Efficacité</h3>
-            <p class="stat-number">{{ stats.efficiency || 0 }}%</p>
-            <span class="stat-label">Performance globale</span>
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-purple-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Total Plannings</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ plannings.length }}</p>
+            <p v-if="duplicateStats.totalDuplicates > 0" class="text-xs text-red-600">
+              ⚠️ {{ duplicateStats.totalDuplicates }} duplicates
+            </p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ✅ OUTILS DE PLANIFICATION -->
-    <div class="tools-section">
-      <div class="tools-grid">
-
-        <!-- Planification Automatique -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <h3>🤖 Planification Automatique</h3>
-            <p>Répartition intelligente des commandes entre {{ stats.employeeCount || 'm' }} employés</p>
-          </div>
-
-          <div class="tool-content">
-            <div class="setting-row">
-              <label>Date de début :</label>
-              <input
-                type="date"
-                v-model="config.startDate"
-                class="form-input"
-                :min="minDate"
-              />
-            </div>
-
-            <div class="setting-row">
-              <label>Temps par carte :</label>
-              <div class="input-group">
-                <input
-                  type="number"
-                  v-model="config.cardProcessingTime"
-                  class="form-input"
-                  min="1"
-                  max="10"
-                />
-                <span class="input-suffix">minutes</span>
-              </div>
-            </div>
-
-            <div class="setting-row">
-              <label>Prioriser :</label>
-              <select v-model="config.priorityMode" class="form-select">
-                <option value="urgent">Commandes urgentes d'abord</option>
-                <option value="date">Par date de commande</option>
-                <option value="size">Petites commandes d'abord</option>
-                <option value="balanced">Équilibrage de charge</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="tool-actions">
-            <button
-              @click="generatePlanning"
-              :disabled="generating"
-              class="btn btn-primary full-width"
-            >
-              {{ generating ? '🔄 Génération...' : '🚀 Générer Planning' }}
-            </button>
-          </div>
+    <!-- Planning Configuration -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Planning Configuration</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+          <input
+            v-model="config.startDate"
+            type="date"
+            class="input-field"
+            :min="minDate"
+          >
         </div>
-
-        <!-- Optimisation -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <h3>⚡ Optimisation de Performance</h3>
-            <p>Amélioration de la répartition des charges de travail</p>
-          </div>
-
-          <div class="tool-content">
-            <div class="performance-metrics">
-              <div class="metric">
-                <span class="metric-label">Charge max :</span>
-                <span class="metric-value">{{ performance.maxLoad || 0 }}%</span>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Équilibrage :</span>
-                <span class="metric-value">{{ performance.balance || 0 }}%</span>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Temps total :</span>
-                <span class="metric-value">{{ performance.totalTime || 0 }}h</span>
-              </div>
-            </div>
-
-            <div class="optimization-options">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="config.redistributeOverload" />
-                Redistribuer les surcharges
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="config.respectPriorities" />
-                Respecter les priorités
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="config.minimizeDowntime" />
-                Minimiser les temps morts
-              </label>
-            </div>
-          </div>
-
-          <div class="tool-actions">
-            <button
-              @click="optimizePlanning"
-              :disabled="optimizing"
-              class="btn btn-success full-width"
-            >
-              {{ optimizing ? '⚡ Optimisation...' : '⚡ Optimiser' }}
-            </button>
-          </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Time per Card (minutes)</label>
+          <input
+            v-model.number="config.cardProcessingTime"
+            type="number"
+            min="1"
+            max="10"
+            class="input-field"
+          >
+          <p class="text-xs text-gray-500 mt-1">Current: {{ CARD_PROCESSING_TIME }}min (from config)</p>
         </div>
-
-        <!-- Gestion des Données -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <h3>🔧 Gestion des Données</h3>
-            <p>Nettoyage et maintenance de la base de planning</p>
-          </div>
-
-          <div class="tool-content">
-            <div class="feature-list">
-              <div class="feature-item">
-                <span class="feature-icon">🧹</span>
-                <span class="feature-text">Nettoyer les doublons</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">📊</span>
-                <span class="feature-text">Recalculer les statistiques</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">🔄</span>
-                <span class="feature-text">Réinitialiser le planning</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">📤</span>
-                <span class="feature-text">Exporter les données</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="tool-actions">
-            <button
-              @click="cleanupData"
-              class="btn btn-warning full-width"
-            >
-              🧹 Nettoyer Base
-            </button>
-          </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Priority Mode</label>
+          <select v-model="config.priorityMode" class="input-field">
+            <option value="urgent">Urgent First</option>
+            <option value="balanced">Balanced</option>
+            <option value="efficiency">Efficiency First</option>
+          </select>
         </div>
+      </div>
 
+      <!-- Options -->
+      <div class="mt-4 flex items-center space-x-6">
+        <label class="flex items-center">
+          <input
+            v-model="config.redistributeOverload"
+            type="checkbox"
+            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          >
+          <span class="ml-2 text-sm text-gray-700">Redistribute overload</span>
+        </label>
+        <label class="flex items-center">
+          <input
+            v-model="config.respectPriorities"
+            type="checkbox"
+            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          >
+          <span class="ml-2 text-sm text-gray-700">Respect priorities</span>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="mt-6 flex space-x-3">
+        <button
+          @click="generatePlanning"
+          :disabled="generating"
+          class="btn-primary"
+        >
+          {{ generating ? '⏳ Generating...' : '🚀 Generate Planning' }}
+        </button>
+        <button
+          @click="optimizePlanning"
+          :disabled="optimizing"
+          class="btn-secondary"
+        >
+          {{ optimizing ? '⏳ Optimizing...' : '⚡ Optimize Planning' }}
+        </button>
+        <button
+          @click="cleanupData"
+          class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+        >
+          🗑️ Clean Up
+        </button>
+        <button
+          @click="removeDuplicates"
+          class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
+        >
+          🧹 Remove Duplicates
+        </button>
       </div>
     </div>
 
-    <!-- ✅ RÉSULTATS DU PLANNING -->
-    <div v-if="plannings.length > 0" class="results-section">
-      <div class="section-header">
-        <h2>📋 Planning Généré</h2>
-        <p>{{ plannings.length }} planifications créées</p>
+    <!-- Plannings List -->
+    <div v-if="plannings.length > 0" class="bg-white rounded-lg shadow-md overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Current Plannings</h2>
       </div>
 
-      <div class="planning-table-container">
-        <table class="planning-table">
-          <thead>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
           <tr>
-            <th>Commande</th>
-            <th>Employé</th>
-            <th>Date</th>
-            <th>Heure</th>
-            <th>Durée</th>
-            <th>Priorité</th>
-            <th>Statut</th>
-            <th>Actions</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
           </thead>
-          <tbody>
-          <tr v-for="planning in plannings" :key="planning.id" class="planning-row">
-            <td class="order-cell">
-              <span class="order-number">{{ planning.orderNumber || 'N/A' }}</span>
+          <tbody class="bg-white divide-y divide-gray-200">
+          <tr
+            v-for="planning in groupedPlannings"
+            :key="planning.id"
+            :class="[
+                'hover:bg-gray-50',
+                planning.isDuplicate ? 'bg-red-50 border-l-4 border-red-400' : ''
+              ]"
+          >
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {{ formatDate(planning.planningDate) }}
             </td>
-            <td class="employee-cell">
-              <span class="employee-name">{{ planning.employeeName || 'Non assigné' }}</span>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-gray-900">{{ planning.employeeName || 'Unknown Employee' }}</div>
             </td>
-            <td class="date-cell">
-              {{ formatDate(planning.scheduledDate) }}
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-gray-900">
+                {{ planning.orderNumber || `Order ${planning.orderId}` }}
+                <span v-if="planning.isDuplicate" class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                    ⚠️ Duplicate ({{ planning.duplicateCount }})
+                  </span>
+              </div>
+              <div class="text-sm text-gray-500">{{ planning.cardCount || 0 }} cards</div>
             </td>
-            <td class="time-cell">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {{ planning.startTime }} - {{ planning.endTime }}
             </td>
-            <td class="duration-cell">
-              <span class="duration-badge">{{ planning.duration || 0 }}min</span>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-gray-900">{{ formatDuration(planning.durationMinutes) }}</div>
+              <div class="text-sm text-gray-500">
+                {{ planning.cardCount || 0 }} cards × {{ CARD_PROCESSING_TIME }}min
+              </div>
             </td>
-            <td class="priority-cell">
-                <span :class="getPriorityClass(planning.priority)">
-                  {{ planning.priority || 'MEDIUM' }}
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span :class="[
+                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                  planning.completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                ]">
+                  {{ planning.completed ? 'Completed' : 'Pending' }}
                 </span>
             </td>
-            <td class="status-cell">
-                <span :class="getStatusClass(planning.status)">
-                  {{ getStatusLabel(planning.status) }}
-                </span>
-            </td>
-            <td class="actions-cell">
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
               <button
-                @click="editPlanning(planning)"
-                class="btn-small btn-edit"
-                title="Modifier"
+                @click="viewPlanningDetails(planning)"
+                class="text-blue-600 hover:text-blue-900 mr-3"
               >
-                ✏️
+                View
               </button>
               <button
-                @click="deletePlanning(planning.id)"
-                class="btn-small btn-delete"
-                title="Supprimer"
+                @click="editPlanning(planning)"
+                class="text-green-600 hover:text-green-900"
               >
-                🗑️
+                Edit
               </button>
             </td>
           </tr>
@@ -295,723 +252,603 @@
       </div>
     </div>
 
-    <!-- ✅ MESSAGE D'ÉTAT VIDE -->
-    <div v-else-if="!loading" class="empty-state">
-      <div class="empty-icon">📅</div>
-      <h3>Aucun planning généré</h3>
-      <p>Utilisez les outils ci-dessus pour créer une planification automatique des commandes.</p>
-      <button @click="generatePlanning" class="btn btn-primary">
-        🚀 Créer Premier Planning
+    <!-- Empty State -->
+    <div v-else-if="!loading" class="bg-white rounded-lg shadow-md p-8 text-center">
+      <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+      </svg>
+      <h3 class="text-lg font-medium text-gray-900 mb-2">No plannings found</h3>
+      <p class="text-gray-600 mb-4">Start by generating your first planning</p>
+      <button
+        @click="generatePlanning"
+        class="btn-primary"
+      >
+        🚀 Generate First Planning
       </button>
     </div>
 
-    <!-- ✅ LOADING STATE -->
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div>
-      <p>{{ loadingMessage || 'Chargement en cours...' }}</p>
+    <!-- Loading State -->
+    <div v-if="loading" class="bg-white rounded-lg shadow-md p-8 text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p class="text-gray-600">{{ loadingMessage || 'Loading plannings...' }}</p>
     </div>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'Planning',
-  data() {
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+
+// ========== CONSTANTS ==========
+// Configuration from environment or default values
+const CARD_PROCESSING_TIME = parseInt(import.meta.env.VITE_CARD_PROCESSING_TIME || '3') // minutes per card
+const DEFAULT_WORK_HOURS = parseInt(import.meta.env.VITE_DEFAULT_WORK_HOURS || '8') // hours per day
+
+console.log(`⚙️ Configuration: ${CARD_PROCESSING_TIME}min per card, ${DEFAULT_WORK_HOURS}h per day`)
+
+// ========== INTERFACES ==========
+interface Planning {
+  id: string
+  orderId: string
+  employeeId: string
+  employeeName?: string
+  orderNumber?: string
+  planningDate: string
+  startTime: string
+  endTime: string
+  durationMinutes: number
+  cardCount?: number
+  priority?: string
+  status?: string
+  completed: boolean
+  notes?: string
+}
+
+interface PlanningConfig {
+  startDate: string
+  cardProcessingTime: number
+  priorityMode: string
+  redistributeOverload: boolean
+  respectPriorities: boolean
+}
+
+// ========== STATE ==========
+const loading = ref(false)
+const generating = ref(false)
+const optimizing = ref(false)
+const loadingMessage = ref('')
+
+const plannings = ref<Planning[]>([])
+
+const config = ref<PlanningConfig>({
+  startDate: getNextBusinessDay(),
+  cardProcessingTime: CARD_PROCESSING_TIME, // Use environment variable
+  priorityMode: 'urgent',
+  redistributeOverload: true,
+  respectPriorities: true
+})
+
+const stats = ref({
+  totalOrders: 0,
+  plannedOrders: 0,
+  pendingOrders: 0,
+  efficiency: 0,
+  employeeCount: 0,
+  duplicateCount: 0
+})
+
+// Computed for duplicate statistics
+const duplicateStats = computed(() => {
+  const duplicateGroups = new Map()
+
+  plannings.value.forEach(planning => {
+    const key = `${planning.orderNumber}_${planning.planningDate}_${planning.startTime}`
+    if (!duplicateGroups.has(key)) {
+      duplicateGroups.set(key, [])
+    }
+    duplicateGroups.get(key).push(planning)
+  })
+
+  const duplicateGroupsArray = Array.from(duplicateGroups.values()).filter(group => group.length > 1)
+  const totalDuplicates = duplicateGroupsArray.reduce((sum, group) => sum + (group.length - 1), 0)
+
+  return {
+    duplicateGroups: duplicateGroupsArray.length,
+    totalDuplicates
+  }
+})
+
+// ========== COMPUTED ==========
+const minDate = computed(() => {
+  return new Date().toISOString().split('T')[0]
+})
+
+const groupedPlannings = computed(() => {
+  const sorted = plannings.value.sort((a, b) => {
+    const dateA = new Date(`${a.planningDate} ${a.startTime}`)
+    const dateB = new Date(`${b.planningDate} ${b.startTime}`)
+    return dateA.getTime() - dateB.getTime()
+  })
+
+  // Mark potential duplicates (same order at same time)
+  const duplicateGroups = new Map()
+  sorted.forEach(planning => {
+    const key = `${planning.orderNumber}_${planning.planningDate}_${planning.startTime}`
+    if (!duplicateGroups.has(key)) {
+      duplicateGroups.set(key, [])
+    }
+    duplicateGroups.get(key).push(planning)
+  })
+
+  // Add isDuplicate flag
+  return sorted.map(planning => {
+    const key = `${planning.orderNumber}_${planning.planningDate}_${planning.startTime}`
+    const group = duplicateGroups.get(key)
     return {
-      loading: false,
-      generating: false,
-      optimizing: false,
-      loadingMessage: '',
+      ...planning,
+      isDuplicate: group && group.length > 1,
+      duplicateCount: group ? group.length : 1
+    }
+  })
+})
 
-      // Configuration
-      config: {
-        startDate: this.getNextBusinessDay(),
-        cardProcessingTime: 3,
-        priorityMode: 'urgent',
-        redistributeOverload: true,
-        respectPriorities: true,
-        minimizeDowntime: false
-      },
+// ========== METHODS ==========
+function getNextBusinessDay(): string {
+  const date = new Date()
+  const day = date.getDay()
 
-      // Données
-      plannings: [],
-      stats: {
-        totalOrders: 0,
-        plannedOrders: 0,
-        pendingOrders: 0,
-        efficiency: 0,
-        employeeCount: 0
-      },
+  // If it's Friday (5), Saturday (6), or Sunday (0), move to Monday
+  if (day === 5) {
+    date.setDate(date.getDate() + 3) // Friday + 3 = Monday
+  } else if (day === 6) {
+    date.setDate(date.getDate() + 2) // Saturday + 2 = Monday
+  } else if (day === 0) {
+    date.setDate(date.getDate() + 1) // Sunday + 1 = Monday
+  } else if (day === 4) {
+    date.setDate(date.getDate() + 4) // Thursday + 4 = Monday (skip weekend)
+  } else {
+    date.setDate(date.getDate() + 1) // Next day
+  }
 
-      // Performance
-      performance: {
-        maxLoad: 0,
-        balance: 0,
-        totalTime: 0
+  return date.toISOString().split('T')[0]
+}
+
+const refreshData = async () => {
+  await Promise.all([
+    loadStats(),
+    loadPlannings()
+  ])
+}
+
+const loadStats = async () => {
+  try {
+    // Try multiple endpoints for stats
+    const endpoints = [
+      'http://localhost:8080/api/dashboard/stats',
+      'http://localhost:8080/api/planning/stats',
+      'http://localhost:8080/api/stats'
+    ]
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint)
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ Stats loaded from ${endpoint}:`, data)
+
+          stats.value = {
+            totalOrders: data.totalCommandes || data.totalOrders || 0,
+            plannedOrders: data.commandesEnCours || data.plannedOrders || 0,
+            pendingOrders: data.commandesEnAttente || data.pendingOrders || 0,
+            efficiency: data.efficiency || 85,
+            employeeCount: data.employesActifs || data.employeeCount || 0
+          }
+          break
+        }
+      } catch (error) {
+        console.warn(`⚠️ ${endpoint} failed:`, error)
+        continue
       }
     }
-  },
-
-  computed: {
-    minDate() {
-      return new Date().toISOString().split('T')[0]
-    }
-  },
-
-  mounted() {
-    this.loadInitialData()
-  },
-
-  methods: {
-    async loadInitialData() {
-      this.loading = true
-      this.loadingMessage = 'Chargement des données initiales...'
-
-      try {
-        await this.loadStats()
-        await this.loadPlannings()
-      } catch (error) {
-        console.error('Erreur chargement initial:', error)
-        this.$emit('show-notification', 'Erreur de chargement', 'error')
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async loadStats() {
-      try {
-        const response = await fetch('/api/pokemon-planning/stats')
-        if (response.ok) {
-          this.stats = await response.json()
-        }
-      } catch (error) {
-        console.error('Erreur stats:', error)
-      }
-    },
-
-    async loadPlannings() {
-      try {
-        const response = await fetch('/api/pokemon-planning/view')
-        if (response.ok) {
-          this.plannings = await response.json()
-        }
-      } catch (error) {
-        console.error('Erreur plannings:', error)
-      }
-    },
-
-    async refreshData() {
-      await this.loadInitialData()
-      this.$emit('show-notification', 'Données actualisées', 'success')
-    },
-
-    async generatePlanning() {
-      this.generating = true
-      this.loadingMessage = 'Génération du planning automatique...'
-
-      try {
-        const response = await fetch('/api/pokemon-planning/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.config)
-        })
-
-        if (response.ok) {
-          const result = await response.json()
-          this.$emit('show-notification', `Planning généré: ${result.count} planifications`, 'success')
-          await this.loadPlannings()
-        } else {
-          throw new Error('Erreur génération planning')
-        }
-      } catch (error) {
-        console.error('Erreur génération:', error)
-        this.$emit('show-notification', 'Erreur génération planning', 'error')
-      } finally {
-        this.generating = false
-      }
-    },
-
-    async optimizePlanning() {
-      this.optimizing = true
-      this.loadingMessage = 'Optimisation du planning...'
-
-      try {
-        const response = await fetch('/api/pokemon-planning/optimize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.config)
-        })
-
-        if (response.ok) {
-          const result = await response.json()
-          this.$emit('show-notification', 'Planning optimisé avec succès', 'success')
-          await this.loadPlannings()
-        }
-      } catch (error) {
-        console.error('Erreur optimisation:', error)
-        this.$emit('show-notification', 'Erreur optimisation', 'error')
-      } finally {
-        this.optimizing = false
-      }
-    },
-
-    async cleanupData() {
-      if (!confirm('Nettoyer les données de planning ?')) return
-
-      try {
-        const response = await fetch('/api/pokemon-planning/cleanup', {
-          method: 'DELETE'
-        })
-
-        if (response.ok) {
-          this.$emit('show-notification', 'Nettoyage effectué', 'success')
-          await this.loadPlannings()
-        }
-      } catch (error) {
-        console.error('Erreur nettoyage:', error)
-        this.$emit('show-notification', 'Erreur nettoyage', 'error')
-      }
-    },
-
-    // Méthodes utilitaires
-    getNextBusinessDay() {
-      const date = new Date()
-      const day = date.getDay()
-      if (day === 6) date.setDate(date.getDate() + 2) // Samedi -> Lundi
-      else if (day === 0) date.setDate(date.getDate() + 1) // Dimanche -> Lundi
-      return date.toISOString().split('T')[0]
-    },
-
-    formatDate(dateStr) {
-      if (!dateStr) return 'N/A'
-      try {
-        return new Date(dateStr).toLocaleDateString('fr-FR')
-      } catch {
-        return dateStr
-      }
-    },
-
-    getPriorityClass(priority) {
-      const classes = {
-        'URGENT': 'priority-urgent',
-        'HIGH': 'priority-high',
-        'MEDIUM': 'priority-medium',
-        'LOW': 'priority-low'
-      }
-      return classes[priority] || 'priority-medium'
-    },
-
-    getStatusClass(status) {
-      const classes = {
-        'SCHEDULED': 'status-scheduled',
-        'IN_PROGRESS': 'status-progress',
-        'COMPLETED': 'status-completed',
-        'CANCELLED': 'status-cancelled'
-      }
-      return classes[status] || 'status-scheduled'
-    },
-
-    getStatusLabel(status) {
-      const labels = {
-        'SCHEDULED': 'Planifié',
-        'IN_PROGRESS': 'En cours',
-        'COMPLETED': 'Terminé',
-        'CANCELLED': 'Annulé'
-      }
-      return labels[status] || 'Planifié'
-    },
-
-    editPlanning(planning) {
-      // À implémenter
-      console.log('Edit planning:', planning)
-    },
-
-    deletePlanning(id) {
-      if (!confirm('Supprimer cette planification ?')) return
-      // À implémenter
-      console.log('Delete planning:', id)
-    }
+  } catch (error) {
+    console.error('❌ Error loading stats:', error)
   }
 }
+
+const loadPlannings = async () => {
+  loading.value = true
+  loadingMessage.value = 'Loading plannings...'
+
+  try {
+    // Try multiple endpoints for plannings
+    const endpoints = [
+      'http://localhost:8080/api/planning/view-simple',
+      'http://localhost:8080/api/planifications',
+      'http://localhost:8080/api/planning',
+      'http://localhost:8080/api/test/planifications'
+    ]
+
+    let rawPlannings = []
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🔄 Trying plannings endpoint: ${endpoint}`)
+        const response = await fetch(endpoint)
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ Plannings loaded from ${endpoint}:`, data)
+
+          if (Array.isArray(data)) {
+            rawPlannings = data
+            console.log(`🎯 Found ${rawPlannings.length} raw plannings`)
+            break
+          } else if (data.planifications && Array.isArray(data.planifications)) {
+            rawPlannings = data.planifications
+            console.log(`🎯 Found ${rawPlannings.length} raw plannings in wrapper`)
+            break
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ ${endpoint} failed:`, error)
+        continue
+      }
+    }
+
+    // Map and deduplicate plannings
+    const mappedPlannings = rawPlannings.map(mapPlanning)
+
+    // Remove duplicates based on unique combination of orderId + employeeId + date + time
+    const uniquePlannings = []
+    const seen = new Set()
+
+    for (const planning of mappedPlannings) {
+      const uniqueKey = `${planning.orderId}_${planning.employeeId}_${planning.planningDate}_${planning.startTime}`
+
+      if (!seen.has(uniqueKey)) {
+        seen.add(uniqueKey)
+        uniquePlannings.push(planning)
+      } else {
+        console.warn(`🔄 Duplicate planning filtered:`, {
+          orderNumber: planning.orderNumber,
+          employeeName: planning.employeeName,
+          date: planning.planningDate,
+          time: planning.startTime
+        })
+      }
+    }
+
+    plannings.value = uniquePlannings
+
+    console.log(`🎯 Final plannings: ${rawPlannings.length} raw → ${uniquePlannings.length} unique`)
+
+    if (rawPlannings.length !== uniquePlannings.length) {
+      const duplicatesRemoved = rawPlannings.length - uniquePlannings.length
+      showNotification(`Loaded ${uniquePlannings.length} unique plannings (${duplicatesRemoved} duplicates filtered)`, 'success')
+    } else {
+      showNotification(`Loaded ${uniquePlannings.length} plannings`, 'success')
+    }
+
+  } catch (error) {
+    console.error('❌ Error loading plannings:', error)
+    showNotification('Error loading plannings', 'error')
+  } finally {
+    loading.value = false
+    loadingMessage.value = ''
+  }
+}
+
+const mapPlanning = (planningData: any): Planning => {
+  // Calculate card count and duration
+  const cardCount = planningData.cardCount || planningData.nombreCartes || planningData.cards_count || 0
+  const calculatedDuration = cardCount > 0 ? cardCount * CARD_PROCESSING_TIME : (planningData.durationMinutes || planningData.dureeMinutes || planningData.duree_minutes || 60)
+
+  return {
+    id: planningData.id || `planning-${Date.now()}`,
+    orderId: planningData.orderId || planningData.order_id || '',
+    employeeId: planningData.employeeId || planningData.employe_id || '',
+    employeeName: planningData.employeeName || planningData.employe_nom || planningData.employeFullName || 'Unknown Employee',
+    orderNumber: planningData.orderNumber || planningData.numeroCommande || planningData.num_commande || `Order ${planningData.orderId}`,
+    planningDate: planningData.planningDate || planningData.datePlanifiee || planningData.date_planification || new Date().toISOString().split('T')[0],
+    startTime: planningData.startTime || planningData.heureDebut || planningData.heure_debut || '09:00',
+    endTime: planningData.endTime || planningData.heureFin || planningData.heure_fin || calculateEndTime(planningData.startTime || '09:00', calculatedDuration),
+    durationMinutes: calculatedDuration,
+    cardCount,
+    priority: planningData.priority || planningData.priorite || 'MEDIUM',
+    status: planningData.status || planningData.statut || 'PENDING',
+    completed: planningData.completed || planningData.terminee || false,
+    notes: planningData.notes || `${cardCount} cards × ${CARD_PROCESSING_TIME}min = ${calculatedDuration}min`
+  }
+}
+
+// Helper function to calculate end time based on start time and duration
+const calculateEndTime = (startTime: string, durationMinutes: number): string => {
+  try {
+    const [hours, minutes] = startTime.split(':').map(Number)
+    const startDate = new Date()
+    startDate.setHours(hours, minutes, 0, 0)
+
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60000)
+
+    return endDate.toTimeString().slice(0, 5) // Format HH:MM
+  } catch (error) {
+    // Fallback calculation
+    const totalMinutes = durationMinutes + (parseInt(startTime.split(':')[0]) * 60) + parseInt(startTime.split(':')[1] || '0')
+    const endHours = Math.floor(totalMinutes / 60) % 24
+    const endMins = totalMinutes % 60
+    return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`
+  }
+}
+
+const generatePlanning = async () => {
+  if (generating.value) return
+
+  generating.value = true
+  loadingMessage.value = 'Generating planning...'
+
+  try {
+    console.log('🚀 Generating planning with config:', config.value)
+
+    // Try different generation endpoints
+    const endpoints = [
+      'http://localhost:8080/api/planification-gloutonne/juin-2025',
+      'http://localhost:8080/api/planning/generate',
+      'http://localhost:8080/api/planifications/generate',
+      'http://localhost:8080/api/test/planification-simple'
+    ]
+
+    let success = false
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🔄 Trying generate endpoint: ${endpoint}`)
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startDate: config.value.startDate,
+            timePerCard: config.value.cardProcessingTime,
+            cleanFirst: false,
+            priorityMode: config.value.priorityMode
+          })
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log(`✅ Planning generated successfully with ${endpoint}:`, result)
+
+          const planningsCreated = result.nombreCommandesPlanifiees || result.planningsSaved || result.count || 0
+          showNotification(`Planning generated successfully! ${planningsCreated} orders planned`, 'success')
+
+          // Reload plannings
+          await loadPlannings()
+          success = true
+          break
+        } else {
+          console.warn(`⚠️ ${endpoint} failed with status:`, response.status)
+        }
+      } catch (error) {
+        console.warn(`⚠️ ${endpoint} error:`, error)
+        continue
+      }
+    }
+
+    if (!success) {
+      throw new Error('All planning generation endpoints failed')
+    }
+
+  } catch (error) {
+    console.error('❌ Error generating planning:', error)
+    showNotification('Error generating planning', 'error')
+  } finally {
+    generating.value = false
+    loadingMessage.value = ''
+  }
+}
+
+const optimizePlanning = async () => {
+  optimizing.value = true
+  loadingMessage.value = 'Optimizing planning...'
+
+  try {
+    // For now, just reload the data
+    await loadPlannings()
+    showNotification('Planning optimization completed', 'success')
+  } catch (error) {
+    console.error('❌ Error optimizing planning:', error)
+    showNotification('Error optimizing planning', 'error')
+  } finally {
+    optimizing.value = false
+    loadingMessage.value = ''
+  }
+}
+
+const removeDuplicates = async () => {
+  try {
+    // Client-side duplicate removal (immediate)
+    const originalCount = plannings.value.length
+    const uniquePlannings = []
+    const seen = new Set()
+
+    for (const planning of plannings.value) {
+      const uniqueKey = `${planning.orderId}_${planning.employeeId}_${planning.planningDate}_${planning.startTime}`
+
+      if (!seen.has(uniqueKey)) {
+        seen.add(uniqueKey)
+        uniquePlannings.push(planning)
+      }
+    }
+
+    plannings.value = uniquePlannings
+    const duplicatesRemoved = originalCount - uniquePlannings.length
+
+    if (duplicatesRemoved > 0) {
+      showNotification(`Removed ${duplicatesRemoved} duplicate plannings`, 'success')
+
+      // Try to clean duplicates on backend too
+      try {
+        await fetch('http://localhost:8080/api/planning/remove-duplicates', {
+          method: 'POST'
+        })
+        console.log('✅ Backend duplicates cleanup requested')
+      } catch (backendError) {
+        console.warn('⚠️ Backend duplicate cleanup failed:', backendError)
+      }
+    } else {
+      showNotification('No duplicates found', 'success')
+    }
+
+  } catch (error) {
+    console.error('❌ Error removing duplicates:', error)
+    showNotification('Error removing duplicates', 'error')
+  }
+}
+
+const cleanupData = async () => {
+  if (!confirm('Are you sure you want to clean up old planning data?')) {
+    return
+  }
+
+  try {
+    // Try cleanup endpoint
+    const response = await fetch('http://localhost:8080/api/planning/cleanup', {
+      method: 'DELETE'
+    })
+
+    if (response.ok) {
+      showNotification('Planning data cleaned up successfully', 'success')
+      await loadPlannings()
+    } else {
+      throw new Error(`HTTP ${response.status}`)
+    }
+  } catch (error) {
+    console.error('❌ Error cleaning up data:', error)
+    showNotification('Error cleaning up data', 'error')
+  }
+}
+
+// Debug function to test all planning endpoints
+const testPlanningEndpoints = async () => {
+  console.log('🔍 === TESTING PLANNING ENDPOINTS ===')
+
+  const endpoints = [
+    { name: 'view-simple', url: 'http://localhost:8080/api/planning/view-simple' },
+    { name: 'planifications', url: 'http://localhost:8080/api/planifications' },
+    { name: 'planning', url: 'http://localhost:8080/api/planning' },
+    { name: 'test-planifications', url: 'http://localhost:8080/api/test/planifications' },
+    { name: 'dashboard-stats', url: 'http://localhost:8080/api/dashboard/stats' },
+    { name: 'planification-gloutonne-test', url: 'http://localhost:8080/api/planification-gloutonne/test' }
+  ]
+
+  for (const endpoint of endpoints) {
+    try {
+      console.log(`🔄 Testing: ${endpoint.url}`)
+      const response = await fetch(endpoint.url)
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`✅ ${endpoint.name} - SUCCESS:`, data)
+
+        if (Array.isArray(data)) {
+          console.log(`  📊 Array with ${data.length} items`)
+          if (data.length > 0) {
+            console.log(`  📋 First item structure:`, Object.keys(data[0]))
+          }
+        } else if (typeof data === 'object') {
+          console.log(`  📊 Object with keys:`, Object.keys(data))
+        }
+      } else {
+        console.log(`❌ ${endpoint.name} - FAILED: ${response.status}`)
+      }
+    } catch (error) {
+      console.log(`❌ ${endpoint.name} - ERROR:`, error.message)
+    }
+  }
+
+  console.log('🏁 === ENDPOINT TESTING COMPLETE ===')
+  showNotification('Check console for detailed endpoint test results', 'success')
+}
+
+const viewPlanningDetails = (planning: Planning) => {
+  console.log('View planning details:', planning)
+  // Implement details view
+}
+
+const editPlanning = (planning: Planning) => {
+  console.log('Edit planning:', planning)
+  // Implement edit functionality
+}
+
+const formatDate = (dateStr: string): string => {
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  } catch {
+    return dateStr || 'Unknown date'
+  }
+}
+
+const formatDuration = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+
+  if (hours > 0) {
+    return `${hours}h ${remainingMinutes}m`
+  }
+  return `${remainingMinutes}m`
+}
+
+// Simple notification function
+const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  console.log(`${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'} ${message}`)
+  // You can implement a real toast notification here
+}
+
+// ========== LIFECYCLE ==========
+onMounted(() => {
+  console.log('📅 Planning page mounted - Loading data...')
+  refreshData()
+})
 </script>
 
 <style scoped>
-/* =============================================== */
-/* STYLES CORRIGÉS POUR LA PAGE PLANNING          */
-/* =============================================== */
-
 .planning-page {
-  min-height: 100vh;
-  background: #f8fafc;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 24px;
 }
 
-/* ✅ EN-TÊTE */
-.page-header {
-  background: white;
-  border-radius: 12px;
-  padding: 32px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  color: #64748b;
-  font-size: 1rem;
-  line-height: 1.5;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-/* ✅ BOUTONS */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.btn-secondary {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #e2e8f0;
-}
-
-.btn-success {
-  background: #10b981;
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background: #059669;
-}
-
-.btn-warning {
-  background: #f59e0b;
-  color: white;
-}
-
-.btn-warning:hover:not(:disabled) {
-  background: #d97706;
-}
-
-.full-width {
-  width: 100%;
-}
-
-/* ✅ STATISTIQUES */
-.stats-section {
-  margin-bottom: 24px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border-left: 4px solid #e2e8f0;
-}
-
-.stat-card.blue { border-left-color: #3b82f6; }
-.stat-card.green { border-left-color: #10b981; }
-.stat-card.yellow { border-left-color: #f59e0b; }
-.stat-card.purple { border-left-color: #8b5cf6; }
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-content h3 {
-  font-size: 0.875rem;
-  color: #64748b;
-  margin: 0 0 4px 0;
-  font-weight: 500;
-}
-
-.stat-number {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0 0 4px 0;
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  color: #94a3b8;
-}
-
-/* ✅ OUTILS */
-.tools-section {
-  margin-bottom: 24px;
-}
-
-.tools-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 24px;
-}
-
-.tool-card {
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.tool-header {
-  padding: 24px 24px 16px 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.tool-header h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1a202c;
-  margin: 0 0 8px 0;
-}
-
-.tool-header p {
-  color: #64748b;
-  font-size: 0.875rem;
-  margin: 0;
-}
-
-.tool-content {
-  padding: 24px;
-}
-
-.tool-actions {
-  padding: 0 24px 24px 24px;
-}
-
-/* ✅ FORMULAIRES */
-.setting-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.setting-row label {
-  min-width: 120px;
-  font-weight: 500;
-  color: #374151;
-}
-
-.form-input, .form-select {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.875rem;
-}
-
-.input-group {
-  display: flex;
-  align-items: center;
-  flex: 1;
-}
-
-.input-suffix {
-  margin-left: 8px;
-  color: #6b7280;
-  font-size: 0.875rem;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 0.875rem;
-  color: #374151;
-  cursor: pointer;
-}
-
-/* ✅ MÉTRIQUES */
-.performance-metrics {
-  background: #f8fafc;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.metric {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.metric:last-child {
-  margin-bottom: 0;
-}
-
-.metric-label {
-  color: #64748b;
-  font-size: 0.875rem;
-}
-
-.metric-value {
-  font-weight: 600;
-  color: #1a202c;
-}
-
-/* ✅ FEATURES */
-.feature-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-}
-
-.feature-icon {
-  font-size: 1.25rem;
-}
-
-.feature-text {
-  color: #374151;
-  font-size: 0.875rem;
-}
-
-/* ✅ TABLEAU */
-.results-section {
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.section-header {
-  padding: 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.section-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1a202c;
-  margin: 0 0 4px 0;
-}
-
-.section-header p {
-  color: #64748b;
-  margin: 0;
-}
-
-.planning-table-container {
-  overflow-x: auto;
-}
-
-.planning-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.planning-table th {
-  background: #f8fafc;
-  padding: 12px;
-  text-align: left;
-  font-weight: 600;
-  color: #374151;
-  font-size: 0.875rem;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.planning-table td {
-  padding: 12px;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
-}
-
-.planning-row:hover {
-  background: #f8fafc;
-}
-
-/* Cellules spécifiques */
-.order-number {
-  font-family: monospace;
-  font-weight: 600;
-  color: #3b82f6;
-}
-
-.employee-name {
-  font-weight: 500;
-  color: #1a202c;
-}
-
-.duration-badge {
-  background: #e0e7ff;
-  color: #3730a3;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-/* ✅ PRIORITÉS */
-.priority-urgent { color: #dc2626; font-weight: 600; }
-.priority-high { color: #ea580c; font-weight: 600; }
-.priority-medium { color: #059669; font-weight: 600; }
-.priority-low { color: #64748b; font-weight: 600; }
-
-/* ✅ STATUTS */
-.status-scheduled { color: #3b82f6; }
-.status-progress { color: #f59e0b; }
-.status-completed { color: #10b981; }
-.status-cancelled { color: #ef4444; }
-
-/* ✅ BOUTONS PETITS */
-.btn-small {
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-right: 4px;
-}
-
-.btn-edit {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.btn-delete {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-/* ✅ ÉTATS VIDES ET LOADING */
-.empty-state {
-  text-align: center;
-  padding: 64px 24px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: 16px;
-}
-
-.empty-state h3 {
-  font-size: 1.25rem;
-  color: #374151;
-  margin-bottom: 8px;
-}
-
-.empty-state p {
-  color: #64748b;
-  margin-bottom: 24px;
-}
-
-.loading-state {
-  text-align: center;
-  padding: 64px 24px;
-}
-
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e2e8f0;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
+/* Loading spinner */
+.animate-spin {
   animation: spin 1s linear infinite;
-  margin: 0 auto 16px auto;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* ✅ RESPONSIVE */
+/* Responsive design */
 @media (max-width: 768px) {
   .planning-page {
     padding: 16px;
-    max-width: 100%;
   }
 
-  .page-header {
-    padding: 24px;
+  .grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .page-header .flex {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .tools-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .setting-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .setting-row label {
-    min-width: auto;
-    margin-bottom: 4px;
-  }
-
-  .planning-table-container {
-    font-size: 0.875rem;
+  .md\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 </style>

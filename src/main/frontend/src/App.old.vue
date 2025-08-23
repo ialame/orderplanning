@@ -25,7 +25,7 @@
                 class="px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 :class="$route.path === '/orders' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'"
               >
-                📦 Orders
+                📦 Commandes
               </router-link>
 
               <router-link
@@ -33,7 +33,7 @@
                 class="px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 :class="$route.path === '/employees' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'"
               >
-                👥 Employees
+                👥 Employés
               </router-link>
 
               <router-link
@@ -50,7 +50,7 @@
           <div class="flex items-center">
             <div class="flex items-center space-x-2">
               <div class="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span class="text-sm text-gray-600">System operational</span>
+              <span class="text-sm text-gray-600">Système opérationnel</span>
             </div>
           </div>
         </div>

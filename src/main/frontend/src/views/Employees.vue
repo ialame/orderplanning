@@ -1,322 +1,659 @@
 <template>
   <div class="employees-page">
     <!-- Header -->
-    <div class="page-header">
-      <h1 class="page-title">👥 Employee Management</h1>
-      <p class="page-subtitle">Manage your team and track their workload</p>
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">👥 Employee Management</h1>
+          <p class="text-gray-600 mt-1">Manage team members and view their work assignments</p>
+        </div>
+        <div class="flex space-x-3">
+          <button
+            @click="currentView = currentView === 'management' ? 'planning' : 'management'"
+            class="btn-secondary"
+          >
+            {{ currentView === 'management' ? '📊 Switch to Planning' : '👥 Switch to Management' }}
+          </button>
+          <button
+            @click="refreshEmployees"
+            :disabled="loading"
+            class="btn-primary"
+          >
+            {{ loading ? '⏳ Loading...' : '🔄 Refresh' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Mode Selector -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+      <div class="flex items-center space-x-4">
+        <button
+          @click="currentView = 'management'"
+          :class="[
+            'px-4 py-2 rounded-lg font-medium transition-colors',
+            currentView === 'management'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          ]"
+        >
+          👥 Employee Management
+        </button>
+        <button
+          @click="currentView = 'planning'"
+          :class="[
+            'px-4 py-2 rounded-lg font-medium transition-colors',
+            currentView === 'planning'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          ]"
+        >
+          📊 Work Planning
+        </button>
+      </div>
     </div>
 
     <!-- Statistics Cards -->
-    <div class="stats-grid">
-      <div class="stat-card total">
-        <div class="stat-icon">👥</div>
-        <div class="stat-content">
-          <h3>Total Employees</h3>
-          <p class="stat-number">{{ stats.total }}</p>
+    <div v-if="currentView === 'planning'" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-blue-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Total Employees</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ stats.total }}</p>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card active">
-        <div class="stat-icon">✅</div>
-        <div class="stat-content">
-          <h3>Active</h3>
-          <p class="stat-number">{{ stats.active }}</p>
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-green-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Available</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ stats.available }}</p>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card busy">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-content">
-          <h3>Busy</h3>
-          <p class="stat-number">{{ stats.busy }}</p>
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-orange-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Busy</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ stats.busy }}</p>
+          </div>
         </div>
       </div>
 
-      <div class="stat-card available">
-        <div class="stat-icon">🆓</div>
-        <div class="stat-content">
-          <h3>Available</h3>
-          <p class="stat-number">{{ stats.available }}</p>
+      <div class="card">
+        <div class="flex items-center">
+          <div class="bg-red-500 rounded-lg p-3 mr-4">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm text-gray-600">Overloaded</p>
+            <p class="text-2xl font-semibold text-gray-900">{{ stats.overloaded }}</p>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="action-bar">
-      <button @click="refreshEmployees" class="btn-primary" :disabled="loading">
-        {{ loading ? '🔄 Loading...' : '🔄 Refresh Employees' }}
-      </button>
-      <button @click="addEmployee" class="btn-success">
-        ➕ Add Employee
-      </button>
-      <button @click="loadSampleData" class="btn-secondary">
-        🧪 Load Sample Data
-      </button>
-    </div>
+    <!-- Employee List -->
+    <div v-if="!selectedEmployeeId">
+      <!-- Management View -->
+      <div v-if="currentView === 'management'" class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Team Members</h2>
+            <button @click="showAddForm = !showAddForm" class="btn-primary">
+              {{ showAddForm ? 'Cancel' : '+ Add Employee' }}
+            </button>
+          </div>
+        </div>
 
-    <!-- Employees Grid -->
-    <div class="employees-container">
-      <div class="section-header">
-        <h2>👥 Team Members ({{ employees.length }})</h2>
-        <div class="view-options">
-          <button
-            @click="viewMode = 'grid'"
-            :class="['view-btn', { active: viewMode === 'grid' }]"
+        <!-- Add Employee Form -->
+        <div v-if="showAddForm" class="p-6 bg-gray-50 border-b">
+          <form @submit.prevent="addEmployee" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <input
+              v-model="newEmployee.firstName"
+              placeholder="First Name"
+              class="input-field"
+              required
+            >
+            <input
+              v-model="newEmployee.lastName"
+              placeholder="Last Name"
+              class="input-field"
+              required
+            >
+            <input
+              v-model="newEmployee.email"
+              type="email"
+              placeholder="Email"
+              class="input-field"
+              required
+            >
+            <div class="flex space-x-2">
+              <button type="submit" class="btn-primary flex-1">Add</button>
+              <button type="button" @click="showAddForm = false" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Employee Grid -->
+        <div v-if="employees.length > 0" class="p-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="employee in employees"
+              :key="employee.id"
+              class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
+              @click="viewEmployee(employee.id)"
+            >
+              <!-- Employee Header -->
+              <div class="flex items-center mb-4">
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
+                  {{ getInitials(employee) }}
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-lg font-medium text-gray-900">{{ employee.firstName }} {{ employee.lastName }}</h3>
+                  <p class="text-sm text-gray-600">{{ employee.email }}</p>
+                </div>
+              </div>
+
+              <!-- Employee Stats -->
+              <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">Status:</span>
+                  <span :class="[
+                    'px-2 py-1 rounded-full text-xs font-medium',
+                    employee.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' :
+                    employee.status === 'BUSY' ? 'bg-orange-100 text-orange-800' :
+                    'bg-gray-100 text-gray-800'
+                  ]">
+                    {{ employee.status }}
+                  </span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">Work Hours:</span>
+                  <span class="font-medium">{{ employee.workHoursPerDay || 8 }}h/day</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Planning View -->
+      <div v-else-if="currentView === 'planning'" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div
+            v-for="employee in employeesWithWorkload"
+            :key="employee.id"
+            class="bg-white rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-shadow"
+            @click="viewEmployee(employee.id)"
           >
-            🔲 Grid
-          </button>
-          <button
-            @click="viewMode = 'list'"
-            :class="['view-btn', { active: viewMode === 'list' }]"
-          >
-            📋 List
-          </button>
+            <!-- Employee Header -->
+            <div class="flex items-center mb-4">
+              <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
+                {{ getInitials(employee) }}
+              </div>
+              <div class="ml-3">
+                <h3 class="text-lg font-medium text-gray-900">{{ employee.firstName }} {{ employee.lastName }}</h3>
+                <span :class="[
+                  'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                  getWorkloadColor(employee.workload)
+                ]">
+                  {{ getWorkloadStatus(employee.workload) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Workload Progress -->
+            <div class="mb-4">
+              <div class="flex justify-between text-sm text-gray-600 mb-1">
+                <span>Workload</span>
+                <span>{{ employee.workload }}%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  :class="[
+                    'h-2 rounded-full transition-all duration-300',
+                    getWorkloadProgressColor(employee.workload)
+                  ]"
+                  :style="{ width: Math.min(employee.workload, 100) + '%' }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- Current Tasks -->
+            <div class="space-y-2">
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Active Orders:</span>
+                <span class="font-medium">{{ employee.activeOrders || 0 }}</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Estimated Hours:</span>
+                <span class="font-medium">{{ employee.estimatedHours || 0 }}h</span>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="mt-4 flex space-x-2">
+              <button
+                @click.stop="viewEmployee(employee.id)"
+                class="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded text-sm font-medium hover:bg-blue-100"
+              >
+                👁️ View Details
+              </button>
+              <button
+                @click.stop="assignWork(employee.id)"
+                class="flex-1 bg-green-50 text-green-600 px-3 py-2 rounded text-sm font-medium hover:bg-green-100"
+                :disabled="employee.workload >= 100"
+              >
+                📋 Assign Work
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div v-if="loading" class="loading-state">
-        <div class="loading-spinner">🔄</div>
-        <p>Loading employees...</p>
+      <!-- Empty State -->
+      <div v-if="employees.length === 0 && !loading" class="bg-white rounded-lg shadow-md p-8 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
+        <p class="text-gray-600 mb-4">Start by adding your first team member</p>
+        <button @click="showAddForm = true" class="btn-primary">
+          + Add First Employee
+        </button>
       </div>
 
-      <div v-else-if="employees.length === 0" class="empty-state">
-        <div class="empty-icon">👥</div>
-        <h3>No employees found</h3>
-        <p>Add your first team member to get started.</p>
-        <button @click="loadSampleData" class="btn-primary">Load Sample Data</button>
-      </div>
-
-      <!-- Grid View -->
-      <div v-else-if="viewMode === 'grid'" class="employees-grid">
-        <div
-          v-for="employee in employees"
-          :key="employee.id"
-          class="employee-card"
-          @click="viewEmployee(employee)"
-        >
-          <div class="employee-avatar">
-            {{ getInitials(employee.name) }}
-          </div>
-          <div class="employee-info">
-            <h3 class="employee-name">{{ employee.name }}</h3>
-            <p class="employee-role">{{ employee.role }}</p>
-            <div class="employee-stats">
-              <span class="stat">
-                📋 {{ employee.totalTasks || 0 }} tasks
-              </span>
-              <span class="stat">
-                ⏱️ {{ employee.totalHours || 0 }}h
-              </span>
-            </div>
-          </div>
-          <div class="employee-status">
-            <span :class="['status-badge', employee.status.toLowerCase()]">
-              {{ getStatusIcon(employee.status) }} {{ employee.status }}
-            </span>
-          </div>
-          <div class="employee-actions">
-            <button @click.stop="editEmployee(employee)" class="btn-edit">✏️</button>
-            <button @click.stop="viewSchedule(employee)" class="btn-schedule">📅</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- List View -->
-      <div v-else class="employees-list">
-        <div class="list-header">
-          <div class="col-name">Name</div>
-          <div class="col-role">Role</div>
-          <div class="col-status">Status</div>
-          <div class="col-workload">Workload</div>
-          <div class="col-actions">Actions</div>
-        </div>
-        <div
-          v-for="employee in employees"
-          :key="employee.id"
-          class="employee-row"
-          @click="viewEmployee(employee)"
-        >
-          <div class="col-name">
-            <div class="employee-avatar-small">
-              {{ getInitials(employee.name) }}
-            </div>
-            <div>
-              <h4>{{ employee.name }}</h4>
-              <p class="employee-email">{{ employee.email }}</p>
-            </div>
-          </div>
-          <div class="col-role">{{ employee.role }}</div>
-          <div class="col-status">
-            <span :class="['status-badge', employee.status.toLowerCase()]">
-              {{ getStatusIcon(employee.status) }} {{ employee.status }}
-            </span>
-          </div>
-          <div class="col-workload">
-            <div class="workload-bar">
-              <div
-                class="workload-fill"
-                :style="{ width: `${employee.workloadPercentage || 0}%` }"
-              ></div>
-            </div>
-            <span class="workload-text">{{ employee.workloadPercentage || 0 }}%</span>
-          </div>
-          <div class="col-actions">
-            <button @click.stop="editEmployee(employee)" class="btn-action">✏️ Edit</button>
-            <button @click.stop="viewSchedule(employee)" class="btn-action">📅 Schedule</button>
-          </div>
-        </div>
+      <!-- Loading State -->
+      <div v-if="loading" class="bg-white rounded-lg shadow-md p-8 text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p class="text-gray-600">Loading employees...</p>
       </div>
     </div>
 
-    <!-- Message -->
-    <div v-if="message.text" :class="['message', message.type]">
-      {{ message.text }}
+    <!-- Employee Detail View -->
+    <div v-else>
+      <EmployeeDetailPage
+        :employeeId="selectedEmployeeId"
+        @back="selectedEmployeeId = null"
+        @refresh="refreshEmployees"
+      />
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+// import { apiService } from '../services/api'
+import EmployeeDetailPage from '../components/EmployeeDetailPage.vue'
 
-// State
+// ========== INTERFACES ==========
+interface Employee {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  status: 'AVAILABLE' | 'BUSY' | 'OFFLINE'
+  workHoursPerDay?: number
+  workload?: number
+  activeOrders?: number
+  estimatedHours?: number
+}
+
+interface NewEmployee {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+// ========== STATE ==========
 const loading = ref(false)
-const employees = ref([])
-const viewMode = ref('grid')
-const message = ref({ text: '', type: 'info' })
+const employees = ref<Employee[]>([])
+const selectedEmployeeId = ref<string | null>(null)
+const currentView = ref<'management' | 'planning'>('management')
+const showAddForm = ref(false)
 
-// Stats
-const stats = computed(() => {
-  const total = employees.value.length
-  const active = employees.value.filter(e => e.status === 'ACTIVE').length
-  const busy = employees.value.filter(e => e.status === 'BUSY').length
-  const available = employees.value.filter(e => e.status === 'AVAILABLE').length
-
-  return { total, active, busy, available }
+const newEmployee = ref<NewEmployee>({
+  firstName: '',
+  lastName: '',
+  email: ''
 })
 
-// Methods
+// ========== COMPUTED ==========
+const stats = computed(() => {
+  const total = employees.value.length
+  const available = employees.value.filter(e => e.status === 'AVAILABLE').length
+  const busy = employees.value.filter(e => e.status === 'BUSY').length
+  const overloaded = employees.value.filter(e => (e.workload || 0) > 100).length
+
+  return { total, available, busy, overloaded }
+})
+
+const employeesWithWorkload = computed(() => {
+  return employees.value.map(employee => ({
+    ...employee,
+    workload: employee.workload || Math.floor(Math.random() * 120), // Mock workload if not available
+    activeOrders: employee.activeOrders || Math.floor(Math.random() * 5),
+    estimatedHours: employee.estimatedHours || Math.floor(Math.random() * 40)
+  }))
+})
+
+// ========== METHODS ==========
 const refreshEmployees = async () => {
   loading.value = true
   try {
-    console.log('🔄 Refreshing employees...')
+    console.log('🔄 Loading employees from API...')
 
-    const response = await fetch('/api/employees')
-    if (response.ok) {
-      const data = await response.json()
-      employees.value = data.map(employee => ({
-        ...employee,
-        role: employee.role || 'Card Processor',
-        status: employee.status || ['ACTIVE', 'BUSY', 'AVAILABLE'][Math.floor(Math.random() * 3)],
-        email: employee.email || `${employee.name.toLowerCase().replace(' ', '.')}@pokemon.com`,
-        totalTasks: employee.totalTasks || Math.floor(Math.random() * 20),
-        totalHours: employee.totalHours || Math.floor(Math.random() * 40),
-        workloadPercentage: employee.workloadPercentage || Math.floor(Math.random() * 100)
-      }))
+    // Try multiple endpoints like the Dashboard does
+    const endpoints = [
+      'http://localhost:8080/api/employes/avec-stats',
+      'http://localhost:8080/api/employes',
+      'http://localhost:8080/api/employees',
+      'http://localhost:8080/api/test/employes'
+    ]
 
-      showMessage(`✅ Loaded ${employees.value.length} employees`, 'success')
+    let employeesData = []
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🔄 Trying endpoint: ${endpoint}`)
+        const response = await fetch(endpoint)
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ Success with ${endpoint}:`, data)
+
+          // Handle different response formats
+          if (Array.isArray(data)) {
+            employeesData = data
+          } else if (data.employes && Array.isArray(data.employes)) {
+            employeesData = data.employes
+          } else if (data.employees && Array.isArray(data.employees)) {
+            employeesData = data.employees
+          }
+
+          if (employeesData.length > 0) {
+            console.log(`🎯 Found ${employeesData.length} employees from ${endpoint}`)
+            break
+          }
+        }
+      } catch (endpointError) {
+        console.warn(`⚠️ ${endpoint} failed:`, endpointError.message)
+        continue
+      }
+    }
+
+    if (employeesData && employeesData.length > 0) {
+      employees.value = employeesData.map(mapEmployee)
+      console.log(`✅ Loaded ${employees.value.length} real employees:`)
+      employees.value.forEach(emp => console.log(`  - ${emp.firstName} ${emp.lastName} (${emp.email})`))
+      showNotification(`Successfully loaded ${employees.value.length} employees`, 'success')
     } else {
-      throw new Error(`HTTP ${response.status}`)
+      // Fallback to demo data if no employees found
+      console.log('⚠️ No real employees found, using demo data')
+      employees.value = generateDemoEmployees()
+      showNotification('No employees found in database - showing demo data', 'success')
     }
   } catch (error) {
-    console.error('Error loading employees:', error)
-    loadSampleEmployees() // Fallback to sample data
-    showMessage('⚠️ Using sample data (backend not available)', 'warning')
+    console.error('❌ Error loading employees:', error)
+    // Use demo data as fallback
+    employees.value = generateDemoEmployees()
+    showNotification('API error - using demo employees', 'error')
   } finally {
     loading.value = false
   }
 }
 
-const loadSampleData = () => {
-  console.log('🧪 Loading sample employees...')
+const mapEmployee = (employeeData: any): Employee => {
+  console.log('🔧 Mapping employee data:', employeeData)
 
-  const sampleEmployees = [
+  // Handle different data structures from different endpoints
+  return {
+    id: employeeData.id || `emp-${Date.now()}`,
+    firstName: employeeData.firstName || employeeData.prenom || extractFirstName(employeeData),
+    lastName: employeeData.lastName || extractLastName(employeeData),
+    email: employeeData.email || `employee${employeeData.id}@company.com`,
+    status: mapEmployeeStatus(employeeData.status || employeeData.statut || employeeData.active),
+    workHoursPerDay: employeeData.workHoursPerDay || employeeData.heuresTravailParJour || 8,
+    workload: employeeData.workload || employeeData.chargeActuelle || calculateWorkload(employeeData),
+    activeOrders: employeeData.activeOrders || employeeData.commandesActives || employeeData.nombreTaches || 0,
+    estimatedHours: employeeData.estimatedHours || employeeData.heuresEstimees || (employeeData.totalMinutes ? Math.round(employeeData.totalMinutes / 60) : 0)
+  }
+}
+
+const extractFirstName = (employeeData: any): string => {
+  if (employeeData.firstName) return employeeData.firstName
+  if (employeeData.prenom) return employeeData.prenom
+  if (employeeData.nom) {
+    // If nom contains full name, extract first part
+    const parts = employeeData.nom.split(' ')
+    return parts[0] || 'Unknown'
+  }
+  if (employeeData.name || employeeData.fullName) {
+    const parts = (employeeData.name || employeeData.fullName).split(' ')
+    return parts[0] || 'Unknown'
+  }
+  return 'Unknown'
+}
+
+const extractLastName = (employeeData: any): string => {
+  if (employeeData.lastName) return employeeData.lastName
+  if (employeeData.nom) {
+    const parts = employeeData.nom.split(' ')
+    return parts.slice(1).join(' ') || 'Employee'
+  }
+  if (employeeData.name || employeeData.fullName) {
+    const parts = (employeeData.name || employeeData.fullName).split(' ')
+    return parts.slice(1).join(' ') || 'Employee'
+  }
+  return 'Employee'
+}
+
+const mapEmployeeStatus = (status: any): 'AVAILABLE' | 'BUSY' | 'OFFLINE' => {
+  if (!status) return 'AVAILABLE'
+
+  // Handle boolean active status
+  if (typeof status === 'boolean') {
+    return status ? 'AVAILABLE' : 'OFFLINE'
+  }
+
+  const s = String(status).toUpperCase()
+  if (s.includes('BUSY') || s.includes('OCCUPE') || s.includes('WORKING')) return 'BUSY'
+  if (s.includes('OFFLINE') || s.includes('ABSENT') || s.includes('INACTIVE') || s === 'FALSE') return 'OFFLINE'
+  if (s.includes('AVAILABLE') || s.includes('LIBRE') || s.includes('ACTIVE') || s === 'TRUE') return 'AVAILABLE'
+  return 'AVAILABLE'
+}
+
+const calculateWorkload = (employeeData: any): number => {
+  // Calculate workload based on assigned tasks/orders
+  const tasks = employeeData.tasks || employeeData.commandes || employeeData.taches || []
+  const totalMinutes = employeeData.totalMinutes || 0
+  const maxMinutes = employeeData.maxMinutes || (employeeData.heuresTravailParJour || 8) * 60
+
+  if (totalMinutes && maxMinutes) {
+    return Math.min((totalMinutes / maxMinutes) * 100, 150)
+  }
+
+  if (tasks.length === 0) return Math.floor(Math.random() * 30) // Light workload if no tasks
+
+  // Simple calculation: each task takes 3 hours on average
+  const hoursPerDay = employeeData.workHoursPerDay || employeeData.heuresTravailParJour || 8
+  const estimatedHours = tasks.length * 3
+  return Math.min((estimatedHours / hoursPerDay) * 100, 150)
+}
+
+const generateDemoEmployees = (): Employee[] => {
+  return [
     {
-      id: '1',
-      name: 'Alice Johnson',
-      role: 'Senior Card Processor',
-      status: 'ACTIVE',
-      email: 'alice.johnson@pokemon.com',
-      totalTasks: 15,
-      totalHours: 32,
-      workloadPercentage: 85
-    },
-    {
-      id: '2',
-      name: 'Bob Smith',
-      role: 'Card Processor',
-      status: 'BUSY',
-      email: 'bob.smith@pokemon.com',
-      totalTasks: 12,
-      totalHours: 28,
-      workloadPercentage: 95
-    },
-    {
-      id: '3',
-      name: 'Carol Davis',
-      role: 'Quality Checker',
+      id: 'emp-1',
+      firstName: 'John',
+      lastName: 'Smith',
+      email: 'john.smith@company.com',
       status: 'AVAILABLE',
-      email: 'carol.davis@pokemon.com',
-      totalTasks: 8,
-      totalHours: 20,
-      workloadPercentage: 60
+      workHoursPerDay: 8,
+      workload: 65,
+      activeOrders: 3,
+      estimatedHours: 24
     },
     {
-      id: '4',
-      name: 'David Wilson',
-      role: 'Card Processor',
-      status: 'ACTIVE',
-      email: 'david.wilson@pokemon.com',
-      totalTasks: 10,
-      totalHours: 25,
-      workloadPercentage: 75
+      id: 'emp-2',
+      firstName: 'Sarah',
+      lastName: 'Johnson',
+      email: 'sarah.johnson@company.com',
+      status: 'BUSY',
+      workHoursPerDay: 8,
+      workload: 95,
+      activeOrders: 5,
+      estimatedHours: 38
+    },
+    {
+      id: 'emp-3',
+      firstName: 'Mike',
+      lastName: 'Davis',
+      email: 'mike.davis@company.com',
+      status: 'AVAILABLE',
+      workHoursPerDay: 6,
+      workload: 40,
+      activeOrders: 2,
+      estimatedHours: 12
     }
   ]
-
-  employees.value = sampleEmployees
-  showMessage('🧪 Sample employees loaded successfully', 'success')
 }
 
-const loadSampleEmployees = () => loadSampleData()
+const addEmployee = async () => {
+  try {
+    const employeeData = {
+      firstName: newEmployee.value.firstName,
+      lastName: newEmployee.value.lastName,
+      email: newEmployee.value.email,
+      workHoursPerDay: 8,
+      active: true
+    }
 
-const addEmployee = () => {
-  showMessage('➕ Add employee feature coming soon!', 'info')
-}
+    // Try the same endpoints used for fetching employees
+    const createEndpoints = [
+      'http://localhost:8080/api/employes',
+      'http://localhost:8080/api/employees',
+      'http://localhost:8080/api/test/employes'
+    ]
 
-const editEmployee = (employee) => {
-  showMessage(`✏️ Editing ${employee.name}`, 'info')
-}
+    let success = false
 
-const viewEmployee = (employee) => {
-  showMessage(`👁️ Viewing ${employee.name}'s profile`, 'info')
-}
+    for (const endpoint of createEndpoints) {
+      try {
+        console.log(`🔄 Trying to create employee at: ${endpoint}`)
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(employeeData)
+        })
 
-const viewSchedule = (employee) => {
-  showMessage(`📅 Viewing ${employee.name}'s schedule`, 'info')
-}
+        if (response.ok) {
+          const result = await response.json()
+          console.log(`✅ Employee created successfully at ${endpoint}:`, result)
+          success = true
+          break
+        } else {
+          console.warn(`⚠️ ${endpoint} failed with status:`, response.status)
+        }
+      } catch (endpointError) {
+        console.warn(`⚠️ ${endpoint} error:`, endpointError.message)
+        continue
+      }
+    }
 
-const showMessage = (text, type = 'info') => {
-  message.value = { text, type }
-  setTimeout(() => {
-    message.value = { text: '', type: 'info' }
-  }, 3000)
-}
+    if (success) {
+      // Refresh the list to show the new employee
+      await refreshEmployees()
+      showNotification('Employee added successfully', 'success')
+    } else {
+      console.warn('⚠️ All API endpoints failed, adding to demo data')
+      // Add to local demo data as fallback
+      const newEmp = {
+        id: `emp-${Date.now()}`,
+        ...employeeData,
+        status: 'AVAILABLE' as const,
+        workload: 0,
+        activeOrders: 0,
+        estimatedHours: 0
+      }
+      employees.value.push(newEmp)
+      showNotification('Employee added to local data (API unavailable)', 'success')
+    }
 
-// Utility functions
-const getInitials = (name) => {
-  return name.split(' ').map(n => n[0]).join('').toUpperCase()
-}
+    // Reset form
+    newEmployee.value = { firstName: '', lastName: '', email: '' }
+    showAddForm.value = false
 
-const getStatusIcon = (status) => {
-  const icons = {
-    'ACTIVE': '✅',
-    'BUSY': '⚡',
-    'AVAILABLE': '🆓'
+  } catch (error) {
+    console.error('❌ Error adding employee:', error)
+    showNotification('Error adding employee', 'error')
   }
-  return icons[status] || '❓'
 }
 
-// Initialize
+const viewEmployee = (employeeId: string) => {
+  selectedEmployeeId.value = employeeId
+}
+
+const assignWork = (employeeId: string) => {
+  console.log('Assign work to employee:', employeeId)
+  // Implement work assignment logic
+  showNotification('Work assignment feature coming soon', 'success')
+}
+
+const getInitials = (employee: Employee): string => {
+  return `${employee.firstName?.[0] || ''}${employee.lastName?.[0] || ''}`.toUpperCase()
+}
+
+const getWorkloadColor = (workload: number): string => {
+  if (workload <= 60) return 'bg-green-100 text-green-800'
+  if (workload <= 85) return 'bg-yellow-100 text-yellow-800'
+  if (workload <= 100) return 'bg-orange-100 text-orange-800'
+  return 'bg-red-100 text-red-800'
+}
+
+const getWorkloadStatus = (workload: number): string => {
+  if (workload <= 60) return '✅ Available'
+  if (workload <= 85) return '⚡ Busy'
+  if (workload <= 100) return '⚠️ Full'
+  return '🚨 Overloaded'
+}
+
+const getWorkloadProgressColor = (workload: number): string => {
+  if (workload <= 60) return 'bg-green-500'
+  if (workload <= 85) return 'bg-yellow-500'
+  if (workload <= 100) return 'bg-orange-500'
+  return 'bg-red-500'
+}
+
+// Simple notification function
+const showNotification = (message: string, type: 'success' | 'error') => {
+  console.log(`${type === 'success' ? '✅' : '❌'} ${message}`)
+  // You can implement a real toast notification here
+}
+
+// ========== LIFECYCLE ==========
 onMounted(() => {
+  console.log('👥 Employees page mounted - Loading employees...')
   refreshEmployees()
 })
 </script>
@@ -325,159 +662,11 @@ onMounted(() => {
 .employees-page {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px;
 }
 
-.page-header {
-  margin-bottom: 30px;
-}
-
-.page-title {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #1f2937;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  color: #6b7280;
-  font-size: 1.1rem;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.stat-card {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  border-left: 4px solid;
-}
-
-.stat-card.total { border-left-color: #3b82f6; }
-.stat-card.active { border-left-color: #10b981; }
-.stat-card.busy { border-left-color: #f59e0b; }
-.stat-card.available { border-left-color: #8b5cf6; }
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-content h3 {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.stat-number {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #1f2937;
-}
-
-.action-bar {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-}
-
-.btn-primary, .btn-secondary, .btn-success {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover { background: #2563eb; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-secondary {
-  background: #6b7280;
-  color: white;
-}
-
-.btn-secondary:hover { background: #4b5563; }
-
-.btn-success {
-  background: #10b981;
-  color: white;
-}
-
-.btn-success:hover { background: #059669; }
-
-.employees-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.section-header {
-  padding: 20px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.section-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.view-options {
-  display: flex;
-  gap: 8px;
-}
-
-.view-btn {
-  padding: 6px 12px;
-  border: 1px solid #d1d5db;
-  background: white;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
-}
-
-.view-btn.active {
-  background: #3b82f6;
-  color: white;
-  border-color: #3b82f6;
-}
-
-.loading-state, .empty-state {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-.loading-spinner {
-  font-size: 3rem;
+/* Loading spinner */
+.animate-spin {
   animation: spin 1s linear infinite;
 }
 
@@ -486,249 +675,30 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: 20px;
+/* Responsive design */
+@media (max-width: 768px) {
+  .employees-page {
+    padding: 16px;
+  }
+
+  .grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
 }
 
-.employees-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-  padding: 20px;
+@media (min-width: 768px) {
+  .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .md\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
-.employee-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.employee-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.employee-avatar {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #3b82f6;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 1.2rem;
-  margin-bottom: 15px;
-}
-
-.employee-name {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 5px;
-}
-
-.employee-role {
-  color: #6b7280;
-  font-size: 0.9rem;
-  margin-bottom: 15px;
-}
-
-.employee-stats {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.stat {
-  font-size: 0.8rem;
-  color: #6b7280;
-}
-
-.employee-status {
-  margin-bottom: 15px;
-}
-
-.status-badge {
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.status-badge.active { background: #dcfce7; color: #16a34a; }
-.status-badge.busy { background: #fef3c7; color: #d97706; }
-.status-badge.available { background: #e0e7ff; color: #7c3aed; }
-
-.employee-actions {
-  display: flex;
-  gap: 8px;
-  position: absolute;
-  top: 15px;
-  right: 15px;
-}
-
-.btn-edit, .btn-schedule {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
-}
-
-.btn-edit {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.btn-edit:hover { background: #fde68a; }
-
-.btn-schedule {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.btn-schedule:hover { background: #c7d2fe; }
-
-.employees-list {
-  padding: 0;
-}
-
-.list-header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
-  gap: 20px;
-  padding: 15px 20px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  font-weight: 600;
-  color: #374151;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-}
-
-.employee-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
-  gap: 20px;
-  padding: 15px 20px;
-  border-bottom: 1px solid #f3f4f6;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  align-items: center;
-}
-
-.employee-row:hover {
-  background: #f9fafb;
-}
-
-.col-name {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.employee-avatar-small {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #3b82f6;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 0.9rem;
-}
-
-.col-name h4 {
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 2px;
-}
-
-.employee-email {
-  color: #6b7280;
-  font-size: 0.8rem;
-}
-
-.workload-bar {
-  width: 60px;
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 4px;
-}
-
-.workload-fill {
-  height: 100%;
-  background: #3b82f6;
-  transition: width 0.3s;
-}
-
-.workload-text {
-  font-size: 0.8rem;
-  color: #6b7280;
-}
-
-.btn-action {
-  padding: 4px 8px;
-  border: none;
-  border-radius: 4px;
-  background: #e0e7ff;
-  color: #3730a3;
-  cursor: pointer;
-  font-size: 0.8rem;
-  margin-right: 4px;
-  transition: background-color 0.2s;
-}
-
-.btn-action:hover {
-  background: #c7d2fe;
-}
-
-.message {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 15px 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  font-weight: 500;
-  z-index: 1000;
-}
-
-.message.success {
-  background: #dcfce7;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
-}
-
-.message.error {
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.message.warning {
-  background: #fef3c7;
-  color: #d97706;
-  border: 1px solid #fde68a;
-}
-
-.message.info {
-  background: #e0f2fe;
-  color: #0891b2;
-  border: 1px solid #bae6fd;
+@media (min-width: 1024px) {
+  .lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>
