@@ -1,5 +1,7 @@
 package com.pcagrade.order.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,8 @@ public class GreedyPlanningService {
     @Autowired
     private OrderService orderService;
 
+    @Autowired
+    private EntityManager entityManager;
     /**
      * Execute greedy planning algorithm
      * @param day target day
@@ -61,11 +65,23 @@ public class GreedyPlanningService {
             List<Map<String, Object>> createdPlannings = new ArrayList<>();
             int employeeIndex = 0;
 
+// ✅ DEBUG: Log the employees we have
+            log.info("🧑‍💼 DEBUG: Found {} employees for round-robin distribution", employees.size());
+            for (int i = 0; i < employees.size(); i++) {
+                Map<String, Object> emp = employees.get(i);
+                log.info("  Employee {}: {} {} (ID: {})", i, emp.get("firstName"), emp.get("lastName"), emp.get("id"));
+            }
+
             for (Map<String, Object> order : orders) {
-                // Round-robin assignment to employees
-                Map<String, Object> employee = employees.get(employeeIndex % employees.size());
+                // ✅ DEBUG: Log which employee is selected BEFORE the calculation
+                int currentEmployeeIndex = employeeIndex % employees.size();
+                Map<String, Object> employee = employees.get(currentEmployeeIndex);
                 String employeeId = (String) employee.get("id");
                 String employeeName = employee.get("firstName") + " " + employee.get("lastName");
+
+                log.info("🔄 DEBUG: Order {} -> Employee index {} ({}% {}) -> Employee: {} (ID: {})",
+                        order.get("orderNumber"), employeeIndex, employeeIndex, employees.size(),
+                        employeeName, employeeId);
 
                 // Calculate duration based on card count
                 Integer cardCount = (Integer) order.get("cardCount");
@@ -78,32 +94,54 @@ public class GreedyPlanningService {
 
                 int durationMinutes = Math.max(60, 30 + cardCount * 3);
 
+                // ✅ Si vous avez ajouté la vérification de doublons, assurez-vous qu'elle ressemble à ça :
+                String orderId = (String) order.get("id");
+                if (isPlanningAlreadyExists(orderId, employeeId)) {
+                    log.debug("Planning already exists for order {} and employee {}, skipping but continuing rotation",
+                            order.get("orderNumber"), employeeName);
+                    employeeIndex++; // ✅ IMPORTANT: Incrémenter même en cas de skip
+                    continue;
+                }
+
                 // Create planning entry data
                 Map<String, Object> planning = new HashMap<>();
-                planning.put("order_id", order.get("id"));
-                planning.put("orderId", order.get("id")); // Alternative format
+                planning.put("order_id", orderId);
+                planning.put("orderId", orderId);
                 planning.put("employee_id", employeeId);
-                planning.put("employeeId", employeeId); // Alternative format
+                planning.put("employeeId", employeeId);
                 planning.put("employee_name", employeeName);
-                planning.put("employeeName", employeeName); // Alternative format
+                planning.put("employeeName", employeeName);
                 planning.put("duration_minutes", durationMinutes);
-                planning.put("durationMinutes", durationMinutes); // Alternative format
+                planning.put("durationMinutes", durationMinutes);
                 planning.put("card_count", cardCount);
-                planning.put("cardCount", cardCount); // Alternative format
-
-                // Add order details for display
+                planning.put("cardCount", cardCount);
                 planning.put("order_number", order.get("orderNumber"));
-                planning.put("numeroCommande", order.get("orderNumber")); // Legacy compatibility
+                planning.put("numeroCommande", order.get("orderNumber"));
                 planning.put("priority", order.get("priority"));
-                planning.put("priorite", order.get("priority")); // Legacy compatibility
+                planning.put("priorite", order.get("priority"));
 
                 createdPlannings.add(planning);
-                employeeIndex++;
+
+                // ✅ DEBUG: Confirmer l'assignation avant d'incrémenter
+                log.info("✅ DEBUG: Order {} assigned to employee {} (index {})",
+                        order.get("orderNumber"), employeeName, employeeIndex);
+
+                employeeIndex++; // ✅ Incrémenter après l'assignation
 
                 log.debug("Assigned order {} to employee {} (duration: {} minutes)",
                         order.get("orderNumber"), employeeName, durationMinutes);
             }
 
+// ✅ DEBUG: Log final distribution
+            log.info("🎯 DEBUG: Final distribution summary:");
+            Map<String, Integer> employeeOrderCounts = new HashMap<>();
+            for (Map<String, Object> planning : createdPlannings) {
+                String empName = (String) planning.get("employee_name");
+                employeeOrderCounts.merge(empName, 1, Integer::sum);
+            }
+            employeeOrderCounts.forEach((name, count) ->
+                    log.info("  Employee {}: {} orders assigned", name, count));
+// ✅ DEBUG: Log final distribution  FIN
             result.put("success", true);
             result.put("message", String.format("✅ Greedy planning completed: %d assignments created",
                     createdPlannings.size()));
@@ -221,5 +259,31 @@ public class GreedyPlanningService {
         }
 
         return stats;
+    }
+    /**
+     * Check if planning already exists for this order and employee
+     * @param orderId the order ID
+     * @param employeeId the employee ID
+     * @return true if planning exists, false otherwise
+     */
+    private boolean isPlanningAlreadyExists(String orderId, String employeeId) {
+        try {
+            // Check in your planning table (adjust table name if needed)
+            String checkSql = """
+            SELECT COUNT(*) FROM j_planning 
+            WHERE order_id = UNHEX(?) AND employee_id = UNHEX(?)
+            """;
+
+            Query query = entityManager.createNativeQuery(checkSql);
+            query.setParameter(1, orderId.replace("-", ""));
+            query.setParameter(2, employeeId.replace("-", ""));
+
+            Number count = (Number) query.getSingleResult();
+            return count.intValue() > 0;
+
+        } catch (Exception e) {
+            log.warn("Error checking existing planning: {}", e.getMessage());
+            return false; // In case of error, assume it doesn't exist
+        }
     }
 }

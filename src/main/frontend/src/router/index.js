@@ -4,6 +4,7 @@ import Orders from '../views/Orders.vue'
 import Employees from '../views/Employees.vue'
 import Planning from '../views/Planning.vue'
 
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [

@@ -128,7 +128,7 @@
 </template>
 
 <script>
-import ApiService from '../services/api.js'
+import ApiService from '../services/api.ts'
 
 export default {
   name: 'Dashboard',

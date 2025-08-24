@@ -588,12 +588,12 @@ const generatePlanning = async () => {
   try {
     console.log('🚀 Generating planning with config:', config.value)
 
-    // Try different generation endpoints
+    // ✅ CORRECTION: Mettre le GreedyPlanningService en PREMIER
     const endpoints = [
-      'http://localhost:8080/api/planification-gloutonne/juin-2025',
-      'http://localhost:8080/api/planning/generate',
-      'http://localhost:8080/api/planifications/generate',
-      'http://localhost:8080/api/test/planification-simple'
+      'http://localhost:8080/api/planification-gloutonne/juin-2025',  // ✅ Round-robin (Greedy)
+      'http://localhost:8080/api/test/planification-simple',          // ✅ Simple round-robin
+      'http://localhost:8080/api/planifications/generate',            // ✅ Smart distribution
+      'http://localhost:8080/api/planning/generate'                   // ❌ Least busy (causait le problème)
     ]
 
     let success = false
@@ -622,7 +622,7 @@ const generatePlanning = async () => {
           // Reload plannings
           await loadPlannings()
           success = true
-          break
+          break  // ✅ Arrêter au premier succès
         } else {
           console.warn(`⚠️ ${endpoint} failed with status:`, response.status)
         }
