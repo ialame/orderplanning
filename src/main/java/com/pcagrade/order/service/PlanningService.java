@@ -72,8 +72,29 @@ public class PlanningService {
             List<Map<String, Object>> createdPlannings = new ArrayList<>();
             int planningsSaved = 0;
 
+// ✅ NOUVEAU: Nettoyer les planifications existantes pour éviter les doublons
+            cleanExistingPlannings(startDate);
+
+// ✅ NOUVEAU: Map pour suivre les assignations et éviter les doublons
+            Set<String> assignedOrders = new HashSet<>();
+
             for (Map<String, Object> order : orders) {
                 try {
+                    String orderId = (String) order.get("id");
+
+                    // ✅ Vérifier si cette commande a déjà été assignée
+                    if (assignedOrders.contains(orderId)) {
+                        log.warn("Order {} already assigned, skipping", order.get("numCommande"));
+                        continue;
+                    }
+
+                    // ✅ Vérifier en base de données aussi
+                    if (isPlanningExistsForOrder(orderId)) {
+                        log.warn("Order {} already has planning in database, skipping", order.get("numCommande"));
+                        assignedOrders.add(orderId);
+                        continue;
+                    }
+
                     // Trouver l'employé le moins chargé
                     EmployeeWorkload leastBusy = findLeastBusyEmployee(workloads);
 
@@ -86,7 +107,6 @@ public class PlanningService {
 
                     // Créer la planification
                     String planningId = UUID.randomUUID().toString().replace("-", "");
-                    String orderId = (String) order.get("id");
                     String employeeId = leastBusy.getEmployee().get("id").toString();
                     String priority = (String) order.getOrDefault("priorite", "MEDIUM");
 
@@ -98,6 +118,7 @@ public class PlanningService {
 
                     if (saved) {
                         planningsSaved++;
+                        assignedOrders.add(orderId); // ✅ Marquer comme assigné
 
                         // Mettre à jour la charge de travail
                         leastBusy.addWorkload(durationMinutes, startTime);
@@ -109,22 +130,22 @@ public class PlanningService {
                         planningResult.put("employeeId", employeeId);
                         planningResult.put("employeeName", leastBusy.getEmployee().get("firstName") +
                                 " " + leastBusy.getEmployee().get("lastName"));
-                        planningResult.put("orderNumber", order.get("numCommande"));
-                        planningResult.put("startTime", startTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
                         planningResult.put("durationMinutes", durationMinutes);
                         planningResult.put("cardCount", cardCount);
                         planningResult.put("priority", priority);
+                        planningResult.put("startTime", startTime);
 
                         createdPlannings.add(planningResult);
 
-                        log.debug("✅ Planification créée: {} → {} ({}min, {} cartes)",
+                        log.info("✅ Order {} assigned to employee {} (duration: {}min)",
                                 order.get("numCommande"),
-                                leastBusy.getEmployee().get("firstName"),
-                                durationMinutes, cardCount);
+                                planningResult.get("employeeName"),
+                                durationMinutes);
                     }
 
-                } catch (Exception e) {
-                    log.error("❌ Erreur traitement commande {}: {}", order.get("numCommande"), e.getMessage());
+                } catch (Exception orderError) {
+                    log.error("❌ Error processing order {}: {}",
+                            order.get("numCommande"), orderError.getMessage());
                 }
             }
 
@@ -383,6 +404,50 @@ public class PlanningService {
 
         public LocalDateTime getLastEndTime() {
             return lastEndTime;
+        }
+    }
+
+    /**
+     * Nettoyer les planifications existantes pour éviter les doublons
+     */
+    private void cleanExistingPlannings(LocalDate fromDate) {
+        try {
+            String deleteSql = """
+        DELETE FROM j_planning 
+        WHERE planning_date >= ?
+        AND created_at >= NOW() - INTERVAL 1 HOUR
+        """;
+
+            Query deleteQuery = entityManager.createNativeQuery(deleteSql);
+            deleteQuery.setParameter(1, fromDate);
+
+            int deletedCount = deleteQuery.executeUpdate();
+            log.info("🗑️ Cleaned {} recent plannings from date {}", deletedCount, fromDate);
+
+        } catch (Exception e) {
+            log.warn("Error cleaning existing plannings: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Vérifier si une commande a déjà une planification
+     */
+    private boolean isPlanningExistsForOrder(String orderId) {
+        try {
+            String checkSql = """
+        SELECT COUNT(*) FROM j_planning 
+        WHERE order_id = UNHEX(?)
+        """;
+
+            Query checkQuery = entityManager.createNativeQuery(checkSql);
+            checkQuery.setParameter(1, orderId.replace("-", ""));
+
+            Number count = (Number) checkQuery.getSingleResult();
+            return count.intValue() > 0;
+
+        } catch (Exception e) {
+            log.warn("Error checking planning existence for order {}: {}", orderId, e.getMessage());
+            return false;
         }
     }
 }

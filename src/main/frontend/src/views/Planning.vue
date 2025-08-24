@@ -92,13 +92,18 @@
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Planning Configuration</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Start Date
+          </label>
           <input
             v-model="config.startDate"
             type="date"
             class="input-field"
-            :min="minDate"
+            :min="'2025-01-01'"
           >
+          <p class="text-xs text-gray-500 mt-1">
+            📦 All orders from this date onwards will be planned (Currently: ~50 orders from June 1st, 2025)
+          </p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Time per Card (minutes)</label>
@@ -320,12 +325,14 @@ const loadingMessage = ref('')
 const plannings = ref<Planning[]>([])
 
 const config = ref<PlanningConfig>({
-  startDate: getNextBusinessDay(),
-  cardProcessingTime: CARD_PROCESSING_TIME, // Use environment variable
+  startDate: '2025-06-01', // ✅ Default: June 1st, 2025
+  cardProcessingTime: CARD_PROCESSING_TIME,
   priorityMode: 'urgent',
   redistributeOverload: true,
   respectPriorities: true
 })
+
+
 
 const stats = ref({
   totalOrders: 0,
@@ -393,23 +400,8 @@ const groupedPlannings = computed(() => {
 
 // ========== METHODS ==========
 function getNextBusinessDay(): string {
-  const date = new Date()
-  const day = date.getDay()
-
-  // If it's Friday (5), Saturday (6), or Sunday (0), move to Monday
-  if (day === 5) {
-    date.setDate(date.getDate() + 3) // Friday + 3 = Monday
-  } else if (day === 6) {
-    date.setDate(date.getDate() + 2) // Saturday + 2 = Monday
-  } else if (day === 0) {
-    date.setDate(date.getDate() + 1) // Sunday + 1 = Monday
-  } else if (day === 4) {
-    date.setDate(date.getDate() + 4) // Thursday + 4 = Monday (skip weekend)
-  } else {
-    date.setDate(date.getDate() + 1) // Next day
-  }
-
-  return date.toISOString().split('T')[0]
+  // Par défaut, utiliser le 1er juin 2025
+  return '2025-06-01'
 }
 
 const refreshData = async () => {
@@ -583,62 +575,74 @@ const generatePlanning = async () => {
   if (generating.value) return
 
   generating.value = true
-  loadingMessage.value = 'Generating planning...'
+  loadingMessage.value = 'Planning ALL orders from selected date...'
 
   try {
-    console.log('🚀 Generating planning with config:', config.value)
+    console.log('🚀 Generating planning for ALL orders with config:', config.value)
 
-    // ✅ CORRECTION: Mettre le GreedyPlanningService en PREMIER
-    const endpoints = [
-      'http://localhost:8080/api/planification-gloutonne/juin-2025',  // ✅ Round-robin (Greedy)
-      'http://localhost:8080/api/test/planification-simple',          // ✅ Simple round-robin
-      'http://localhost:8080/api/planifications/generate',            // ✅ Smart distribution
-      'http://localhost:8080/api/planning/generate'                   // ❌ Least busy (causait le problème)
-    ]
-
-    let success = false
-
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`🔄 Trying generate endpoint: ${endpoint}`)
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            startDate: config.value.startDate,
-            timePerCard: config.value.cardProcessingTime,
-            cleanFirst: false,
-            priorityMode: config.value.priorityMode
-          })
-        })
-
-        if (response.ok) {
-          const result = await response.json()
-          console.log(`✅ Planning generated successfully with ${endpoint}:`, result)
-
-          const planningsCreated = result.nombreCommandesPlanifiees || result.planningsSaved || result.count || 0
-          showNotification(`Planning generated successfully! ${planningsCreated} orders planned`, 'success')
-
-          // Reload plannings
-          await loadPlannings()
-          success = true
-          break  // ✅ Arrêter au premier succès
-        } else {
-          console.warn(`⚠️ ${endpoint} failed with status:`, response.status)
-        }
-      } catch (error) {
-        console.warn(`⚠️ ${endpoint} error:`, error)
-        continue
-      }
+    // ✅ UTILISER SEULEMENT L'ENDPOINT QUI EXISTE ET QUI FONCTIONNE
+    const planningConfig = {
+      startDate: config.value.startDate,
+      timePerCard: config.value.cardProcessingTime,
+      cleanFirst: true,
+      priorityMode: config.value.priorityMode,
+      planAllOrders: true
     }
 
-    if (!success) {
-      throw new Error('All planning generation endpoints failed')
+    console.log('📋 Using ONLY the existing /api/planning/generate endpoint')
+    console.log('📋 Config sent:', planningConfig)
+
+    const response = await fetch('http://localhost:8080/api/planning/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(planningConfig)
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      console.log('✅ Planning generation result:', result)
+
+      const ordersProcessed = result.ordersAnalyzed || 0
+      const planningsCreated = result.planningsSaved || 0
+      const employeesUsed = result.employeesUsed || 0
+
+      console.log(`📊 PLANNING SUMMARY:`)
+      console.log(`  📦 Orders analyzed: ${ordersProcessed}`)
+      console.log(`  ✅ Plannings created: ${planningsCreated}`)
+      console.log(`  👥 Employees used: ${employeesUsed}`)
+
+      // Show distribution per employee
+      if (result.distributionSummary) {
+        console.log(`📋 Distribution per employee:`)
+        Object.entries(result.distributionSummary).forEach(([name, count]) => {
+          console.log(`  ${name}: ${count} orders`)
+        })
+      }
+
+      if (planningsCreated > 0) {
+        showNotification(
+          `✅ SUCCESS! ${planningsCreated} orders planned for ${employeesUsed} employees from ${config.value.startDate}`,
+          'success'
+        )
+      } else {
+        showNotification(
+          `⚠️ No new plannings created. Check if orders exist from ${config.value.startDate}`,
+          'info'
+        )
+      }
+
+      // Reload plannings to show ALL results
+      await loadPlannings()
+
+    } else {
+      const errorText = await response.text()
+      console.error('❌ Planning generation failed:', response.status, errorText)
+      throw new Error(`Planning generation failed: ${response.status} - ${errorText}`)
     }
 
   } catch (error) {
     console.error('❌ Error generating planning:', error)
-    showNotification('Error generating planning', 'error')
+    showNotification(`❌ Error: ${error.message}`, 'error')
   } finally {
     generating.value = false
     loadingMessage.value = ''

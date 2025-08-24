@@ -5,11 +5,12 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.UUID;
-
+import jakarta.persistence.EntityTransaction;
+import org.springframework.transaction.annotation.Transactional;
 import com.pcagrade.order.service.EmployeeService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
-import jakarta.transaction.Transactional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,9 +33,6 @@ public class PlanningController {
 // ===============================================
 // 🎯 MÉTHODE DE GÉNÉRATION SIMPLIFIÉE GARANTIE
 // ===============================================
-
-// Ajoutez cette méthode dans PlanningController.java
-// Cette version est ultra-simplifiée pour identifier le problème exact
 
     @PostMapping("/generate-simple")
     public ResponseEntity<Map<String, Object>> generatePlanningSimple(@RequestBody Map<String, Object> request) {
@@ -666,102 +664,69 @@ public class PlanningController {
      * ✅ CORRECTIF FINAL - Remplacez la méthode generatePlanning dans PlanningController.java
      * L'erreur vient de l'utilisation d'executeUpdate() sur une requête SELECT
      */
+// ✅ CORRECTION - Variable scope dans PlanningController.java
+
     @PostMapping("/generate")
-    @Transactional
     public ResponseEntity<Map<String, Object>> generatePlanning(@RequestBody Map<String, Object> request) {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            System.out.println("=== GENERATION PLANIFICATION POKEMON (CORRECTIF FINAL) ===");
+            System.out.println("=== PLANNING GENERATION (MANUAL TRANSACTION) ===");
+            System.out.println("📋 Request: " + request);
 
-            // ========== PARAMÈTRES ==========
-            String startDate = "2025-06-01";
-            Integer timePerCard = 3;
-            boolean cleanFirst = request.containsKey("cleanFirst") ? (Boolean) request.get("cleanFirst") : false;
+            // ========== PARAMETERS ==========
+            String startDate = (String) request.getOrDefault("startDate", "2025-06-01");
+            Integer timePerCard = request.containsKey("timePerCard") ?
+                    ((Number) request.get("timePerCard")).intValue() : 3;
 
-            // ========== NETTOYAGE PRÉVENTIF ==========
-            if (cleanFirst) {
-                System.out.println("🧹 Nettoyage préventif des doublons...");
-                try {
-                    String cleanupSql = """
-                    DELETE p1 FROM j_planning p1
-                    INNER JOIN j_planning p2 
-                    WHERE p1.order_id = p2.order_id 
-                      AND p1.employee_id = p2.employee_id
-                      AND p1.planning_date = p2.planning_date
-                      AND p1.start_time = p2.start_time
-                      AND p1.created_at < p2.created_at
-                """;
-                    int cleaned = entityManager.createNativeQuery(cleanupSql).executeUpdate();
-                    System.out.println("✅ " + cleaned + " doublons supprimés");
-                } catch (Exception cleanError) {
-                    System.out.println("⚠️ Erreur nettoyage (continuons): " + cleanError.getMessage());
-                }
-            }
+            System.out.println("✅ Parameters:");
+            System.out.println("  startDate: " + startDate);
+            System.out.println("  timePerCard: " + timePerCard);
 
-            // ========== CHARGEMENT DES EMPLOYÉS ==========
-            List<Map<String, Object>> employees = null;
-            try {
-                employees = employeService.getAllActiveEmployees();
-                System.out.println("✅ Employés via service: " + employees.size());
-            } catch (Exception e) {
-                System.out.println("⚠️ Service employés indisponible, essai SQL direct...");
-
-                // Fallback: SQL direct pour les employés
-                try {
-                    String sqlEmployees = "SELECT HEX(id) as id, nom, prenom FROM j_employee WHERE actif = 1 LIMIT 5";
-                    Query empQuery = entityManager.createNativeQuery(sqlEmployees);
-                    @SuppressWarnings("unchecked")
-                    List<Object[]> empResults = empQuery.getResultList();
-
-                    employees = new ArrayList<>();
-                    for (Object[] row : empResults) {
-                        Map<String, Object> emp = new HashMap<>();
-                        emp.put("id", (String) row[0]);
-                        emp.put("nom", row[1]);
-                        emp.put("prenom", row[2]);
-                        employees.add(emp);
-                    }
-                    System.out.println("✅ Employés via SQL: " + employees.size());
-                } catch (Exception sqlError) {
-                    // Créer un employé de test si aucun trouvé
-                    employees = new ArrayList<>();
-                    Map<String, Object> testEmp = new HashMap<>();
-                    testEmp.put("id", "E93263727DF943D78BD9B0F91845F358");
-                    testEmp.put("nom", "Test");
-                    testEmp.put("prenom", "Employé");
-                    employees.add(testEmp);
-                    System.out.println("⚠️ Utilisation employé de test");
-                }
-            }
-
+            // ========== LOAD EMPLOYEES (READ-ONLY) ==========
+            List<Map<String, Object>> employees = employeService.getAllActiveEmployees();
             if (employees.isEmpty()) {
                 result.put("success", false);
-                result.put("error", "Aucun employé disponible");
+                result.put("message", "No active employees found");
                 return ResponseEntity.ok(result);
             }
+            System.out.println("👥 Active employees: " + employees.size());
+            for (Map<String, Object> emp : employees) {
+                System.out.println("  👤 " + emp.get("firstName") + " " + emp.get("lastName"));
+            }
 
-            // ========== CHARGEMENT DES COMMANDES ==========
+            // ========== LOAD ORDERS (READ-ONLY) ==========
             String sqlOrders = """
             SELECT 
                 HEX(o.id) as id, 
-                o.num_commande, 
-                COALESCE(o.delai, 'F') as delai, 
-                COALESCE(COUNT(cco.card_certification_id), 5) as card_count
+                o.num_commande as orderNumber, 
+                o.delai as delayCode,
+                COALESCE(COUNT(cco.card_certification_id), 1) as cardCount,
+                CASE o.delai
+                    WHEN 'X' THEN 'URGENT'
+                    WHEN 'F+' THEN 'HIGH' 
+                    WHEN 'F' THEN 'MEDIUM'
+                    WHEN 'E' THEN 'LOW'
+                    WHEN 'C' THEN 'NORMAL'
+                    ELSE 'MEDIUM'
+                END as priority,
+                o.date as creationDate
             FROM `order` o
             LEFT JOIN card_certification_order cco ON o.id = cco.order_id
             WHERE o.status IN (1,2,3) 
-            AND o.date >= ? 
-            GROUP BY o.id, o.num_commande, o.delai
-            HAVING card_count > 0
+            AND o.date >= ?
+            GROUP BY o.id, o.num_commande, o.delai, o.date
+            HAVING cardCount > 0
             ORDER BY 
-                CASE COALESCE(o.delai, 'F')
-                    WHEN 'X' THEN 1 
+                CASE o.delai
+                    WHEN 'X' THEN 1
                     WHEN 'F+' THEN 2 
-                    WHEN 'F' THEN 3 
-                    ELSE 4 
-                END
-            LIMIT 10
+                    WHEN 'F' THEN 3
+                    WHEN 'E' THEN 4
+                    WHEN 'C' THEN 5
+                    ELSE 6 
+                END,
+                o.date ASC
         """;
 
             Query orderQuery = entityManager.createNativeQuery(sqlOrders);
@@ -770,138 +735,187 @@ public class PlanningController {
             @SuppressWarnings("unchecked")
             List<Object[]> orderResults = orderQuery.getResultList();
 
-            System.out.println("✅ Commandes trouvées: " + orderResults.size());
+            System.out.println("📦 TOTAL orders found from " + startDate + ": " + orderResults.size());
 
             if (orderResults.isEmpty()) {
                 result.put("success", true);
-                result.put("message", "Aucune commande trouvée depuis " + startDate);
+                result.put("message", "No orders found from " + startDate);
+                result.put("ordersAnalyzed", 0);
                 result.put("planningsSaved", 0);
                 return ResponseEntity.ok(result);
             }
 
-            // ========== GÉNÉRATION PLANIFICATIONS ==========
+            // ========== DECLARE VARIABLES IN CORRECT SCOPE ==========
+            EntityTransaction transaction = entityManager.getTransaction();
             int planningsSaved = 0;
             List<Map<String, Object>> createdPlannings = new ArrayList<>();
-            LocalDate currentDate = LocalDate.parse("2025-09-01");
-            LocalTime currentTime = LocalTime.of(9, 0);
-            int employeeIndex = 0;
+            LocalDate planningStartDate = LocalDate.parse(startDate);
+            LocalDate currentDate = planningStartDate; // ✅ Déclarer ici
+            LocalTime currentTime = LocalTime.of(9, 0); // ✅ Déclarer ici
 
-            for (Object[] row : orderResults) {
-                try {
+            try {
+                transaction.begin();
+                System.out.println("🔄 Manual transaction started");
+
+                // ========== CLEAN EXISTING PLANNINGS ==========
+                String cleanSql = """
+                DELETE FROM j_planning 
+                WHERE planning_date >= ? 
+                OR created_at >= NOW() - INTERVAL 1 HOUR
+            """;
+                Query cleanQuery = entityManager.createNativeQuery(cleanSql);
+                cleanQuery.setParameter(1, planningStartDate);
+                int cleanedPlannings = cleanQuery.executeUpdate();
+                System.out.println("🗑️ Cleaned " + cleanedPlannings + " existing plannings");
+
+                // ========== PLAN ALL ORDERS WITH ROUND-ROBIN ==========
+                Set<String> processedOrderIds = new HashSet<>();
+
+                System.out.println("🎯 Starting round-robin distribution for " + orderResults.size() + " orders among " + employees.size() + " employees");
+
+                for (int i = 0; i < orderResults.size(); i++) {
+                    Object[] row = orderResults.get(i);
                     String orderId = (String) row[0];
                     String orderNumber = (String) row[1];
-                    String delaiCode = (String) row[2];
+                    String delayCode = (String) row[2];
                     Integer cardCount = ((Number) row[3]).intValue();
+                    String priority = (String) row[4];
 
-                    // Calcul durée
-                    int durationMinutes = Math.max(15, cardCount * timePerCard);
-
-                    // Sélection employé
-                    Map<String, Object> employee = employees.get(employeeIndex % employees.size());
-                    String employeeId = (String) employee.get("id");
-                    String employeeName = employee.get("prenom") + " " + employee.get("nom");
-
-                    // ========== VÉRIFICATION ANTI-DOUBLON - CORRECTIF CRITIQUE ==========
-                    String checkExistsSql = """
-                    SELECT COUNT(*) FROM j_planning 
-                    WHERE order_id = UNHEX(?)
-                    AND employee_id = UNHEX(?)
-                    AND planning_date = ?
-                    AND start_time = ?
-                """;
-
-                    Query checkQuery = entityManager.createNativeQuery(checkExistsSql);
-                    checkQuery.setParameter(1, orderId);
-                    checkQuery.setParameter(2, employeeId);
-                    checkQuery.setParameter(3, currentDate);
-                    checkQuery.setParameter(4, LocalDateTime.of(currentDate, currentTime));
-
-                    // ✅ CORRECTIF CRITIQUE: getSingleResult() pour SELECT, pas executeUpdate()
-                    Number existingCount = (Number) checkQuery.getSingleResult();
-
-                    if (existingCount.intValue() > 0) {
-                        System.out.println("⚠️ Planning existant pour " + orderNumber + " - IGNORÉ");
-
-                        // Avancer dans le temps
-                        currentTime = currentTime.plusMinutes(durationMinutes + 15);
-                        if (currentTime.isAfter(LocalTime.of(17, 0))) {
-                            currentDate = currentDate.plusDays(1);
-                            currentTime = LocalTime.of(9, 0);
-                            employeeIndex++;
-                        }
+                    // Skip duplicates
+                    if (processedOrderIds.contains(orderId)) {
                         continue;
                     }
 
-                    // ========== INSERTION NOUVELLE PLANIFICATION ==========
+                    // Calculate duration
+                    int durationMinutes = Math.max(30, cardCount * timePerCard);
+
+                    // ✅ ROUND-ROBIN DISTRIBUTION
+                    int employeeIndex = i % employees.size();
+                    Map<String, Object> employee = employees.get(employeeIndex);
+                    String employeeId = (String) employee.get("id");
+                    String employeeName = employee.get("firstName") + " " + employee.get("lastName");
+
+                    // Create planning entry
                     String planningId = UUID.randomUUID().toString().replace("-", "");
                     LocalDateTime startDateTime = LocalDateTime.of(currentDate, currentTime);
                     LocalDateTime endDateTime = startDateTime.plusMinutes(durationMinutes);
 
-                    String insertSql = """
+                    try {
+                        String insertSql = """
                     INSERT INTO j_planning 
                     (id, order_id, employee_id, planning_date, start_time, end_time, 
                      estimated_duration_minutes, estimated_end_time, priority, status, 
-                     completed, card_count, notes, progress_percentage, created_at, updated_at)
-                    VALUES (UNHEX(?), UNHEX(?), UNHEX(?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                """;
+                     completed, card_count, notes, created_at, updated_at)
+                    VALUES (UNHEX(?), UNHEX(?), UNHEX(?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    """;
 
-                    try {
-                        // ✅ executeUpdate() est CORRECT pour INSERT/UPDATE/DELETE
-                        int rowsAffected = entityManager.createNativeQuery(insertSql)
-                                .setParameter(1, planningId)
-                                .setParameter(2, orderId)
-                                .setParameter(3, employeeId)
-                                .setParameter(4, currentDate)
-                                .setParameter(5, startDateTime)
-                                .setParameter(6, endDateTime)
-                                .setParameter(7, durationMinutes)
-                                .setParameter(8, endDateTime)
-                                .setParameter(9, mapDelaiToPriorityEnum(delaiCode))
-                                .setParameter(10, "SCHEDULED")
-                                .setParameter(11, false) // completed
-                                .setParameter(12, cardCount)
-                                .setParameter(13, "🎮 Pokémon: " + orderNumber + " → " + employeeName + " (" + cardCount + " cartes)")
-                                .setParameter(14, 0) // progress_percentage
-                                .executeUpdate(); // ✅ CORRECT pour INSERT
+                        Query insertQuery = entityManager.createNativeQuery(insertSql);
+                        insertQuery.setParameter(1, planningId);
+                        insertQuery.setParameter(2, orderId);
+                        insertQuery.setParameter(3, employeeId);
+                        insertQuery.setParameter(4, currentDate);
+                        insertQuery.setParameter(5, startDateTime);
+                        insertQuery.setParameter(6, endDateTime);
+                        insertQuery.setParameter(7, durationMinutes);
+                        insertQuery.setParameter(8, endDateTime);
+                        insertQuery.setParameter(9, priority);
+                        insertQuery.setParameter(10, "SCHEDULED");
+                        insertQuery.setParameter(11, 0); // completed = false
+                        insertQuery.setParameter(12, cardCount);
+                        insertQuery.setParameter(13, "Auto-planned: " + orderNumber + " (" + cardCount + " cards, " + delayCode + ")");
+
+                        int rowsAffected = insertQuery.executeUpdate();
 
                         if (rowsAffected > 0) {
                             planningsSaved++;
+                            processedOrderIds.add(orderId);
 
+                            // Add to results
                             Map<String, Object> planning = new HashMap<>();
-                            planning.put("planningId", planningId);
+                            planning.put("id", planningId);
+                            planning.put("orderId", orderId);
                             planning.put("orderNumber", orderNumber);
+                            planning.put("employeeId", employeeId);
                             planning.put("employeeName", employeeName);
-                            planning.put("cardCount", cardCount);
                             planning.put("durationMinutes", durationMinutes);
+                            planning.put("cardCount", cardCount);
+                            planning.put("priority", priority);
+                            planning.put("delayCode", delayCode);
                             planning.put("planningDate", currentDate.toString());
                             planning.put("startTime", currentTime.toString());
-                            planning.put("priority", mapDelaiToPriorityEnum(delaiCode));
+
                             createdPlannings.add(planning);
 
-                            System.out.println("  ✅ " + orderNumber + " → " + employeeName +
-                                    " (" + currentDate + " " + currentTime + ")");
+                            System.out.println("✅ [" + (i+1) + "/" + orderResults.size() + "] " +
+                                    orderNumber + " (" + delayCode + "/" + priority + ") → " + employeeName +
+                                    " (" + cardCount + " cards, " + durationMinutes + "min)");
+
+                            // Advance time realistically
+                            currentTime = currentTime.plusMinutes(durationMinutes + 15);
+                            if (currentTime.isAfter(LocalTime.of(17, 0))) {
+                                currentDate = currentDate.plusDays(1);
+                                currentTime = LocalTime.of(9, 0);
+
+                                // Skip weekends
+                                while (currentDate.getDayOfWeek().getValue() >= 6) {
+                                    currentDate = currentDate.plusDays(1);
+                                }
+                            }
                         }
 
                     } catch (Exception insertError) {
-                        System.err.println("  ❌ Erreur insertion: " + insertError.getMessage());
-                        insertError.printStackTrace();
+                        System.err.println("❌ Insert error for " + orderNumber + ": " + insertError.getMessage());
+                        // Continue with other orders instead of failing completely
                     }
-
-                    // ========== AVANCEMENT TEMPOREL ==========
-                    currentTime = currentTime.plusMinutes(durationMinutes + 15);
-                    if (currentTime.isAfter(LocalTime.of(17, 0))) {
-                        currentDate = currentDate.plusDays(1);
-                        currentTime = LocalTime.of(9, 0);
-                        employeeIndex++;
-                    }
-
-                } catch (Exception orderError) {
-                    System.err.println("❌ Erreur commande " + orderError.getMessage());
-                    orderError.printStackTrace();
                 }
+
+                // ========== COMMIT TRANSACTION ==========
+                transaction.commit();
+                System.out.println("✅ Transaction committed successfully");
+
+            } catch (Exception transactionError) {
+                System.err.println("❌ Transaction error: " + transactionError.getMessage());
+                transactionError.printStackTrace();
+
+                if (transaction.isActive()) {
+                    try {
+                        transaction.rollback();
+                        System.out.println("🔄 Transaction rolled back");
+                    } catch (Exception rollbackError) {
+                        System.err.println("❌ Rollback error: " + rollbackError.getMessage());
+                    }
+                }
+
+                result.put("success", false);
+                result.put("message", "Transaction failed: " + transactionError.getMessage());
+                return ResponseEntity.status(500).body(result);
             }
 
-            // ========== RÉSULTATS FINAUX ==========
+            // ========== FINAL SUMMARY ==========
+            System.out.println("📊 FINAL DISTRIBUTION SUMMARY:");
+            Map<String, Integer> employeeAssignments = new HashMap<>();
+            Map<String, Integer> priorityDistribution = new HashMap<>();
+
+            for (Map<String, Object> planning : createdPlannings) {
+                String empName = (String) planning.get("employeeName");
+                String priority = (String) planning.get("priority");
+                employeeAssignments.merge(empName, 1, Integer::sum);
+                priorityDistribution.merge(priority, 1, Integer::sum);
+            }
+
+            employeeAssignments.forEach((name, count) ->
+                    System.out.println("  👤 " + name + ": " + count + " orders"));
+
+            System.out.println("📊 PRIORITY DISTRIBUTION:");
+            priorityDistribution.forEach((priority, count) ->
+                    System.out.println("  🎯 " + priority + ": " + count + " orders"));
+
+            System.out.println("🎉 PLANNING COMPLETED!");
+            System.out.println("  📦 Total orders: " + orderResults.size());
+            System.out.println("  ✅ Successfully planned: " + planningsSaved);
+            System.out.println("  👥 Employees used: " + employeeAssignments.size());
+
+            // ========== RESULTS ==========
             int totalCards = createdPlannings.stream()
                     .mapToInt(p -> (Integer) p.get("cardCount"))
                     .sum();
@@ -910,25 +924,28 @@ public class PlanningController {
                     .sum();
 
             result.put("success", true);
-            result.put("message", "🎮 Planification Pokémon terminée - " + planningsSaved + " plannings créés");
+            result.put("message", "All orders planned successfully with round-robin distribution!");
             result.put("ordersAnalyzed", orderResults.size());
-            result.put("employeesUsed", Math.min(employees.size(), employeeIndex + 1));
             result.put("planningsSaved", planningsSaved);
+            result.put("employeesUsed", employeeAssignments.size());
             result.put("totalCards", totalCards);
             result.put("totalMinutes", totalMinutes);
             result.put("totalHours", String.format("%.1f", totalMinutes / 60.0));
+            result.put("startDate", startDate);
+            result.put("endDate", currentDate.toString()); // ✅ Maintenant accessible
             result.put("createdPlannings", createdPlannings);
+            result.put("distributionSummary", employeeAssignments);
+            result.put("priorityDistribution", priorityDistribution);
             result.put("timePerCardMinutes", timePerCard);
-            result.put("strategy", "POKEMON_FINAL_FIX");
 
-            System.out.println("🎉 GÉNÉRATION TERMINÉE - " + planningsSaved + " plannings sauvés !");
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
-            System.err.println("❌ ERREUR GÉNÉRATION GLOBALE: " + e.getMessage());
+            System.err.println("❌ GENERAL ERROR: " + e.getMessage());
             e.printStackTrace();
             result.put("success", false);
-            result.put("error", e.getMessage());
+            result.put("message", "Planning generation failed: " + e.getMessage());
+            result.put("error", e.getClass().getSimpleName());
             return ResponseEntity.status(500).body(result);
         }
     }
@@ -1344,6 +1361,83 @@ public class PlanningController {
             case "C": return "MEDIUM";
             default: return "MEDIUM";
         }
+    }
+
+    /**
+     * Remove duplicate plannings based on order_id + employee_id + planning_date
+     */
+    @PostMapping("/remove-duplicates")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> removeDuplicates() {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            log.info("🗑️ Starting duplicate planning removal...");
+
+            // Trouver les doublons
+            String findDuplicatesSql = """
+        SELECT order_id, employee_id, planning_date, COUNT(*) as duplicate_count
+        FROM j_planning 
+        GROUP BY order_id, employee_id, planning_date
+        HAVING COUNT(*) > 1
+        """;
+
+            Query findQuery = entityManager.createNativeQuery(findDuplicatesSql);
+            @SuppressWarnings("unchecked")
+            List<Object[]> duplicateGroups = findQuery.getResultList();
+
+            int totalDuplicatesRemoved = 0;
+
+            for (Object[] group : duplicateGroups) {
+                byte[] orderId = (byte[]) group[0];
+                byte[] employeeId = (byte[]) group[1];
+                java.sql.Date planningDate = (java.sql.Date) group[2];
+                int duplicateCount = ((Number) group[3]).intValue();
+
+                // Garder seulement le plus récent (par created_at)
+                String deleteDuplicatesSql = """
+            DELETE FROM j_planning 
+            WHERE order_id = ? AND employee_id = ? AND planning_date = ?
+            AND id NOT IN (
+                SELECT id FROM (
+                    SELECT id FROM j_planning 
+                    WHERE order_id = ? AND employee_id = ? AND planning_date = ?
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                ) as keeper
+            )
+            """;
+
+                Query deleteQuery = entityManager.createNativeQuery(deleteDuplicatesSql);
+                deleteQuery.setParameter(1, orderId);
+                deleteQuery.setParameter(2, employeeId);
+                deleteQuery.setParameter(3, planningDate);
+                deleteQuery.setParameter(4, orderId);
+                deleteQuery.setParameter(5, employeeId);
+                deleteQuery.setParameter(6, planningDate);
+
+                int deletedCount = deleteQuery.executeUpdate();
+                totalDuplicatesRemoved += deletedCount;
+
+                log.info("Removed {} duplicates for order-employee-date group", deletedCount);
+            }
+
+            result.put("success", true);
+            result.put("message", "Duplicate removal completed");
+            result.put("duplicateGroupsFound", duplicateGroups.size());
+            result.put("totalDuplicatesRemoved", totalDuplicatesRemoved);
+
+            log.info("✅ Duplicate removal completed: {} duplicates removed from {} groups",
+                    totalDuplicatesRemoved, duplicateGroups.size());
+
+        } catch (Exception e) {
+            log.error("❌ Error removing duplicates: {}", e.getMessage(), e);
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+
+        return ResponseEntity.ok(result);
     }
 
 }

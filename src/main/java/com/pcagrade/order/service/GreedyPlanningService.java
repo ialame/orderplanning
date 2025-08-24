@@ -7,10 +7,9 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.*;
 
 /**
  * Greedy Planning Service - Simple greedy algorithm for task assignment
@@ -40,8 +39,11 @@ public class GreedyPlanningService {
 
             Map<String, Object> result = new HashMap<>();
 
+            // ✅ NOUVEAU: Nettoyer les planifications existantes pour cette date
+            cleanExistingPlanningsForDate(day, month, year);
+
             // 1. Get active employees
-            List<Map<String, Object>> employees =  employeeService.getAllActiveEmployees();
+            List<Map<String, Object>> employees = employeeService.getAllActiveEmployees();
             if (employees.isEmpty()) {
                 log.warn("❌ No active employees found");
                 result.put("success", false);
@@ -61,87 +63,58 @@ public class GreedyPlanningService {
             }
             log.info("Found {} orders to plan", orders.size());
 
-            // 3. Execute greedy algorithm
+            // 3. Execute greedy algorithm with improved distribution
             List<Map<String, Object>> createdPlannings = new ArrayList<>();
             int employeeIndex = 0;
 
-// ✅ DEBUG: Log the employees we have
-            log.info("🧑‍💼 DEBUG: Found {} employees for round-robin distribution", employees.size());
-            for (int i = 0; i < employees.size(); i++) {
-                Map<String, Object> emp = employees.get(i);
-                log.info("  Employee {}: {} {} (ID: {})", i, emp.get("firstName"), emp.get("lastName"), emp.get("id"));
-            }
-
+            // ✅ CORRECTION: Sauvegarder en base de données immédiatement pour éviter les doublons
             for (Map<String, Object> order : orders) {
-                // ✅ DEBUG: Log which employee is selected BEFORE the calculation
                 int currentEmployeeIndex = employeeIndex % employees.size();
                 Map<String, Object> employee = employees.get(currentEmployeeIndex);
                 String employeeId = (String) employee.get("id");
-                String employeeName = employee.get("firstName") + " " + employee.get("lastName");
-
-                log.info("🔄 DEBUG: Order {} -> Employee index {} ({}% {}) -> Employee: {} (ID: {})",
-                        order.get("orderNumber"), employeeIndex, employeeIndex, employees.size(),
-                        employeeName, employeeId);
-
-                // Calculate duration based on card count
-                Integer cardCount = (Integer) order.get("cardCount");
-                if (cardCount == null) {
-                    cardCount = (Integer) order.get("nombreCartes"); // Legacy compatibility
-                }
-                if (cardCount == null) {
-                    cardCount = 10; // Default fallback
-                }
-
-                int durationMinutes = Math.max(60, 30 + cardCount * 3);
-
-                // ✅ Si vous avez ajouté la vérification de doublons, assurez-vous qu'elle ressemble à ça :
                 String orderId = (String) order.get("id");
-                if (isPlanningAlreadyExists(orderId, employeeId)) {
-                    log.debug("Planning already exists for order {} and employee {}, skipping but continuing rotation",
-                            order.get("orderNumber"), employeeName);
-                    employeeIndex++; // ✅ IMPORTANT: Incrémenter même en cas de skip
-                    continue;
+
+                // ✅ Vérification finale avant création
+                if (!isPlanningAlreadyExists(orderId, employeeId)) {
+
+                    // Calculer les données de planification
+                    Integer cardCount = (Integer) order.get("cardCount");
+                    if (cardCount == null) {
+                        cardCount = (Integer) order.get("nombreCartes");
+                    }
+                    if (cardCount == null) {
+                        cardCount = 10; // Default fallback
+                    }
+
+                    int durationMinutes = Math.max(60, 30 + cardCount * 3);
+
+                    // ✅ Sauvegarder immédiatement en base
+                    boolean saved = savePlanningToDatabase(orderId, employeeId, day, month, year, durationMinutes, cardCount);
+
+                    if (saved) {
+                        String employeeName = employee.get("firstName") + " " + employee.get("lastName");
+
+                        // Créer l'objet résultat
+                        Map<String, Object> planning = new HashMap<>();
+                        planning.put("order_id", orderId);
+                        planning.put("employee_id", employeeId);
+                        planning.put("employee_name", employeeName);
+                        planning.put("duration_minutes", durationMinutes);
+                        planning.put("card_count", cardCount);
+                        planning.put("order_number", order.get("orderNumber"));
+                        planning.put("priority", order.get("priority"));
+
+                        createdPlannings.add(planning);
+
+                        log.info("✅ Order {} assigned to employee {} (saved to DB)",
+                                order.get("orderNumber"), employeeName);
+                    }
                 }
 
-                // Create planning entry data
-                Map<String, Object> planning = new HashMap<>();
-                planning.put("order_id", orderId);
-                planning.put("orderId", orderId);
-                planning.put("employee_id", employeeId);
-                planning.put("employeeId", employeeId);
-                planning.put("employee_name", employeeName);
-                planning.put("employeeName", employeeName);
-                planning.put("duration_minutes", durationMinutes);
-                planning.put("durationMinutes", durationMinutes);
-                planning.put("card_count", cardCount);
-                planning.put("cardCount", cardCount);
-                planning.put("order_number", order.get("orderNumber"));
-                planning.put("numeroCommande", order.get("orderNumber"));
-                planning.put("priority", order.get("priority"));
-                planning.put("priorite", order.get("priority"));
-
-                createdPlannings.add(planning);
-
-                // ✅ DEBUG: Confirmer l'assignation avant d'incrémenter
-                log.info("✅ DEBUG: Order {} assigned to employee {} (index {})",
-                        order.get("orderNumber"), employeeName, employeeIndex);
-
-                employeeIndex++; // ✅ Incrémenter après l'assignation
-
-                log.debug("Assigned order {} to employee {} (duration: {} minutes)",
-                        order.get("orderNumber"), employeeName, durationMinutes);
+                employeeIndex++; // Toujours incrémenter pour maintenir la rotation
             }
 
-// ✅ DEBUG: Log final distribution
-            log.info("🎯 DEBUG: Final distribution summary:");
-            Map<String, Integer> employeeOrderCounts = new HashMap<>();
-            for (Map<String, Object> planning : createdPlannings) {
-                String empName = (String) planning.get("employee_name");
-                employeeOrderCounts.merge(empName, 1, Integer::sum);
-            }
-            employeeOrderCounts.forEach((name, count) ->
-                    log.info("  Employee {}: {} orders assigned", name, count));
-// ✅ DEBUG: Log final distribution  FIN
+            // Suite du code existant...
             result.put("success", true);
             result.put("message", String.format("✅ Greedy planning completed: %d assignments created",
                     createdPlannings.size()));
@@ -150,14 +123,6 @@ public class GreedyPlanningService {
             result.put("totalEmployees", employees.size());
             result.put("totalOrders", orders.size());
 
-            // Add algorithm info
-            Map<String, Object> algorithmInfo = new HashMap<>();
-            algorithmInfo.put("name", "Greedy Round-Robin");
-            algorithmInfo.put("description", "Simple round-robin assignment of orders to employees");
-            algorithmInfo.put("complexity", "O(n)");
-            result.put("algorithm", algorithmInfo);
-
-            log.info("✅ Greedy planning completed successfully: {} assignments", createdPlannings.size());
             return result;
 
         } catch (Exception e) {
@@ -165,7 +130,6 @@ public class GreedyPlanningService {
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", "Error in greedy planning: " + e.getMessage());
-            error.put("error", e.getClass().getSimpleName());
             return error;
         }
     }
@@ -268,22 +232,89 @@ public class GreedyPlanningService {
      */
     private boolean isPlanningAlreadyExists(String orderId, String employeeId) {
         try {
-            // Check in your planning table (adjust table name if needed)
             String checkSql = """
-            SELECT COUNT(*) FROM j_planning 
-            WHERE order_id = UNHEX(?) AND employee_id = UNHEX(?)
-            """;
+        SELECT COUNT(*) FROM j_planning 
+        WHERE order_id = UNHEX(?) 
+        AND employee_id = UNHEX(?)
+        """;
 
-            Query query = entityManager.createNativeQuery(checkSql);
-            query.setParameter(1, orderId.replace("-", ""));
-            query.setParameter(2, employeeId.replace("-", ""));
+            Query checkQuery = entityManager.createNativeQuery(checkSql);
+            checkQuery.setParameter(1, orderId.replace("-", ""));
+            checkQuery.setParameter(2, employeeId.replace("-", ""));
 
-            Number count = (Number) query.getSingleResult();
-            return count.intValue() > 0;
+            Number count = (Number) checkQuery.getSingleResult();
+            boolean exists = count.intValue() > 0;
+
+            if (exists) {
+                log.debug("Planning already exists for order {} and employee {}", orderId, employeeId);
+            }
+
+            return exists;
 
         } catch (Exception e) {
             log.warn("Error checking existing planning: {}", e.getMessage());
-            return false; // In case of error, assume it doesn't exist
+            return false; // Si erreur, on assume qu'il n'existe pas pour éviter de bloquer
+        }
+    }
+    private void cleanExistingPlanningsForDate(int day, int month, int year) {
+        try {
+            LocalDate targetDate = LocalDate.of(year, month, day);
+
+            String deleteSql = """
+        DELETE FROM j_planning 
+        WHERE planning_date = ?
+        """;
+
+            Query deleteQuery = entityManager.createNativeQuery(deleteSql);
+            deleteQuery.setParameter(1, targetDate);
+
+            int deletedCount = deleteQuery.executeUpdate();
+            log.info("🗑️ Cleaned {} existing plannings for date {}", deletedCount, targetDate);
+
+        } catch (Exception e) {
+            log.warn("Error cleaning existing plannings: {}", e.getMessage());
+        }
+    }
+
+    private boolean savePlanningToDatabase(String orderId, String employeeId, int day, int month, int year,
+                                           int durationMinutes, int cardCount) {
+        try {
+            LocalDate planningDate = LocalDate.of(year, month, day);
+            LocalTime startTime = LocalTime.of(9, 0); // Heure de début par défaut
+            LocalDateTime startDateTime = LocalDateTime.of(planningDate, startTime);
+            LocalDateTime endDateTime = startDateTime.plusMinutes(durationMinutes);
+
+            String planningId = UUID.randomUUID().toString().replace("-", "");
+
+            String insertSql = """
+        INSERT INTO j_planning 
+        (id, order_id, employee_id, planning_date, start_time, end_time, 
+         estimated_duration_minutes, estimated_end_time, priority, status, 
+         completed, card_count, notes, created_at, updated_at)
+        VALUES (UNHEX(?), UNHEX(?), UNHEX(?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        """;
+
+            Query insertQuery = entityManager.createNativeQuery(insertSql);
+            insertQuery.setParameter(1, planningId);
+            insertQuery.setParameter(2, orderId.replace("-", ""));
+            insertQuery.setParameter(3, employeeId.replace("-", ""));
+            insertQuery.setParameter(4, planningDate);
+            insertQuery.setParameter(5, startDateTime);
+            insertQuery.setParameter(6, endDateTime);
+            insertQuery.setParameter(7, durationMinutes);
+            insertQuery.setParameter(8, endDateTime);
+            insertQuery.setParameter(9, "MEDIUM");
+            insertQuery.setParameter(10, "SCHEDULED");
+            insertQuery.setParameter(11, 0); // completed = false
+            insertQuery.setParameter(12, cardCount);
+            insertQuery.setParameter(13, String.format("Auto-generated planning for %d cards", cardCount));
+
+            int rowsAffected = insertQuery.executeUpdate();
+            return rowsAffected > 0;
+
+        } catch (Exception e) {
+            log.error("Error saving planning to database: {}", e.getMessage());
+            return false;
         }
     }
 }
