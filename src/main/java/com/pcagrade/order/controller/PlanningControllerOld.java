@@ -1,10 +1,8 @@
 package com.pcagrade.order.controller;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.*;
-import java.util.UUID;
+import com.pcagrade.order.service.EmployeeService;
+import com.pcagrade.order.service.GreedyPlanningService;
+import com.pcagrade.order.service.PlanningService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.slf4j.Logger;
@@ -12,15 +10,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.pcagrade.order.service.EmployeeService;
-import com.pcagrade.order.service.PlanningService;
-import com.pcagrade.order.service.GreedyPlanningService;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/planning")
 @CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
-public class PlanningController {
-    private static final Logger log = LoggerFactory.getLogger(PlanningController.class);
+public class PlanningControllerOld {
+    private static final Logger log = LoggerFactory.getLogger(PlanningControllerOld.class);
 
     @Autowired
     private EntityManager entityManager;
